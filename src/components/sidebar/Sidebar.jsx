@@ -1,16 +1,30 @@
 import User from '../common/User';
-import { Link, useLocation, Navigate } from 'react-router';
+import { Link, useLocation, Navigate, useNavigate } from 'react-router';
+import toast from 'react-hot-toast';
 
 
 
 // eslint-disable-next-line react/prop-types
-function Sidebar({ users = [] }) {
+function Sidebar({ users = [], roomId }) {
     const location = useLocation();
+    const navigate = useNavigate();
 
     if (!location.state) {
         return <Navigate to='/' />;
     }
 
+    const handleCopyRoomId = async () => {
+        try {
+            await navigator.clipboard.writeText(roomId);
+            toast.success('Room ID copied');
+        } catch {
+            toast.error('Failed to copy room ID');
+        }
+    };
+
+    const handleGoHome = () => {
+        navigate('/');
+    };
 
     return (
         <div className="flex h-full w-full flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
@@ -53,6 +67,7 @@ function Sidebar({ users = [] }) {
             <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 backdrop-blur-sm p-6 flex-shrink-0">
                 <div className="flex justify-center gap-4">
                     <button
+                        onClick={handleCopyRoomId}
                         className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                         aria-label="Copy room ID"
                         title="Copy room ID"
@@ -65,6 +80,7 @@ function Sidebar({ users = [] }) {
                     </button>
                     
                     <button
+                        onClick={handleGoHome}
                         className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                         aria-label="Go to dashboard"
                         title="Dashboard"
