@@ -18,7 +18,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173", // Local development
-      "http://localhost:3000", // Alternative local port
+      "http://localhost:5000", // Alternative local port
       "https://ForkSpace.studio", // Production domain
       "https://www.ForkSpace.studio", // Production with www
       "https://ForkSpace.vercel.app", // Vercel preview deployments
