@@ -15,12 +15,24 @@ function Editor() {
   const [users, setUsers] = useState([]); // Add this to track users
   
   useEffect(() => {
+    function handleErrors(e) {
+      console.log('socket error', e); // remove in prod
+      toast.error('An error occurred while connecting to the server');
+      setSocketConnected(false);
+      navigate('/');
+    }
+
     const initSocket = async () => {
       try {
         socketRef.current = await connectSocket();
-        
-        socketRef.current.on('connect_failed', handleErrors);
+
         socketRef.current.on('connect_error', handleErrors);
+        socketRef.current.on('connect', () => {
+          setSocketConnected(true);
+        });
+        socketRef.current.on('disconnect', () => {
+          setSocketConnected(false);
+        });
         
         // Join the room
         socketRef.current.emit('join', {
@@ -29,7 +41,7 @@ function Editor() {
         });
         
         // Listen for user events at the top level
-        socketRef.current.on('joined', ({ users, username, socketId }) => {
+        socketRef.current.on('joined', ({ users, username }) => {
           console.log("Users in room:", users); // remove in prod
           setUsers(users);
           if (location.state?.username !== username) {
@@ -42,24 +54,21 @@ function Editor() {
           toast.success(`${username} left the room`);
           setUsers(prev => prev.filter(user => user.socketId !== socketId));
         });
-        
-        setSocketConnected(true);
       } catch (err) {
         console.error('Socket initialization error:', err);
         toast.error('Failed to connect to server');
       }
     };
-    
-    function handleErrors(e) {
-      console.log('socket error', e); // remove in prod 
-      toast.error('An error occurred while connecting to the server');
-      navigate('/');
-    }
-    
+
     initSocket();
     
     return () => {
       if (socketRef.current) {
+        socketRef.current.off('connect_error', handleErrors);
+        socketRef.current.off('connect');
+        socketRef.current.off('disconnect');
+        socketRef.current.off('joined');
+        socketRef.current.off('left');
         socketRef.current.disconnect();
       }
     };

@@ -1,11 +1,32 @@
 import express from 'express';
 import http from 'http';
+import process from 'process';
 import { Server } from 'socket.io';
 
 const app = express();
 app.use(express.json());
 const server = http.createServer(app);
-const io = new Server(server);
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+  transports: ['polling', 'websocket'],
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
+});
 
 
 // Socket.io connection handlers
@@ -67,5 +88,6 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Socket origins: ${allowedOrigins.join(', ')}`);
 });
 

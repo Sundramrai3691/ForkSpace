@@ -10,6 +10,23 @@ import "codemirror/addon/edit/closetag";
 import "codemirror/addon/edit/closebrackets";
 import useAIHint from "./AIHint";
 
+function encodeBase64Utf8(value) {
+    const bytes = new TextEncoder().encode(value);
+    let binary = "";
+
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+
+    return btoa(binary);
+}
+
+function decodeBase64Utf8(value) {
+    return new TextDecoder().decode(
+        Uint8Array.from(atob(value), (char) => char.charCodeAt(0))
+    );
+}
+
 
 // eslint-disable-next-line react/prop-types
 function Workspace({ socketRef, roomId }) {
@@ -137,8 +154,7 @@ function Workspace({ socketRef, roomId }) {
 
 const runCode = async () => {
   const rawCode = editorRef.current.getValue();
-  const encodedCode = btoa(rawCode); // base64 encode
-  const stdin = btoa("Judge0");
+  const stdin = "Judge0";
 
   setOutput(
     <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
@@ -149,11 +165,11 @@ const runCode = async () => {
     </div>
   );
 
-  const options = {
+  const createOptions = (useBase64 = false) => ({
     method: "POST",
     url: "https://judge0-ce.p.rapidapi.com/submissions",
     params: {
-      base64_encoded: "true",
+      ...(useBase64 ? { base64_encoded: "true" } : {}),
       wait: "true",
       fields: "*",
     },
@@ -164,14 +180,33 @@ const runCode = async () => {
     },
     data: {
       language_id: 54,
-      source_code: encodedCode,
-      stdin,
+      source_code: useBase64 ? encodeBase64Utf8(rawCode) : rawCode,
+      stdin: useBase64 ? encodeBase64Utf8(stdin) : stdin,
     },
-  };
+  });
 
   try {
-    const response = await axios.request(options);
+    let response;
+
+    try {
+      response = await axios.request(createOptions(false));
+    } catch (error) {
+      const apiError = error.response?.data?.error;
+      const shouldRetryWithBase64 =
+        typeof apiError === "string" &&
+        apiError.includes("use base64_encoded=true");
+
+      if (!shouldRetryWithBase64) {
+        throw error;
+      }
+
+      response = await axios.request(createOptions(true));
+    }
+
     const { stdout, stderr, compile_output, message, time, memory } = response.data;
+    const decodeResponse = response.config?.params?.base64_encoded === "true"
+      ? decodeBase64Utf8
+      : (value) => value;
 
     const finalOutput = (
       <div className="space-y-4 text-sm">
@@ -181,7 +216,7 @@ const runCode = async () => {
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
               <span className="text-green-700 dark:text-green-400 font-medium">Output</span>
             </div>
-            <pre className="text-green-900 dark:text-green-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{atob(stdout)}</pre>
+            <pre className="text-green-900 dark:text-green-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{decodeResponse(stdout)}</pre>
           </div>
         )}
 
@@ -191,7 +226,7 @@ const runCode = async () => {
               <div className="w-2 h-2 rounded-full bg-red-500"></div>
               <span className="text-red-700 dark:text-red-400 font-medium">Runtime Error</span>
             </div>
-            <pre className="text-red-900 dark:text-red-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{atob(stderr)}</pre>
+            <pre className="text-red-900 dark:text-red-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{decodeResponse(stderr)}</pre>
           </div>
         )}
 
@@ -201,7 +236,7 @@ const runCode = async () => {
               <div className="w-2 h-2 rounded-full bg-amber-500"></div>
               <span className="text-amber-700 dark:text-amber-400 font-medium">Compilation Error</span>
             </div>
-            <pre className="text-amber-900 dark:text-amber-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{atob(compile_output)}</pre>
+            <pre className="text-amber-900 dark:text-amber-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{decodeResponse(compile_output)}</pre>
           </div>
         )}
 
@@ -211,7 +246,7 @@ const runCode = async () => {
               <div className="w-2 h-2 rounded-full bg-blue-500"></div>
               <span className="text-blue-700 dark:text-blue-400 font-medium">System Message</span>
             </div>
-            <pre className="text-blue-900 dark:text-blue-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{atob(message)}</pre>
+            <pre className="text-blue-900 dark:text-blue-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{decodeResponse(message)}</pre>
           </div>
         )}
 
@@ -245,10 +280,10 @@ const runCode = async () => {
 
     setOutput(finalOutput);
   } catch (error) {
-    console.error("Error running code:", error.message);
+    console.error("Error running code:", error.response?.data || error.message);
     setOutput(
       <div className="dark:text-red-200 p-4 text-red-800">
-        <p> Error running code: {error.message}</p>
+        <p>Error running code: {error.response?.data?.error || error.message}</p>
       </div>
     );
   }
