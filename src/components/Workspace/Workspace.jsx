@@ -9,14 +9,17 @@ import "codemirror/lib/codemirror.css";
 import "codemirror/theme/dracula.css";
 import "codemirror/mode/javascript/javascript";
 import "codemirror/mode/clike/clike";
+import "codemirror/mode/python/python";
 import "codemirror/addon/edit/closetag";
 import "codemirror/addon/edit/closebrackets";
 import useAIHint from "./AIHint";
+import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
 
-function Workspace({ socketRef, roomId }) {
+function Workspace({ socketRef, roomId, roomState }) {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const editorRef = useRef(null);
     const settingsRef = useRef(null);
+    const selectedLanguageRef = useRef(DEFAULT_LANGUAGE);
     const navigate = useNavigate();
     const { 
       ghostHint, 
@@ -35,6 +38,8 @@ function Workspace({ socketRef, roomId }) {
     );
     const [output, setOutput] = useState("");
     const [showSettings, setShowSettings] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
+    const [stdin, setStdin] = useState("");
 
 
     useEffect(() => {
@@ -42,7 +47,7 @@ function Workspace({ socketRef, roomId }) {
             editorRef.current = Codemirror.fromTextArea(
                 document.getElementById("realtimeEditor"),
                 {
-                    mode: { name: "clike", json: true },
+                    mode: LANGUAGE_OPTIONS[DEFAULT_LANGUAGE].editorMode,
                     theme: "dracula",
                     autoCloseTags: true,
                     autoCloseBrackets: true,
@@ -71,6 +76,24 @@ function Workspace({ socketRef, roomId }) {
     }, [roomId, socketRef]);
 
     useEffect(() => {
+        if (!editorRef.current || !roomState) return;
+
+        const nextLanguage = LANGUAGE_OPTIONS[roomState.language] ? roomState.language : DEFAULT_LANGUAGE;
+        selectedLanguageRef.current = nextLanguage;
+        setSelectedLanguage(nextLanguage);
+        editorRef.current.setOption("mode", LANGUAGE_OPTIONS[nextLanguage].editorMode);
+
+        if (typeof roomState.code === "string" && editorRef.current.getValue() !== roomState.code) {
+            const cursor = editorRef.current.getCursor();
+            const scrollInfo = editorRef.current.getScrollInfo();
+
+            editorRef.current.setValue(roomState.code);
+            editorRef.current.setCursor(cursor);
+            editorRef.current.scrollTo(scrollInfo.left, scrollInfo.top);
+        }
+    }, [roomState]);
+
+    useEffect(() => {
         const socket = socketRef.current;
 
         if (!socket || !editorRef.current) return;
@@ -88,9 +111,17 @@ function Workspace({ socketRef, roomId }) {
         };
 
         socket.on("code-change", handleCodeChange);
+        socket.on("language-change", ({ language }) => {
+            if (!LANGUAGE_OPTIONS[language]) return;
+
+            selectedLanguageRef.current = language;
+            setSelectedLanguage(language);
+            editorRef.current?.setOption("mode", LANGUAGE_OPTIONS[language].editorMode);
+        });
 
         return () => {
             socket.off("code-change", handleCodeChange);
+            socket.off("language-change");
         };
     }, [socketRef, roomId]);
 
@@ -175,11 +206,48 @@ function Workspace({ socketRef, roomId }) {
         navigate("/");
     };
 
+    const syncCodeToRoom = (nextCode) => {
+      socketRef.current?.emit("code-change", {
+        roomId,
+        code: nextCode,
+      });
+    };
+
+    const handleResetCode = () => {
+      const nextCode = LANGUAGE_OPTIONS[selectedLanguage].starterCode;
+      editorRef.current?.setValue(nextCode);
+      syncCodeToRoom(nextCode);
+    };
+
+    const handleLanguageChange = (event) => {
+      const nextLanguage = event.target.value;
+      const nextLanguageConfig = LANGUAGE_OPTIONS[nextLanguage];
+      const currentLanguageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current];
+      const currentCode = editorRef.current?.getValue() ?? "";
+      const currentStarterCode = currentLanguageConfig?.starterCode ?? "";
+      const nextStarterCode = nextLanguageConfig.starterCode;
+      const shouldReplaceCode =
+        currentCode.trim().length === 0 || currentCode === currentStarterCode;
+
+      selectedLanguageRef.current = nextLanguage;
+      setSelectedLanguage(nextLanguage);
+      editorRef.current?.setOption("mode", nextLanguageConfig.editorMode);
+
+      socketRef.current?.emit("language-change", {
+        roomId,
+        language: nextLanguage,
+      });
+
+      if (shouldReplaceCode && editorRef.current) {
+        editorRef.current.setValue(nextStarterCode);
+        syncCodeToRoom(nextStarterCode);
+      }
+    };
 
 
 const runCode = async () => {
   const rawCode = editorRef.current.getValue();
-  const stdin = "Judge0";
+  const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
 
   setOutput(
     <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
@@ -194,7 +262,7 @@ const runCode = async () => {
     const response = await axios.post(`${serverUrl}/api/run-code`, {
       code: rawCode,
       stdin,
-      languageId: 54,
+      languageId: languageConfig.judge0Id,
     });
 
     const { stdout, stderr, compile_output, message, time, memory } = response.data;
@@ -295,9 +363,7 @@ const runCode = async () => {
                     </button>
                     <button
                         className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm h-9 px-4"
-                        onClick={() =>
-                            editorRef.current.setValue("// ForkSpace - realtime coding platform")
-                        }
+                        onClick={handleResetCode}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h18"/>
@@ -311,6 +377,23 @@ const runCode = async () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <label htmlFor="language-select" className="text-sm text-gray-600 dark:text-gray-400">
+                            Language
+                        </label>
+                        <select
+                            id="language-select"
+                            value={selectedLanguage}
+                            onChange={handleLanguageChange}
+                            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                        >
+                            {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
+                                <option key={languageKey} value={languageKey}>
+                                    {config.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                         <span className="text-sm text-gray-600 dark:text-gray-400">Live Session</span>
@@ -456,6 +539,19 @@ const runCode = async () => {
                                 <div className="h-3 w-3 rounded-full bg-green-500"></div>
                             </div>
                             <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400">Output</span>
+                        </div>
+
+                        <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                            <label htmlFor="stdin" className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                                Standard Input
+                            </label>
+                            <textarea
+                                id="stdin"
+                                value={stdin}
+                                onChange={(event) => setStdin(event.target.value)}
+                                className="h-24 w-full rounded-xl border border-gray-200 bg-white p-3 text-sm font-mono text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                placeholder="Optional stdin..."
+                            />
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4">

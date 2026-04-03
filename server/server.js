@@ -47,6 +47,55 @@ const aiLimiter = rateLimit({
   max: 10,
 });
 
+const SUPPORTED_LANGUAGES = {
+  cpp: {
+    id: 54,
+    label: 'C++',
+    starterCode: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << "Hello, ForkSpace!";\n    return 0;\n}\n',
+  },
+  javascript: {
+    id: 63,
+    label: 'JavaScript',
+    starterCode: 'function main() {\n  console.log("Hello, ForkSpace!");\n}\n\nmain();\n',
+  },
+  python: {
+    id: 71,
+    label: 'Python',
+    starterCode: 'def main():\n    print("Hello, ForkSpace!")\n\n\nif __name__ == "__main__":\n    main()\n',
+  },
+};
+
+const DEFAULT_LANGUAGE = 'cpp';
+const roomStateMap = new Map();
+
+function getLanguageConfig(language) {
+  return SUPPORTED_LANGUAGES[language] || SUPPORTED_LANGUAGES[DEFAULT_LANGUAGE];
+}
+
+function getOrCreateRoomState(roomId) {
+  if (!roomStateMap.has(roomId)) {
+    const defaultConfig = getLanguageConfig(DEFAULT_LANGUAGE);
+    roomStateMap.set(roomId, {
+      language: DEFAULT_LANGUAGE,
+      code: defaultConfig.starterCode,
+    });
+  }
+
+  return roomStateMap.get(roomId);
+}
+
+function extractAiText(responseData) {
+  const firstChoice = responseData?.choices?.[0];
+
+  return (
+    firstChoice?.message?.content ||
+    firstChoice?.delta?.content ||
+    firstChoice?.text ||
+    firstChoice?.completion ||
+    ''
+  );
+}
+
 app.post('/api/ai-hint', aiLimiter, async (req, res) => {
   try {
     const { prompt, suffix } = req.body;
@@ -78,11 +127,12 @@ app.post('/api/ai-hint', aiLimiter, async (req, res) => {
       }
     );
 
-    const hint = response.data.choices?.[0]?.message?.content || '';
+    const hint = extractAiText(response.data);
     return res.json({ hint });
   } catch (error) {
-    return res.status(500).json({
-      error: error.response?.data?.error || 'Failed to fetch AI hint',
+    return res.json({
+      hint: '',
+      error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hint',
     });
   }
 });
@@ -120,7 +170,7 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
         }
       );
 
-      const hint = response.data.choices?.[0]?.message?.content || '';
+      const hint = extractAiText(response.data);
       if (hint.trim()) {
         suggestions.push(hint.trim());
       }
@@ -143,15 +193,15 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
       }
     );
 
-    const hint = response.data.choices?.[0]?.message?.content || '';
+    const hint = extractAiText(response.data);
     if (hint.trim()) {
       suggestions.push(hint.trim());
     }
 
     return res.json({ hints: [...new Set(suggestions)].slice(0, 5) });
   } catch (error) {
-    return res.status(500).json({
-      error: error.response?.data?.error || 'Failed to fetch AI hints',
+    return res.json({
+      error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hints',
       hints: [],
     });
   }
@@ -166,10 +216,15 @@ function decodeBase64Utf8(value) {
 }
 
 app.post('/api/run-code', async (req, res) => {
-  const { code, stdin = '', languageId = 54 } = req.body;
+  const { code, stdin = '', languageId = getLanguageConfig(DEFAULT_LANGUAGE).id } = req.body;
+  const supportedLanguageIds = new Set(Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id));
 
   if (!code) {
     return res.status(400).json({ error: 'Missing code' });
+  }
+
+  if (!supportedLanguageIds.has(languageId)) {
+    return res.status(400).json({ error: 'Unsupported language' });
   }
 
   if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
@@ -252,6 +307,7 @@ io.on('connection', (socket) => {
   // console.log('socket connected', socket.id); // remove in prod
 
   socket.on('join', ({ roomId, username }) => {
+    const roomState = getOrCreateRoomState(roomId);
 
     userSocketMap[socket.id] = username;
     socket.join(roomId);
@@ -267,10 +323,25 @@ io.on('connection', (socket) => {
         socketId: socket.id,
       });
     });
+
+    socket.emit('room-state', roomState);
   });
 
 socket.on('code-change', ({roomId, code}) => {
+  const roomState = getOrCreateRoomState(roomId);
+  roomState.code = code;
   socket.in(roomId).emit('code-change', { code });
+});
+
+socket.on('language-change', ({ roomId, language }) => {
+  const roomState = getOrCreateRoomState(roomId);
+  const nextLanguage = SUPPORTED_LANGUAGES[language] ? language : DEFAULT_LANGUAGE;
+
+  roomState.language = nextLanguage;
+
+  io.to(roomId).emit('language-change', {
+    language: nextLanguage,
+  });
 });
 
   socket.on('disconnecting', () => {
@@ -283,7 +354,8 @@ socket.on('code-change', ({roomId, code}) => {
     })
     delete userSocketMap[socket.id];
     socket.leave();
-  })
+  });
+
 });
 
 const PORT = process.env.PORT || 5000;

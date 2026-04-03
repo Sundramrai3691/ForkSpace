@@ -13,6 +13,7 @@ function Editor() {
   const enteredUsername = state?.username;
   const [socketConnected, setSocketConnected] = useState(false);
   const [users, setUsers] = useState([]); // Add this to track users
+  const [roomState, setRoomState] = useState(null);
   const hasShownConnectionError = useRef(false);
   const username = enteredUsername || 'Anonymous';
   
@@ -43,6 +44,9 @@ function Editor() {
         socketRef.current.on('disconnect', () => {
           setSocketConnected(false);
         });
+        socketRef.current.on('room-state', (nextRoomState) => {
+          setRoomState(nextRoomState);
+        });
 
         // Listen for user events at the top level
         socketRef.current.on('joined', ({ users, username }) => {
@@ -68,6 +72,7 @@ function Editor() {
         socketRef.current.off('connect_error', handleErrors);
         socketRef.current.off('connect');
         socketRef.current.off('disconnect');
+        socketRef.current.off('room-state');
         socketRef.current.off('joined');
         socketRef.current.off('left');
         socketRef.current.disconnect();
@@ -87,7 +92,7 @@ function Editor() {
       </aside>
       <main className="flex min-h-[60vh] flex-1 flex-col bg-white dark:bg-gray-900">
         {socketConnected ? (
-          <Workspace socketRef={socketRef} roomId={roomId} />
+          <Workspace socketRef={socketRef} roomId={roomId} roomState={roomState} />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-16">
             <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-gray-50/90 p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800/60">

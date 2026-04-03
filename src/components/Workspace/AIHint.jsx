@@ -78,8 +78,12 @@ export default function useAIHint(editorRef, socketRef, roomId) {
         suffix: afterCursor,
       });
 
-      const { hint } = res.data; 
-      // console.log("AI Hint:", hint);
+      const { hint, error } = res.data; 
+
+      if (error) {
+        notifyAiUnavailable("AI hints are temporarily unavailable. The editor will keep working without them.");
+        return;
+      }
 
       if (hint && hint.trim()) {
         hasShownAiError.current = false;
@@ -110,7 +114,15 @@ export default function useAIHint(editorRef, socketRef, roomId) {
         afterCursor: afterCursor,
       });
 
-      const { hints } = res.data;
+      const { hints, error } = res.data;
+
+      if (error) {
+        setAiHints([]);
+        setShowDropdown(false);
+        notifyAiUnavailable("AI hints are temporarily unavailable. The editor will keep working without them.");
+        return;
+      }
+
       hasShownAiError.current = false;
 
       if (hints && Array.isArray(hints)) {
