@@ -10,6 +10,20 @@ function Navbar() {
         setIsMenuOpen(!isMenuOpen);
     };
 
+    const closeMenu = () => {
+        setIsMenuOpen(false);
+    };
+
+    const handleScrollToJoin = () => {
+        closeMenu();
+        document.getElementById('join-session')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const handleScrollToSection = (sectionId) => {
+        closeMenu();
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
     return (
         <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 backdrop-blur-md bg-white/95 dark:bg-gray-900/95">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -36,30 +50,34 @@ function Navbar() {
                     {/* Desktop Navigation */}
                     <div className="hidden md:block">
                         <div className="ml-10 flex items-baseline space-x-8">
-                            <a 
-                                href="#features" 
+                            <button 
+                                type="button"
+                                onClick={() => handleScrollToSection('features')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
                                 Features
-                            </a>
-                            <a 
-                                href="#demo" 
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => handleScrollToSection('demo')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
                                 Live Demo
-                            </a>
-                            <a 
-                                href="#documentation" 
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => handleScrollToSection('documentation')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
                                 Docs
-                            </a>
-                            <a 
-                                href="#pricing" 
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => handleScrollToSection('pricing')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
                                 Pricing
-                            </a>
+                            </button>
                         </div>
                     </div>
 
@@ -127,10 +145,18 @@ function Navbar() {
                         </a>
 
                         {/* CTA Buttons */}
-                        <button className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200">
+                        <button
+                            type="button"
+                            onClick={handleScrollToJoin}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
+                        >
                             Sign In
                         </button>
-                        <button className="px-4 py-2 bg-gradient-to-r bg-black hover:from-orange-600 hover:to-amber-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md">
+                        <button
+                            type="button"
+                            onClick={handleScrollToJoin}
+                            className="px-4 py-2 bg-gradient-to-r bg-black hover:from-orange-600 hover:to-amber-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                        >
                             Get Started
                         </button>
                     </div>
@@ -161,30 +187,34 @@ function Navbar() {
             {isMenuOpen && (
                 <div className="md:hidden">
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                        <a 
-                            href="#features" 
+                        <button 
+                            type="button"
+                            onClick={() => handleScrollToSection('features')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
                             Features
-                        </a>
-                        <a 
-                            href="#demo" 
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => handleScrollToSection('demo')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
                             Live Demo
-                        </a>
-                        <a 
-                            href="#documentation" 
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => handleScrollToSection('documentation')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
                             Documentation
-                        </a>
-                        <a 
-                            href="#pricing" 
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => handleScrollToSection('pricing')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
                             Pricing
-                        </a>
+                        </button>
                         
                         {/* Mobile Actions */}
                         <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
@@ -238,10 +268,18 @@ function Navbar() {
                             </div>
                             
                             <div className="mt-3 space-y-2 px-3">
-                                <button className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200">
+                                <button
+                                    type="button"
+                                    onClick={handleScrollToJoin}
+                                    className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
+                                >
                                     Sign In
                                 </button>
-                                <button className="block w-full px-3 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-base font-medium rounded-md transition-all duration-200">
+                                <button
+                                    type="button"
+                                    onClick={handleScrollToJoin}
+                                    className="block w-full px-3 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-base font-medium rounded-md transition-all duration-200"
+                                >
                                     Get Started
                                 </button>
                             </div>

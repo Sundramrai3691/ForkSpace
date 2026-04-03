@@ -1,7 +1,10 @@
 import express from 'express';
 import http from 'http';
 import process from 'process';
+import { config as loadEnv } from 'dotenv';
 import { Server } from 'socket.io';
+
+loadEnv({ path: new URL('./.env', import.meta.url) });
 
 const app = express();
 app.use(express.json());
@@ -12,7 +15,7 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
-  process.env.CLIENT_URL,
+  process.env.CLIENT_URL || process.env.CORS_ORIGIN,
 ].filter(Boolean);
 
 const io = new Server(server, {

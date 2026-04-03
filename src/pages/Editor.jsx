@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { useParams, useLocation, useNavigate} from 'react-router';
+import { useParams, useLocation } from 'react-router';
 import Sidebar from '../components/sidebar/Sidebar';
 import Workspace from '../components/Workspace/Workspace';
 import { connectSocket } from '../socket';
@@ -9,17 +9,21 @@ import toast from 'react-hot-toast';
 function Editor() {
   const socketRef = useRef(null);
   const { roomId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { state } = useLocation();
+  const enteredUsername = state?.username;
   const [socketConnected, setSocketConnected] = useState(false);
   const [users, setUsers] = useState([]); // Add this to track users
+  const hasShownConnectionError = useRef(false);
+  const username = enteredUsername || 'Anonymous';
   
   useEffect(() => {
-    function handleErrors(e) {
-      console.log('socket error', e); // remove in prod
-      toast.error('An error occurred while connecting to the server');
+    function handleErrors() {
       setSocketConnected(false);
-      navigate('/');
+
+      if (!hasShownConnectionError.current) {
+        toast.error('Realtime server is unavailable. Start the backend on port 5000 and we will reconnect automatically.');
+        hasShownConnectionError.current = true;
+      }
     }
 
     const initSocket = async () => {
@@ -29,33 +33,30 @@ function Editor() {
         socketRef.current.on('connect_error', handleErrors);
         socketRef.current.on('connect', () => {
           setSocketConnected(true);
+          hasShownConnectionError.current = false;
+
+          socketRef.current.emit('join', {
+            roomId,
+            username,
+          });
         });
         socketRef.current.on('disconnect', () => {
           setSocketConnected(false);
         });
-        
-        // Join the room
-        socketRef.current.emit('join', {
-          roomId,
-          username: location.state?.username || 'Anonymous',
-        });
-        
+
         // Listen for user events at the top level
         socketRef.current.on('joined', ({ users, username }) => {
-          console.log("Users in room:", users); // remove in prod
           setUsers(users);
-          if (location.state?.username !== username) {
+          if (enteredUsername !== username) {
             toast.success(`${username} joined the room`);
           }
         });
         
         socketRef.current.on('left', ({ socketId, username }) => {
-          console.log("User left:", username); // remove in prod
           toast.success(`${username} left the room`);
           setUsers(prev => prev.filter(user => user.socketId !== socketId));
         });
-      } catch (err) {
-        console.error('Socket initialization error:', err);
+      } catch {
         toast.error('Failed to connect to server');
       }
     };
@@ -72,14 +73,11 @@ function Editor() {
         socketRef.current.disconnect();
       }
     };
-  }, [roomId, location.state, navigate]);
+  }, [roomId, enteredUsername, username]);
 
   return (
-    <>
-
-    {/* <Navbar /> */}
-    <div className="flex h-screen bg-white dark:bg-gray-900 overflow-hidden">
-      <aside className="w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-white dark:bg-gray-900 lg:flex-row">
+      <aside className="w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 lg:w-80 lg:border-b-0 lg:border-r">
         <Sidebar 
           socketRef={socketRef} 
           roomId={roomId} 
@@ -87,11 +85,26 @@ function Editor() {
           users={users}
         />
       </aside>
-      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900">
-        {socketConnected && <Workspace socketRef={socketRef} roomId={roomId} />}
+      <main className="flex min-h-[60vh] flex-1 flex-col bg-white dark:bg-gray-900">
+        {socketConnected ? (
+          <Workspace socketRef={socketRef} roomId={roomId} />
+        ) : (
+          <div className="flex flex-1 items-center justify-center px-6 py-16">
+            <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-gray-50/90 p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800/60">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V6.75a3.75 3.75 0 117.5 0V9m-8.25 0h8.5A2.25 2.25 0 0118.25 11.25v6.5A2.25 2.25 0 0116 20H8a2.25 2.25 0 01-2.25-2.25v-6.5A2.25 2.25 0 018 9z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Connecting to your room</h1>
+              <p className="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-400">
+                The editor will appear as soon as the realtime server on port 5000 responds. Keep `npm run dev:server` running and this page will reconnect automatically.
+              </p>
+            </div>
+          </div>
+        )}
       </main>
     </div>
-    </>
   );
 }
 

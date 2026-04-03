@@ -1,12 +1,23 @@
 import axios from "axios";
 import { useState, useRef } from "react";
+import toast from "react-hot-toast";
 
 export default function useAIHint(editorRef, socketRef, roomId) {
+  const aiServerUrl = (import.meta.env.VITE_AI_SERVER_URL || "").trim();
+  const aiEnabled = import.meta.env.VITE_ENABLE_AI === "true" && Boolean(aiServerUrl);
   const [ghostHint, setGhostHint] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [aiHints, setAiHints] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const ghostMarkerRef = useRef(null);
+  const hasShownAiError = useRef(false);
+
+  const notifyAiUnavailable = (message) => {
+    if (!hasShownAiError.current) {
+      toast.error(message);
+      hasShownAiError.current = true;
+    }
+  };
 
   const showGhostHint = (hint) => {
     clearGhostHint();
@@ -54,6 +65,11 @@ export default function useAIHint(editorRef, socketRef, roomId) {
 
   const fetchHint = async () => {
     if (!editorRef.current) return;
+    if (!aiEnabled) {
+      notifyAiUnavailable("AI hints are disabled. Set VITE_ENABLE_AI=true and configure VITE_AI_SERVER_URL to use them.");
+      return;
+    }
+
     const cm = editorRef.current;
     const cursor = cm.getCursor();
 
@@ -62,7 +78,7 @@ export default function useAIHint(editorRef, socketRef, roomId) {
     const afterCursor = code.substring(cm.indexFromPos(cursor));
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_AI_SERVER_URL}/api/ai-hint`, {
+      const res = await axios.post(`${aiServerUrl}/api/ai-hint`, {
         prompt: beforeCursor,
         suffix: afterCursor,
       });
@@ -71,15 +87,20 @@ export default function useAIHint(editorRef, socketRef, roomId) {
       // console.log("AI Hint:", hint);
 
       if (hint && hint.trim()) {
+        hasShownAiError.current = false;
         showGhostHint(hint);
       }
-    } catch (err) {
-      console.error("AI hint error:", err.message);
+    } catch {
+      notifyAiUnavailable("AI hints server is unavailable. Start the AI server and try again.");
     }
   };
 
   const fetchAIHints = async () => {
     if (!editorRef.current) return;
+    if (!aiEnabled) {
+      notifyAiUnavailable("AI suggestions are disabled. Set VITE_ENABLE_AI=true and configure VITE_AI_SERVER_URL to use them.");
+      return;
+    }
     
     setIsLoading(true);
     setShowDropdown(true);
@@ -91,7 +112,7 @@ export default function useAIHint(editorRef, socketRef, roomId) {
     const afterCursor = code.substring(cm.indexFromPos(cursor));
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_AI_SERVER_URL}/api/ai-hints`, {
+      const res = await axios.post(`${aiServerUrl}/api/ai-hints`, {
         code: code,
         cursor: cm.indexFromPos(cursor),
         beforeCursor: beforeCursor,
@@ -99,16 +120,17 @@ export default function useAIHint(editorRef, socketRef, roomId) {
       });
 
       const { hints } = res.data;
-      // console.log("AI Hints:", hints);
+      hasShownAiError.current = false;
 
       if (hints && Array.isArray(hints)) {
         setAiHints(hints);
       } else {
         setAiHints([]);
       }
-    } catch (err) {
-      console.error("AI hints error:", err.message);
+    } catch {
       setAiHints([]);
+      setShowDropdown(false);
+      notifyAiUnavailable("AI hints server is unavailable. Start the AI server and try again.");
     } finally {
       setIsLoading(false);
     }

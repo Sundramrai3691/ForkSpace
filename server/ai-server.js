@@ -6,7 +6,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import process from "process";
 
-configDotenv({ path: ".env" });
+configDotenv({ path: new URL("./.env", import.meta.url) });
 
 const app = express();
 

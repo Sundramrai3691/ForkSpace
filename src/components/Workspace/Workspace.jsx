@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
@@ -30,8 +31,10 @@ function decodeBase64Utf8(value) {
 }
 
 
-// eslint-disable-next-line react/prop-types
 function Workspace({ socketRef, roomId }) {
+    const judge0ApiUrl = (import.meta.env.VITE_JUDGE0_API_URL || "").trim();
+    const judge0ApiKey = (import.meta.env.VITE_JUDGE0_API_KEY || "").trim();
+    const judge0Enabled = import.meta.env.VITE_ENABLE_RUN_CODE === "true" && Boolean(judge0ApiUrl) && Boolean(judge0ApiKey);
     const editorRef = useRef(null);
     const settingsRef = useRef(null);
     const navigate = useNavigate();
@@ -88,7 +91,9 @@ function Workspace({ socketRef, roomId }) {
     }, [roomId, socketRef]);
 
     useEffect(() => {
-        if (!socketRef.current || !editorRef.current) return;
+        const socket = socketRef.current;
+
+        if (!socket || !editorRef.current) return;
 
         const handleCodeChange = ({ code }) => {
             if (code !== null && editorRef.current) {
@@ -102,12 +107,10 @@ function Workspace({ socketRef, roomId }) {
             }
         };
 
-        socketRef.current.on("code-change", handleCodeChange);
+        socket.on("code-change", handleCodeChange);
 
         return () => {
-            if (socketRef.current) {
-                socketRef.current.off("code-change", handleCodeChange);
-            }
+            socket.off("code-change", handleCodeChange);
         };
     }, [socketRef, roomId]);
 
@@ -186,9 +189,25 @@ function Workspace({ socketRef, roomId }) {
         navigate("/");
     };
 
+    const handleLeaveRoom = () => {
+        setShowSettings(false);
+        socketRef.current?.disconnect();
+        navigate("/");
+    };
+
 
 
 const runCode = async () => {
+  if (!judge0Enabled) {
+    toast.error("Run Code is disabled. Set VITE_ENABLE_RUN_CODE=true, VITE_JUDGE0_API_URL, and VITE_JUDGE0_API_KEY in the root .env.");
+    setOutput(
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100">
+        Run Code is not configured for the frontend yet. Add the required Judge0 variables to the root <code>.env</code> file.
+      </div>
+    );
+    return;
+  }
+
   const rawCode = editorRef.current.getValue();
   const stdin = "Judge0";
 
@@ -203,14 +222,14 @@ const runCode = async () => {
 
   const createOptions = (useBase64 = false) => ({
     method: "POST",
-    url: "https://judge0-ce.p.rapidapi.com/submissions",
+    url: `${judge0ApiUrl}/submissions`,
     params: {
       ...(useBase64 ? { base64_encoded: "true" } : {}),
       wait: "true",
       fields: "*",
     },
     headers: {
-      "x-rapidapi-key": "739bd76508msh59d87ad81cefe3dp1c1d57jsnaead8c2097b7",
+      "x-rapidapi-key": judge0ApiKey,
       "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
       "Content-Type": "application/json",
     },
@@ -316,17 +335,17 @@ const runCode = async () => {
 
     setOutput(finalOutput);
   } catch (error) {
-    console.error("Error running code:", error.response?.data || error.message);
     setOutput(
       <div className="dark:text-red-200 p-4 text-red-800">
         <p>Error running code: {error.response?.data?.error || error.message}</p>
       </div>
     );
+    toast.error("Run Code failed. Check your Judge0 configuration.");
   }
 };
 
     return (
-        <div className="flex h-full flex-col bg-white dark:bg-gray-900">
+        <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 px-6 py-4">
                 <div className="flex items-center gap-3">
                     <button
@@ -396,6 +415,12 @@ const runCode = async () => {
                                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                     >
                                         Go to home
+                                    </button>
+                                    <button
+                                        onClick={handleLeaveRoom}
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                                    >
+                                        Leave room
                                     </button>
                                 </div>
                             )}
@@ -477,32 +502,39 @@ const runCode = async () => {
                 </div>
             </div>
 
-            {output && (
-                <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/20 p-6">
-                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm overflow-hidden">
-                        <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem]">
+                <div className="relative min-h-[24rem] xl:min-h-0">
+                    <textarea 
+                        id="realtimeEditor" 
+                        className="h-full w-full resize-none border-0 bg-white dark:bg-gray-900 p-6 text-sm font-mono outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-white"
+                        placeholder="// Start coding here..."
+                    />
+                </div>
+
+                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:border-l xl:border-t-0">
+                    <div className="flex h-full min-h-[16rem] flex-col">
+                        <div className="flex items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/70">
                             <div className="flex gap-1.5">
-                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                                <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+                                <div className="h-3 w-3 rounded-full bg-green-500"></div>
                             </div>
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400 ml-2">Output</span>
+                            <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400">Output</span>
                         </div>
-                        <div className="p-4">
-                            <div className="font-mono text-sm">
-                                {output}
-                            </div>
+
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {output ? (
+                                <div className="font-mono text-sm text-gray-900 dark:text-white">
+                                    {output}
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-5 text-sm leading-7 text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+                                    Run your code to see compiler output, runtime messages, and execution stats here.
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-            )}
-
-            <div className="flex-1 relative">
-                <textarea 
-                    id="realtimeEditor" 
-                    className="h-full w-full resize-none border-0 bg-white dark:bg-gray-900 p-6 text-sm font-mono outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-white"
-                    placeholder="// Start coding here..."
-                />
+                </aside>
             </div>
         </div>
     );
