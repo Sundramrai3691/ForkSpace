@@ -91,7 +91,7 @@ function Editor() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-hidden bg-white dark:bg-gray-900 lg:flex-row">
-      <aside className="w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 lg:w-80 lg:border-b-0 lg:border-r">
+      <aside className="w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 lg:w-80 lg:border-b-0 lg:border-r lg:panel-resize">
         <Sidebar 
           socketRef={socketRef} 
           roomId={roomId} 

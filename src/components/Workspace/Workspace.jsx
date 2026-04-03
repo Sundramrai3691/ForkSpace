@@ -55,6 +55,20 @@ function normalizeForComparison(value = "") {
         .trim();
 }
 
+function formatTimerLabel(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+const TIMER_PRESETS = [
+    { label: "15m", value: 15 * 60 },
+    { label: "30m", value: 30 * 60 },
+    { label: "45m", value: 45 * 60 },
+    { label: "60m", value: 60 * 60 },
+];
+
 function Workspace({ socketRef, roomId, roomState }) {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const editorRef = useRef(null);
@@ -82,6 +96,9 @@ function Workspace({ socketRef, roomId, roomState }) {
     const [stdin, setStdin] = useState("");
     const [lastRunMeta, setLastRunMeta] = useState(null);
     const [sampleSuiteMeta, setSampleSuiteMeta] = useState(null);
+    const [timerDuration, setTimerDuration] = useState(45 * 60);
+    const [timeRemaining, setTimeRemaining] = useState(45 * 60);
+    const [isTimerRunning, setIsTimerRunning] = useState(false);
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
     const roomSamples = Array.isArray(roomState?.problem?.samples) ? roomState.problem.samples : [];
@@ -230,6 +247,27 @@ function Workspace({ socketRef, roomId, roomState }) {
         };
     }, [showSettings]);
 
+    useEffect(() => {
+        if (!isTimerRunning) {
+            return undefined;
+        }
+
+        const intervalId = window.setInterval(() => {
+            setTimeRemaining((currentValue) => {
+                if (currentValue <= 1) {
+                    window.clearInterval(intervalId);
+                    setIsTimerRunning(false);
+                    toast.success("Timer complete");
+                    return 0;
+                }
+
+                return currentValue - 1;
+            });
+        }, 1000);
+
+        return () => window.clearInterval(intervalId);
+    }, [isTimerRunning]);
+
     const handleCopyRoomId = async () => {
         try {
             await navigator.clipboard.writeText(roomId);
@@ -249,6 +287,26 @@ function Workspace({ socketRef, roomId, roomState }) {
         setShowSettings(false);
         socketRef.current?.disconnect();
         navigate("/");
+    };
+
+    const handleTimerPresetChange = (event) => {
+        const nextDuration = Number(event.target.value);
+        setTimerDuration(nextDuration);
+        setTimeRemaining(nextDuration);
+        setIsTimerRunning(false);
+    };
+
+    const handleTimerToggle = () => {
+        if (timeRemaining === 0) {
+            setTimeRemaining(timerDuration);
+        }
+
+        setIsTimerRunning((currentValue) => !currentValue);
+    };
+
+    const handleTimerReset = () => {
+        setIsTimerRunning(false);
+        setTimeRemaining(timerDuration);
     };
 
     const syncCodeToRoom = (nextCode) => {
@@ -685,7 +743,7 @@ const runSampleSuite = async () => {
                         <div className="relative group">
                             <button 
                                 onClick={fetchAIHints}
-                                className="ai-button inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border border-orange-400 hover:border-orange-500 transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-105 text-sm font-medium"
+                                className="ai-button inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                 aria-label="AI Practice Coach"
                                 title="AI Practice Coach - Get interview-oriented suggestions"
                             >
@@ -755,6 +813,36 @@ const runSampleSuite = async () => {
                                 document.body
                             )}
                         </div>
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700">
+                            <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.12em] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                {formatTimerLabel(timeRemaining)}
+                            </span>
+                            <select
+                                value={timerDuration}
+                                onChange={handleTimerPresetChange}
+                                className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                            >
+                                {TIMER_PRESETS.map((preset) => (
+                                    <option key={preset.value} value={preset.value}>
+                                        {preset.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={handleTimerToggle}
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            >
+                                {isTimerRunning ? "Pause" : "Start"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleTimerReset}
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            >
+                                Reset
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -768,7 +856,7 @@ const runSampleSuite = async () => {
                     />
                 </div>
 
-                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:border-l xl:border-t-0">
+                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left">
                     <div className="flex h-full min-h-[16rem] flex-col">
                         <div className="flex items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/70">
                             <div className="flex gap-1.5">

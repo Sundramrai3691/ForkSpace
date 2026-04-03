@@ -20,3 +20,15 @@
     line-height: 1.6;
     font-size: 15px;
 }
+
+.panel-resize {
+  overflow: auto;
+  resize: horizontal;
+  min-width: 280px;
+  max-width: 48vw;
+}
+
+.panel-resize-left {
+  min-width: 320px;
+  max-width: 42vw;
+}
