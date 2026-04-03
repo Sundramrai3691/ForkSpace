@@ -1,0 +1,24 @@
+{
+  "users": [
+    {
+      "id": "0b83ddd8-3b6d-4d58-9304-ec96b3957dcc",
+      "name": "Mickey",
+      "email": "roymickey22@gmail.com",
+      "passwordHash": "7549262ddc82ed500770cd1d59a1fc39:ffcff59c371ee16a35fe3d894dc2bbb5a7e6a78dc2e4608fc8b8cbc9ca92871f35f8d2a7e122aced9ef3f26771348f6423bbd920449724cc500ab1e9850af9d9",
+      "createdAt": "2026-04-03T20:48:16.547Z"
+    }
+  ],
+  "roomHistoryByUser": {
+    "0b83ddd8-3b6d-4d58-9304-ec96b3957dcc": [
+      {
+        "roomId": "7W6ZKW4C",
+        "role": "Peer",
+        "username": "Mickey",
+        "problemTitle": "Untitled Practice Problem",
+        "problemCode": "",
+        "updatedAt": "2026-04-03T20:49:22.554Z"
+      }
+    ]
+  },
+  "runHistoryByUser": {}
+}

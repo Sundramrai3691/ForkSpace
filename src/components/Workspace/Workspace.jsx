@@ -15,6 +15,7 @@ import "codemirror/addon/edit/closebrackets";
 import useAIHint from "./AIHint";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
 import { formatCode } from "./formatCode";
+import { getAuthHeaders } from "../../lib/auth";
 
 function OutputSection({ tone, title, children }) {
     const toneClasses = {
@@ -399,6 +400,9 @@ const runCode = async () => {
       code: rawCode,
       stdin: effectiveStdin,
       languageId: languageConfig.judge0Id,
+      roomId,
+    }, {
+      headers: getAuthHeaders(),
     });
 
     const { stdout, stderr, compile_output, message, time, memory } = response.data;
@@ -523,6 +527,9 @@ const runSampleSuite = async () => {
       code: rawCode,
       languageId: languageConfig.judge0Id,
       samples: roomSamples,
+      roomId,
+    }, {
+      headers: getAuthHeaders(),
     });
 
     const { results = [], summary } = response.data;

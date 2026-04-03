@@ -1,4 +1,4 @@
-import { useRef, useContext, useEffect, useState } from 'react';
+import { useRef, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
@@ -29,7 +29,7 @@ function FormComp() {
         color: theme === 'dark' ? '#fff' : '#000',
     };
 
-    const loadHistory = async () => {
+    const loadHistory = useCallback(async () => {
         const token = getAuthToken();
 
         if (!token) {
@@ -58,11 +58,11 @@ function FormComp() {
         } finally {
             setHistoryLoading(false);
         }
-    };
+    }, [serverUrl]);
 
     useEffect(() => {
         loadHistory();
-    }, []);
+    }, [loadHistory]);
 
     useEffect(() => {
         if (currentUser && usernameRef.current && !usernameRef.current.value) {

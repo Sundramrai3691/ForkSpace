@@ -96,5 +96,21 @@
         }
       ]
     }
+  },
+  "7W6ZKW4C": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "problem": {
+      "platform": "custom",
+      "problemCode": "",
+      "problemUrl": "",
+      "sourceUrl": "",
+      "title": "Untitled Practice Problem",
+      "prompt": "",
+      "pastedStatement": "",
+      "sampleInput": "",
+      "sampleOutput": "",
+      "samples": []
+    }
   }
 }

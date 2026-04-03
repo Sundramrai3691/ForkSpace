@@ -4,6 +4,7 @@ import Sidebar from '../components/sidebar/Sidebar';
 import Workspace from '../components/Workspace/Workspace';
 import { connectSocket } from '../socket';
 import toast from 'react-hot-toast';
+import { getAuthToken } from '../lib/auth';
 
 
 function Editor() {
@@ -41,6 +42,7 @@ function Editor() {
             roomId,
             username,
             role: enteredRole,
+            authToken: getAuthToken(),
           });
         });
         socketRef.current.on('disconnect', () => {
