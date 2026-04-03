@@ -10,6 +10,7 @@ import { Buffer } from 'buffer';
 import cors from 'cors';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 
 loadEnv({ path: new URL('./.env', import.meta.url) });
 
@@ -44,6 +45,84 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/auth/register', (req, res) => {
+  const { name = '', email = '', password = '' } = req.body || {};
+  const normalizedName = name.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedName || !normalizedEmail || !password) {
+    return res.status(400).json({ error: 'Name, email, and password are required.' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  }
+
+  if (userState.users.some((user) => user.email === normalizedEmail)) {
+    return res.status(409).json({ error: 'An account with this email already exists.' });
+  }
+
+  const user = {
+    id: crypto.randomUUID(),
+    name: normalizedName,
+    email: normalizedEmail,
+    passwordHash: createPasswordHash(password),
+    createdAt: new Date().toISOString(),
+  };
+
+  userState.users.push(user);
+  scheduleUserStatePersist();
+
+  const token = signAuthToken({ userId: user.id, email: user.email, name: user.name });
+
+  return res.status(201).json({
+    token,
+    user: sanitizeUser(user),
+  });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email = '', password = '' } = req.body || {};
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = userState.users.find((entry) => entry.email === normalizedEmail);
+
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ error: 'Invalid email or password.' });
+  }
+
+  const token = signAuthToken({ userId: user.id, email: user.email, name: user.name });
+
+  return res.json({
+    token,
+    user: sanitizeUser(user),
+  });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const user = getUserFromAuthHeader(req);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  return res.json({
+    user: sanitizeUser(user),
+  });
+});
+
+app.get('/api/auth/history', (req, res) => {
+  const user = getUserFromAuthHeader(req);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  return res.json({
+    rooms: userState.roomHistoryByUser[user.id] || [],
+    runs: userState.runHistoryByUser[user.id] || [],
+  });
+});
+
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -71,7 +150,14 @@ const DEFAULT_LANGUAGE = 'cpp';
 const roomStateMap = new Map();
 const dataDirectory = path.join(process.cwd(), 'server', 'data');
 const roomStateFile = path.join(dataDirectory, 'room-state.json');
+const userStateFile = path.join(dataDirectory, 'user-state.json');
 let persistTimer = null;
+let userPersistTimer = null;
+let userState = {
+  users: [],
+  roomHistoryByUser: {},
+  runHistoryByUser: {},
+};
 
 function getLanguageConfig(language) {
   return SUPPORTED_LANGUAGES[language] || SUPPORTED_LANGUAGES[DEFAULT_LANGUAGE];
@@ -131,6 +217,29 @@ async function persistRoomStates() {
   await writeFile(roomStateFile, JSON.stringify(serializableState, null, 2), 'utf8');
 }
 
+async function loadPersistedUserState() {
+  try {
+    await mkdir(dataDirectory, { recursive: true });
+    const fileContent = await readFile(userStateFile, 'utf8');
+    const parsed = JSON.parse(fileContent);
+
+    userState = {
+      users: Array.isArray(parsed?.users) ? parsed.users : [],
+      roomHistoryByUser: parsed?.roomHistoryByUser || {},
+      runHistoryByUser: parsed?.runHistoryByUser || {},
+    };
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Failed to load user state persistence:', error.message);
+    }
+  }
+}
+
+async function persistUserState() {
+  await mkdir(dataDirectory, { recursive: true });
+  await writeFile(userStateFile, JSON.stringify(userState, null, 2), 'utf8');
+}
+
 function scheduleRoomStatePersist() {
   if (persistTimer) {
     clearTimeout(persistTimer);
@@ -140,6 +249,19 @@ function scheduleRoomStatePersist() {
     persistTimer = null;
     persistRoomStates().catch((error) => {
       console.error('Failed to persist room state:', error.message);
+    });
+  }, 250);
+}
+
+function scheduleUserStatePersist() {
+  if (userPersistTimer) {
+    clearTimeout(userPersistTimer);
+  }
+
+  userPersistTimer = setTimeout(() => {
+    userPersistTimer = null;
+    persistUserState().catch((error) => {
+      console.error('Failed to persist user state:', error.message);
     });
   }, 250);
 }
@@ -157,6 +279,19 @@ async function flushRoomStatePersist() {
   }
 }
 
+async function flushUserStatePersist() {
+  if (userPersistTimer) {
+    clearTimeout(userPersistTimer);
+    userPersistTimer = null;
+  }
+
+  try {
+    await persistUserState();
+  } catch (error) {
+    console.error('Failed to flush user state persistence:', error.message);
+  }
+}
+
 function getOrCreateRoomState(roomId) {
   if (!roomStateMap.has(roomId)) {
     roomStateMap.set(roomId, createDefaultRoomState());
@@ -164,6 +299,113 @@ function getOrCreateRoomState(roomId) {
   }
 
   return roomStateMap.get(roomId);
+}
+
+function createPasswordHash(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [salt, originalHash] = String(storedHash || '').split(':');
+
+  if (!salt || !originalHash) {
+    return false;
+  }
+
+  const derivedHash = crypto.scryptSync(password, salt, 64);
+  const originalBuffer = Buffer.from(originalHash, 'hex');
+
+  return derivedHash.length === originalBuffer.length && crypto.timingSafeEqual(derivedHash, originalBuffer);
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
+  return Buffer.from(padded, 'base64').toString('utf8');
+}
+
+function signAuthToken(payload) {
+  const secret = process.env.JWT_SECRET || 'forkspace-dev-secret';
+  const header = encodeBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const expiresAt = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+  const body = encodeBase64Url(JSON.stringify({ ...payload, exp: expiresAt }));
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(`${header}.${body}`)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+
+  return `${header}.${body}.${signature}`;
+}
+
+function verifyAuthToken(token) {
+  try {
+    const secret = process.env.JWT_SECRET || 'forkspace-dev-secret';
+    const [header, body, signature] = token.split('.');
+
+    if (!header || !body || !signature) {
+      return null;
+    }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(`${header}.${body}`)
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    if (signature !== expectedSignature) {
+      return null;
+    }
+
+    const payload = JSON.parse(decodeBase64Url(body));
+
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function getUserFromAuthHeader(req) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const payload = token ? verifyAuthToken(token) : null;
+
+  if (!payload?.userId) {
+    return null;
+  }
+
+  return userState.users.find((user) => user.id === payload.userId) || null;
+}
+
+function sanitizeUser(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    createdAt: user.createdAt,
+  };
 }
 
 function extractAiText(responseData) {
@@ -258,6 +500,34 @@ function buildFallbackHints(code = '', beforeCursor = '', afterCursor = '') {
   suggestions.push('Test one edge case and one normal case after every small change to catch regressions early.');
 
   return [...new Set(suggestions)].slice(0, 5);
+}
+
+function upsertRecentRoom(userId, roomEntry) {
+  const roomHistory = Array.isArray(userState.roomHistoryByUser[userId]) ? userState.roomHistoryByUser[userId] : [];
+  const nextHistory = [
+    {
+      ...roomEntry,
+      updatedAt: new Date().toISOString(),
+    },
+    ...roomHistory.filter((entry) => entry.roomId !== roomEntry.roomId),
+  ].slice(0, 12);
+
+  userState.roomHistoryByUser[userId] = nextHistory;
+  scheduleUserStatePersist();
+}
+
+function appendRunHistory(userId, runEntry) {
+  const runHistory = Array.isArray(userState.runHistoryByUser[userId]) ? userState.runHistoryByUser[userId] : [];
+
+  userState.runHistoryByUser[userId] = [
+    {
+      ...runEntry,
+      createdAt: new Date().toISOString(),
+    },
+    ...runHistory,
+  ].slice(0, 30);
+
+  scheduleUserStatePersist();
 }
 
 function decodeHtmlEntities(value = '') {
