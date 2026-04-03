@@ -1,14 +1,27 @@
-import { useRef, useContext } from 'react';
+import { useRef, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { ThemeContext } from '../../../Context/ThemeContext';
+import { clearAuthToken, getAuthHeaders, getAuthToken, setAuthToken } from '../../lib/auth';
 
 function FormComp() {
     const navigate = useNavigate();
     const roomIdRef = useRef(null);
-    const usernameRef = useRef();
+    const usernameRef = useRef(null);
     const roleRef = useRef(null);
     const { theme } = useContext(ThemeContext);
+    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const [authMode, setAuthMode] = useState('login');
+    const [authLoading, setAuthLoading] = useState(false);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [history, setHistory] = useState({ rooms: [], runs: [] });
+    const [authForm, setAuthForm] = useState({
+        name: '',
+        email: '',
+        password: '',
+    });
 
     const toastStyle = {
         borderRadius: '10px',
@@ -16,8 +29,49 @@ function FormComp() {
         color: theme === 'dark' ? '#fff' : '#000',
     };
 
-    const generateRoomId = (e) => {
-        e.preventDefault();
+    const loadHistory = async () => {
+        const token = getAuthToken();
+
+        if (!token) {
+            setHistory({ rooms: [], runs: [] });
+            return;
+        }
+
+        setHistoryLoading(true);
+
+        try {
+            const [meResponse, historyResponse] = await Promise.all([
+                axios.get(`${serverUrl}/api/auth/me`, {
+                    headers: getAuthHeaders(),
+                }),
+                axios.get(`${serverUrl}/api/auth/history`, {
+                    headers: getAuthHeaders(),
+                }),
+            ]);
+
+            setCurrentUser(meResponse.data.user);
+            setHistory(historyResponse.data);
+        } catch {
+            clearAuthToken();
+            setCurrentUser(null);
+            setHistory({ rooms: [], runs: [] });
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadHistory();
+    }, []);
+
+    useEffect(() => {
+        if (currentUser && usernameRef.current && !usernameRef.current.value) {
+            usernameRef.current.value = currentUser.name;
+        }
+    }, [currentUser]);
+
+    const generateRoomId = (event) => {
+        event.preventDefault();
         const roomId = Math.random().toString(36).substring(2, 10).toUpperCase();
 
         if (roomIdRef.current) {
@@ -28,11 +82,11 @@ function FormComp() {
         toast.success('Room ID generated successfully!', { style: toastStyle });
     };
 
-    const joinRoom = (e) => {
-        e.preventDefault();
+    const joinRoom = (event) => {
+        event.preventDefault();
 
         const roomId = roomIdRef.current?.value?.trim();
-        const username = usernameRef.current?.value?.trim();
+        const username = usernameRef.current?.value?.trim() || currentUser?.name;
         const role = roleRef.current?.value?.trim() || 'Peer';
 
         if (!roomId || !username) {
@@ -46,6 +100,36 @@ function FormComp() {
                 role,
             }
         });
+    };
+
+    const handleAuthSubmit = async (event) => {
+        event.preventDefault();
+        setAuthLoading(true);
+
+        try {
+            const endpoint = authMode === 'signup' ? '/api/auth/register' : '/api/auth/login';
+            const payload = authMode === 'signup'
+                ? authForm
+                : { email: authForm.email, password: authForm.password };
+            const response = await axios.post(`${serverUrl}${endpoint}`, payload);
+
+            setAuthToken(response.data.token);
+            setCurrentUser(response.data.user);
+            setAuthForm({ name: '', email: '', password: '' });
+            toast.success(authMode === 'signup' ? 'Account created' : 'Signed in', { style: toastStyle });
+            await loadHistory();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Authentication failed', { style: toastStyle });
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
+    const handleSignOut = () => {
+        clearAuthToken();
+        setCurrentUser(null);
+        setHistory({ rooms: [], runs: [] });
+        toast.success('Signed out', { style: toastStyle });
     };
 
     return (
@@ -64,19 +148,90 @@ function FormComp() {
                             Welcome to ForkSpace
                         </h1>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Start a mock interview or DSA mentoring room
+                            Sign in to keep your rooms, problems, and recent runs.
                         </p>
                     </div>
 
-                    <form onSubmit={joinRoom} className="space-y-6 p-8">
-                        <div className="space-y-2">
-                            <label
-                                htmlFor="roomId"
-                                className="block text-sm font-medium text-black dark:text-gray-300"
-                            >
-                                Practice Room ID
-                            </label>
-                            <div className="relative">
+                    <div className="space-y-6 p-8">
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <div className="mb-4 flex rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
+                                {['login', 'signup'].map((mode) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => setAuthMode(mode)}
+                                        className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                                            authMode === mode
+                                                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                                                : 'text-gray-600 dark:text-gray-300'
+                                        }`}
+                                    >
+                                        {mode === 'login' ? 'Sign In' : 'Create Account'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {currentUser ? (
+                                <div className="space-y-3">
+                                    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{currentUser.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.email}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleSignOut}
+                                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                    >
+                                        Sign Out
+                                    </button>
+                                </div>
+                            ) : (
+                                <form onSubmit={handleAuthSubmit} className="space-y-3">
+                                    {authMode === 'signup' && (
+                                        <input
+                                            type="text"
+                                            value={authForm.name}
+                                            onChange={(event) => setAuthForm((prev) => ({ ...prev, name: event.target.value }))}
+                                            placeholder="Your name"
+                                            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
+                                            required
+                                        />
+                                    )}
+                                    <input
+                                        type="email"
+                                        value={authForm.email}
+                                        onChange={(event) => setAuthForm((prev) => ({ ...prev, email: event.target.value }))}
+                                        placeholder="Email address"
+                                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
+                                        required
+                                    />
+                                    <input
+                                        type="password"
+                                        value={authForm.password}
+                                        onChange={(event) => setAuthForm((prev) => ({ ...prev, password: event.target.value }))}
+                                        placeholder="Password"
+                                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={authLoading}
+                                        className="w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200"
+                                    >
+                                        {authLoading ? 'Please wait...' : authMode === 'signup' ? 'Create Account' : 'Sign In'}
+                                    </button>
+                                </form>
+                            )}
+                        </div>
+
+                        <form onSubmit={joinRoom} className="space-y-6">
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="roomId"
+                                    className="block text-sm font-medium text-black dark:text-gray-300"
+                                >
+                                    Practice Room ID
+                                </label>
                                 <input
                                     type="text"
                                     id="roomId"
@@ -85,22 +240,15 @@ function FormComp() {
                                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-gray-100"
                                     required
                                 />
-                                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                    </svg>
-                                </div>
                             </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <label
-                                htmlFor="username"
-                                className="block text-sm font-medium text-black dark:text-gray-300"
-                            >
-                                Display Name
-                            </label>
-                            <div className="relative">
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="username"
+                                    className="block text-sm font-medium text-black dark:text-gray-300"
+                                >
+                                    Display Name
+                                </label>
                                 <input
                                     type="text"
                                     id="username"
@@ -109,68 +257,84 @@ function FormComp() {
                                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-gray-100"
                                     required
                                 />
-                                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label
-                                htmlFor="role"
-                                className="block text-sm font-medium text-black dark:text-gray-300"
-                            >
-                                Session Role
-                            </label>
-                            <select
-                                id="role"
-                                ref={roleRef}
-                                defaultValue="Peer"
-                                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
-                            >
-                                <option>Peer</option>
-                                <option>Candidate</option>
-                                <option>Interviewer</option>
-                                <option>Learner</option>
-                                <option>Mentor</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-3">
-                            <button
-                                type="submit"
-                                className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:bg-gray-800 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 dark:focus:ring-gray-100 dark:focus:ring-offset-gray-800"
-                            >
-                                Join Practice Room
-                            </button>
-
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <div className="w-full border-t border-gray-200 dark:border-gray-600"></div>
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-white px-3 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                                        or
-                                    </span>
-                                </div>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={generateRoomId}
-                                className="w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-3 font-medium text-black transition-all duration-200 hover:border-gray-300 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-600 dark:focus:ring-offset-gray-800"
-                            >
-                                <div className="flex items-center justify-center space-x-2">
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                    <span>Generate Practice Room</span>
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="role"
+                                    className="block text-sm font-medium text-black dark:text-gray-300"
+                                >
+                                    Session Role
+                                </label>
+                                <select
+                                    id="role"
+                                    ref={roleRef}
+                                    defaultValue="Peer"
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
+                                >
+                                    <option>Peer</option>
+                                    <option>Candidate</option>
+                                    <option>Interviewer</option>
+                                    <option>Learner</option>
+                                    <option>Mentor</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-3">
+                                <button
+                                    type="submit"
+                                    className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:bg-gray-800 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 dark:focus:ring-gray-100 dark:focus:ring-offset-gray-800"
+                                >
+                                    Join Practice Room
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={generateRoomId}
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-3 font-medium text-black transition-all duration-200 hover:border-gray-300 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-600 dark:focus:ring-offset-gray-800"
+                                >
+                                    Generate Practice Room
+                                </button>
+                            </div>
+                        </form>
+
+                        {currentUser && (
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Recent rooms</p>
+                                    {historyLoading && <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>}
                                 </div>
-                            </button>
-                        </div>
-                    </form>
+                                <div className="space-y-2">
+                                    {(history.rooms || []).length > 0 ? (
+                                        history.rooms.slice(0, 4).map((room) => (
+                                            <button
+                                                key={room.roomId}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (roomIdRef.current) {
+                                                        roomIdRef.current.value = room.roomId;
+                                                    }
+                                                    if (usernameRef.current) {
+                                                        usernameRef.current.value = currentUser.name;
+                                                    }
+                                                }}
+                                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-left transition hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+                                            >
+                                                <p className="font-mono text-sm text-gray-900 dark:text-white">{room.roomId}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {room.problemTitle || 'Untitled Practice Problem'}
+                                                </p>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            Your saved rooms will appear here after you join and work in them.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="border-t border-gray-100 bg-gray-50 px-8 py-6 dark:border-gray-700 dark:bg-gray-900/50">
                         <div className="text-center">

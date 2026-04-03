@@ -1278,8 +1278,9 @@ async function executeSubmission({ code, stdin = '', languageId = getLanguageCon
 }
 
 app.post('/api/run-code', async (req, res) => {
-  const { code, stdin = '', languageId = getLanguageConfig(DEFAULT_LANGUAGE).id } = req.body;
+  const { code, stdin = '', languageId = getLanguageConfig(DEFAULT_LANGUAGE).id, roomId = '' } = req.body;
   const supportedLanguageIds = new Set(Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id));
+  const authenticatedUser = getUserFromAuthHeader(req);
 
   if (!code) {
     return res.status(400).json({ error: 'Missing code' });
@@ -1294,7 +1295,21 @@ app.post('/api/run-code', async (req, res) => {
   }
 
   try {
-    return res.json(await executeSubmission({ code, stdin, languageId }));
+    const execution = await executeSubmission({ code, stdin, languageId });
+
+    if (authenticatedUser) {
+      const roomState = roomId ? getOrCreateRoomState(roomId) : null;
+      appendRunHistory(authenticatedUser.id, {
+        roomId: roomId || null,
+        languageId,
+        languageLabel: Object.values(SUPPORTED_LANGUAGES).find((language) => language.id === languageId)?.label || 'Unknown',
+        problemTitle: roomState?.problem?.title || 'Untitled Practice Problem',
+        problemCode: roomState?.problem?.problemCode || '',
+        status: execution.compile_output ? 'compile_error' : execution.stderr ? 'runtime_error' : 'completed',
+      });
+    }
+
+    return res.json(execution);
   } catch (error) {
     return res.status(error.response?.status || 500).json({
       error: error.response?.data?.error || error.response?.data?.message || 'Error running code',
@@ -1305,6 +1320,8 @@ app.post('/api/run-code', async (req, res) => {
 app.post('/api/run-sample-suite', async (req, res) => {
   const { code, languageId = getLanguageConfig(DEFAULT_LANGUAGE).id, samples = [] } = req.body || {};
   const supportedLanguageIds = new Set(Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id));
+  const authenticatedUser = getUserFromAuthHeader(req);
+  const roomId = req.body?.roomId || '';
 
   if (!code) {
     return res.status(400).json({ error: 'Missing code' });
@@ -1354,6 +1371,18 @@ app.post('/api/run-sample-suite', async (req, res) => {
       }
     }
 
+    if (authenticatedUser) {
+      const roomState = roomId ? getOrCreateRoomState(roomId) : null;
+      appendRunHistory(authenticatedUser.id, {
+        roomId: roomId || null,
+        languageId,
+        languageLabel: Object.values(SUPPORTED_LANGUAGES).find((language) => language.id === languageId)?.label || 'Unknown',
+        problemTitle: roomState?.problem?.title || 'Untitled Practice Problem',
+        problemCode: roomState?.problem?.problemCode || '',
+        status: results.every((result) => result.passed) ? 'samples_passed' : 'samples_failed',
+      });
+    }
+
     return res.json({
       results,
       summary: {
@@ -1391,12 +1420,18 @@ function getUsersInRoom(roomId) {
 io.on('connection', (socket) => {
   // console.log('socket connected', socket.id); // remove in prod
 
-  socket.on('join', ({ roomId, username, role }) => {
+  socket.on('join', ({ roomId, username, role, authToken }) => {
     const roomState = getOrCreateRoomState(roomId);
+    const authPayload = authToken ? verifyAuthToken(authToken) : null;
+    const authenticatedUser = authPayload?.userId
+      ? userState.users.find((user) => user.id === authPayload.userId) || null
+      : null;
+    const resolvedUsername = authenticatedUser?.name || username;
 
     userSocketMap[socket.id] = {
-      username,
+      username: resolvedUsername,
       role: role || 'Peer',
+      userId: authenticatedUser?.id || null,
     };
     socket.join(roomId);
 
@@ -1407,11 +1442,21 @@ io.on('connection', (socket) => {
     users.forEach(({ socketId }) => {
       io.to(socketId).emit('joined', {
         users,
-        username,
+        username: resolvedUsername,
         role: userSocketMap[socket.id].role,
         socketId: socket.id,
       });
     });
+
+    if (authenticatedUser) {
+      upsertRecentRoom(authenticatedUser.id, {
+        roomId,
+        role: role || 'Peer',
+        username: resolvedUsername,
+        problemTitle: roomState.problem?.title || 'Untitled Practice Problem',
+        problemCode: roomState.problem?.problemCode || '',
+      });
+    }
 
     socket.emit('room-state', roomState);
   });
@@ -1443,6 +1488,20 @@ socket.on('problem-update', ({ roomId, problem }) => {
   });
   scheduleRoomStatePersist();
 
+  const authenticatedUsers = getUsersInRoom(roomId)
+    .map((user) => userSocketMap[user.socketId]?.userId)
+    .filter(Boolean);
+
+  authenticatedUsers.forEach((userId) => {
+    upsertRecentRoom(userId, {
+      roomId,
+      role: userSocketMap[socket.id]?.role || 'Peer',
+      username: userSocketMap[socket.id]?.username || 'Anonymous',
+      problemTitle: roomState.problem?.title || 'Untitled Practice Problem',
+      problemCode: roomState.problem?.problemCode || '',
+    });
+  });
+
   io.to(roomId).emit('problem-update', {
     problem: roomState.problem,
   });
@@ -1465,14 +1524,17 @@ socket.on('problem-update', ({ roomId, problem }) => {
 const PORT = process.env.PORT || 5000;
 
 await loadPersistedRoomStates();
+await loadPersistedUserState();
 
 process.on('SIGINT', async () => {
   await flushRoomStatePersist();
+  await flushUserStatePersist();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   await flushRoomStatePersist();
+  await flushUserStatePersist();
   process.exit(0);
 });
 
