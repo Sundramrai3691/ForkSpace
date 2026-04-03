@@ -77,6 +77,25 @@ function getLanguageConfig(language) {
   return SUPPORTED_LANGUAGES[language] || SUPPORTED_LANGUAGES[DEFAULT_LANGUAGE];
 }
 
+function createDefaultProblemState() {
+  return {
+    title: 'Untitled Practice Problem',
+    prompt: '',
+    sampleInput: '',
+    sampleOutput: '',
+  };
+}
+
+function createDefaultRoomState() {
+  const defaultConfig = getLanguageConfig(DEFAULT_LANGUAGE);
+
+  return {
+    language: DEFAULT_LANGUAGE,
+    code: defaultConfig.starterCode,
+    problem: createDefaultProblemState(),
+  };
+}
+
 async function loadPersistedRoomStates() {
   try {
     await mkdir(dataDirectory, { recursive: true });
@@ -90,6 +109,10 @@ async function loadPersistedRoomStates() {
       roomStateMap.set(roomId, {
         language: nextLanguage,
         code: typeof roomState?.code === 'string' ? roomState.code : defaultConfig.starterCode,
+        problem: {
+          ...createDefaultProblemState(),
+          ...(roomState?.problem || {}),
+        },
       });
     });
   } catch (error) {
@@ -133,11 +156,7 @@ async function flushRoomStatePersist() {
 
 function getOrCreateRoomState(roomId) {
   if (!roomStateMap.has(roomId)) {
-    const defaultConfig = getLanguageConfig(DEFAULT_LANGUAGE);
-    roomStateMap.set(roomId, {
-      language: DEFAULT_LANGUAGE,
-      code: defaultConfig.starterCode,
-    });
+    roomStateMap.set(roomId, createDefaultRoomState());
     scheduleRoomStatePersist();
   }
 
@@ -448,7 +467,8 @@ function getUsersInRoom(roomId) {
     []).map(socketId => {
       return {
         socketId,
-        username: userSocketMap[socketId],
+        username: userSocketMap[socketId]?.username,
+        role: userSocketMap[socketId]?.role || 'Peer',
         isOnline: true
       };
     }
@@ -458,10 +478,13 @@ function getUsersInRoom(roomId) {
 io.on('connection', (socket) => {
   // console.log('socket connected', socket.id); // remove in prod
 
-  socket.on('join', ({ roomId, username }) => {
+  socket.on('join', ({ roomId, username, role }) => {
     const roomState = getOrCreateRoomState(roomId);
 
-    userSocketMap[socket.id] = username;
+    userSocketMap[socket.id] = {
+      username,
+      role: role || 'Peer',
+    };
     socket.join(roomId);
 
 
@@ -472,6 +495,7 @@ io.on('connection', (socket) => {
       io.to(socketId).emit('joined', {
         users,
         username,
+        role: userSocketMap[socket.id].role,
         socketId: socket.id,
       });
     });
@@ -498,12 +522,26 @@ socket.on('language-change', ({ roomId, language }) => {
   });
 });
 
+socket.on('problem-update', ({ roomId, problem }) => {
+  const roomState = getOrCreateRoomState(roomId);
+  roomState.problem = {
+    ...createDefaultProblemState(),
+    ...roomState.problem,
+    ...(problem || {}),
+  };
+  scheduleRoomStatePersist();
+
+  io.to(roomId).emit('problem-update', {
+    problem: roomState.problem,
+  });
+});
+
   socket.on('disconnecting', () => {
     const rooms = [...socket.rooms];
     rooms.forEach((roomId) => {
       socket.in(roomId).emit('left',{
         socketId: socket.id,
-        username: userSocketMap[socket.id],
+        username: userSocketMap[socket.id]?.username,
       })
     })
     delete userSocketMap[socket.id];

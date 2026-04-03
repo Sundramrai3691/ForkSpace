@@ -11,6 +11,7 @@ function Editor() {
   const { roomId } = useParams();
   const { state } = useLocation();
   const enteredUsername = state?.username;
+  const enteredRole = state?.role || 'Peer';
   const [socketConnected, setSocketConnected] = useState(false);
   const [users, setUsers] = useState([]); // Add this to track users
   const [roomState, setRoomState] = useState(null);
@@ -39,6 +40,7 @@ function Editor() {
           socketRef.current.emit('join', {
             roomId,
             username,
+            role: enteredRole,
           });
         });
         socketRef.current.on('disconnect', () => {
@@ -47,12 +49,18 @@ function Editor() {
         socketRef.current.on('room-state', (nextRoomState) => {
           setRoomState(nextRoomState);
         });
+        socketRef.current.on('problem-update', ({ problem }) => {
+          setRoomState((prev) => ({
+            ...(prev || {}),
+            problem,
+          }));
+        });
 
         // Listen for user events at the top level
-        socketRef.current.on('joined', ({ users, username }) => {
+        socketRef.current.on('joined', ({ users, username, role }) => {
           setUsers(users);
           if (enteredUsername !== username) {
-            toast.success(`${username} joined the room`);
+            toast.success(`${username} joined as ${role}`);
           }
         });
         
@@ -73,12 +81,13 @@ function Editor() {
         socketRef.current.off('connect');
         socketRef.current.off('disconnect');
         socketRef.current.off('room-state');
+        socketRef.current.off('problem-update');
         socketRef.current.off('joined');
         socketRef.current.off('left');
         socketRef.current.disconnect();
       }
     };
-  }, [roomId, enteredUsername, username]);
+  }, [roomId, enteredRole, enteredUsername, username]);
 
   return (
     <div className="flex min-h-screen flex-col overflow-hidden bg-white dark:bg-gray-900 lg:flex-row">
@@ -88,6 +97,7 @@ function Editor() {
           roomId={roomId} 
           socketConnected={socketConnected} 
           users={users}
+          roomState={roomState}
         />
       </aside>
       <main className="flex min-h-[60vh] flex-1 flex-col bg-white dark:bg-gray-900">

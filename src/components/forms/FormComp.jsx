@@ -7,6 +7,7 @@ function FormComp() {
     const navigate = useNavigate();
     const roomIdRef = useRef(null);
     const usernameRef = useRef();
+    const roleRef = useRef(null);
     const { theme } = useContext(ThemeContext);
 
     const toastStyle = {
@@ -32,6 +33,7 @@ function FormComp() {
 
         const roomId = roomIdRef.current?.value?.trim();
         const username = usernameRef.current?.value?.trim();
+        const role = roleRef.current?.value?.trim() || 'Peer';
 
         if (!roomId || !username) {
             toast.error('Please enter both Room ID and Username', { style: toastStyle });
@@ -41,6 +43,7 @@ function FormComp() {
         navigate(`/editor/${roomId}`, {
             state: {
                 username,
+                role,
             }
         });
     };
@@ -112,6 +115,27 @@ function FormComp() {
                                     </svg>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label
+                                htmlFor="role"
+                                className="block text-sm font-medium text-black dark:text-gray-300"
+                            >
+                                Session Role
+                            </label>
+                            <select
+                                id="role"
+                                ref={roleRef}
+                                defaultValue="Peer"
+                                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
+                            >
+                                <option>Peer</option>
+                                <option>Candidate</option>
+                                <option>Interviewer</option>
+                                <option>Learner</option>
+                                <option>Mentor</option>
+                            </select>
                         </div>
 
                         <div className="space-y-3">

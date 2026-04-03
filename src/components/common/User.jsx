@@ -2,7 +2,7 @@ import Avatar from 'react-avatar'
 
 
 // eslint-disable-next-line react/prop-types
-function User({ username, isOnline }) {
+function User({ username, isOnline, role }) {
     return (
         <div className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm">
             <div className="relative">
@@ -17,6 +17,11 @@ function User({ username, isOnline }) {
                 <span className="font-medium text-gray-900 dark:text-white truncate group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors">
                     {username}
                 </span>
+                {role && (
+                    <span className="mt-1 inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+                        {role}
+                    </span>
+                )}
                 <div className="flex items-center gap-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">

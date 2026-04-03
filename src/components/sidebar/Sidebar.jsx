@@ -1,15 +1,47 @@
+/* eslint-disable react/prop-types */
 import User from '../common/User';
 import { Link, useLocation, Navigate, useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react';
 
 
 
-// eslint-disable-next-line react/prop-types
-function Sidebar({ users = [], roomId }) {
+function Sidebar({ users = [], roomId, roomState, socketRef }) {
     const location = useLocation();
     const navigate = useNavigate();
+    const [problemDraft, setProblemDraft] = useState({
+        title: '',
+        prompt: '',
+        sampleInput: '',
+        sampleOutput: '',
+    });
 
-    if (!location.state) {
+    const hasJoinState = Boolean(location.state);
+
+    useEffect(() => {
+        setProblemDraft({
+            title: roomState?.problem?.title || '',
+            prompt: roomState?.problem?.prompt || '',
+            sampleInput: roomState?.problem?.sampleInput || '',
+            sampleOutput: roomState?.problem?.sampleOutput || '',
+        });
+    }, [roomState?.problem]);
+
+    useEffect(() => {
+        if (!socketRef?.current || !roomState) return;
+        if (JSON.stringify(problemDraft) === JSON.stringify(roomState.problem || {})) return;
+
+        const timer = setTimeout(() => {
+            socketRef.current.emit('problem-update', {
+                roomId,
+                problem: problemDraft,
+            });
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [problemDraft, roomId, socketRef, roomState]);
+
+    if (!hasJoinState) {
         return <Navigate to='/' />;
     }
 
@@ -29,6 +61,47 @@ function Sidebar({ users = [], roomId }) {
     return (
         <div className="flex h-full w-full flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
             <div className="flex flex-col space-y-4 p-6 flex-1 min-h-0">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-800/40">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                            Problem Brief
+                        </h3>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                            Shared
+                        </span>
+                    </div>
+
+                    <div className="space-y-3">
+                        <input
+                            type="text"
+                            value={problemDraft.title}
+                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
+                            placeholder="Problem title"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        />
+                        <textarea
+                            value={problemDraft.prompt}
+                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                            placeholder="Add the prompt, constraints, or the approach you want to discuss..."
+                            className="h-24 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        />
+                        <div className="grid gap-3">
+                            <textarea
+                                value={problemDraft.sampleInput}
+                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
+                                placeholder="Sample input"
+                                className="h-20 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            />
+                            <textarea
+                                value={problemDraft.sampleOutput}
+                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
+                                placeholder="Expected output"
+                                className="h-20 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 <div className="space-y-3 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
@@ -56,6 +129,7 @@ function Sidebar({ users = [], roomId }) {
                                 <User
                                     key={user.socketId}
                                     username={user.username}
+                                    role={user.role}
                                     isOnline={true}
                                 />
                             ))}

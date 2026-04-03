@@ -260,6 +260,12 @@ function Workspace({ socketRef, roomId, roomState }) {
       }
     };
 
+    const handleUseSampleInput = () => {
+      const sampleInput = roomState?.problem?.sampleInput || "";
+      setStdin(sampleInput);
+      toast.success("Sample input copied into stdin");
+    };
+
     const handleLanguageChange = (event) => {
       const nextLanguage = event.target.value;
       const nextLanguageConfig = LANGUAGE_OPTIONS[nextLanguage];
@@ -603,9 +609,20 @@ const runCode = async () => {
                         </div>
 
                         <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                            <label htmlFor="stdin" className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                                Standard Input
-                            </label>
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                                <label htmlFor="stdin" className="block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                                    Standard Input
+                                </label>
+                                {roomState?.problem?.sampleInput && (
+                                    <button
+                                        type="button"
+                                        onClick={handleUseSampleInput}
+                                        className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:text-white"
+                                    >
+                                        Use sample input
+                                    </button>
+                                )}
+                            </div>
                             <textarea
                                 id="stdin"
                                 value={stdin}
@@ -616,6 +633,14 @@ const runCode = async () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4">
+                            {roomState?.problem?.sampleOutput && (
+                                <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                        Expected Output
+                                    </p>
+                                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">{roomState.problem.sampleOutput}</pre>
+                                </div>
+                            )}
                             {output ? (
                                 <div className="font-mono text-sm text-gray-900 dark:text-white">
                                     {output}
