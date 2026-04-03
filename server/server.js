@@ -327,6 +327,39 @@ function extractLeetCodeExampleOutputs(content = '') {
     .join('\n\n');
 }
 
+function extractCodeforcesPrompt(html = '') {
+  const titleRegex = /<div class="title">[\s\S]*?<\/div>/i;
+  const titleMatch = titleRegex.exec(html);
+
+  if (!titleMatch) {
+    return '';
+  }
+
+  const promptStart = titleMatch.index + titleMatch[0].length;
+  const sampleIndex = html.indexOf('<div class="sample-test">', promptStart);
+  const promptEnd = sampleIndex >= 0 ? sampleIndex : html.indexOf('<div class="note">', promptStart);
+
+  if (promptEnd < 0) {
+    return '';
+  }
+
+  return stripHtml(html.slice(promptStart, promptEnd));
+}
+
+function extractCodeforcesSamples(html = '') {
+  const sampleInputs = [...html.matchAll(/<div class="input">[\s\S]*?<pre[^>]*>([\s\S]*?)<\/pre>/gi)]
+    .map((match) => extractPreformattedText(match[1]))
+    .filter(Boolean);
+  const sampleOutputs = [...html.matchAll(/<div class="output">[\s\S]*?<pre[^>]*>([\s\S]*?)<\/pre>/gi)]
+    .map((match) => extractPreformattedText(match[1]))
+    .filter(Boolean);
+
+  return {
+    sampleInput: sampleInputs.join('\n\n'),
+    sampleOutput: sampleOutputs.join('\n\n'),
+  };
+}
+
 async function importCodeforcesProblem(problemCode, sourceUrl = '') {
   const normalized = normalizeCodeforcesProblemCode(problemCode);
 
@@ -343,18 +376,22 @@ async function importCodeforcesProblem(problemCode, sourceUrl = '') {
   });
 
   const html = response.data;
-  const titleMatch = html.match(/<div class="title">([\s\S]*?)<\/div>/i);
-  const promptMatch = html.match(/<div class="problem-statement">[\s\S]*?<div class="header">[\s\S]*?<\/div>([\s\S]*?)<div class="sample-test">/i);
-  const sampleMatches = [...html.matchAll(/<div class="input">[\s\S]*?<pre>([\s\S]*?)<\/pre>[\s\S]*?<div class="output">[\s\S]*?<pre>([\s\S]*?)<\/pre>/gi)];
+  const titleMatch = html.match(/<div class="title">([\s\S]*?)<\/div>/i) || html.match(/<title>[\s\S]*?-\s*([^<]+?)\s*-\s*Codeforces<\/title>/i);
+  const prompt = extractCodeforcesPrompt(html);
+  const { sampleInput, sampleOutput } = extractCodeforcesSamples(html);
+
+  if (!sampleInput && !sampleOutput) {
+    throw new Error('Codeforces samples could not be extracted from this page yet.');
+  }
 
   return {
     platform: 'codeforces',
     problemCode: `${normalized.contestId}${normalized.index}`,
     sourceUrl: nextSourceUrl,
     title: stripHtml(titleMatch?.[1] || '') || `Codeforces ${normalized.contestId}${normalized.index}`,
-    prompt: stripHtml(promptMatch?.[1] || ''),
-    sampleInput: sampleMatches.map((match) => extractPreformattedText(match[1])).filter(Boolean).join('\n\n'),
-    sampleOutput: sampleMatches.map((match) => extractPreformattedText(match[2])).filter(Boolean).join('\n\n'),
+    prompt,
+    sampleInput,
+    sampleOutput,
   };
 }
 
