@@ -3,8 +3,7 @@ import { useState, useRef } from "react";
 import toast from "react-hot-toast";
 
 export default function useAIHint(editorRef, socketRef, roomId) {
-  const aiServerUrl = (import.meta.env.VITE_AI_SERVER_URL || "").trim();
-  const aiEnabled = import.meta.env.VITE_ENABLE_AI === "true" && Boolean(aiServerUrl);
+  const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
   const [ghostHint, setGhostHint] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [aiHints, setAiHints] = useState([]);
@@ -65,10 +64,6 @@ export default function useAIHint(editorRef, socketRef, roomId) {
 
   const fetchHint = async () => {
     if (!editorRef.current) return;
-    if (!aiEnabled) {
-      notifyAiUnavailable("AI hints are disabled. Set VITE_ENABLE_AI=true and configure VITE_AI_SERVER_URL to use them.");
-      return;
-    }
 
     const cm = editorRef.current;
     const cursor = cm.getCursor();
@@ -78,7 +73,7 @@ export default function useAIHint(editorRef, socketRef, roomId) {
     const afterCursor = code.substring(cm.indexFromPos(cursor));
 
     try {
-      const res = await axios.post(`${aiServerUrl}/api/ai-hint`, {
+      const res = await axios.post(`${serverUrl}/api/ai-hint`, {
         prompt: beforeCursor,
         suffix: afterCursor,
       });
@@ -91,16 +86,12 @@ export default function useAIHint(editorRef, socketRef, roomId) {
         showGhostHint(hint);
       }
     } catch {
-      notifyAiUnavailable("AI hints server is unavailable. Start the AI server and try again.");
+      notifyAiUnavailable("AI hints are unavailable right now. Check the backend and Mistral configuration.");
     }
   };
 
   const fetchAIHints = async () => {
     if (!editorRef.current) return;
-    if (!aiEnabled) {
-      notifyAiUnavailable("AI suggestions are disabled. Set VITE_ENABLE_AI=true and configure VITE_AI_SERVER_URL to use them.");
-      return;
-    }
     
     setIsLoading(true);
     setShowDropdown(true);
@@ -112,7 +103,7 @@ export default function useAIHint(editorRef, socketRef, roomId) {
     const afterCursor = code.substring(cm.indexFromPos(cursor));
 
     try {
-      const res = await axios.post(`${aiServerUrl}/api/ai-hints`, {
+      const res = await axios.post(`${serverUrl}/api/ai-hints`, {
         code: code,
         cursor: cm.indexFromPos(cursor),
         beforeCursor: beforeCursor,
@@ -130,7 +121,7 @@ export default function useAIHint(editorRef, socketRef, roomId) {
     } catch {
       setAiHints([]);
       setShowDropdown(false);
-      notifyAiUnavailable("AI hints server is unavailable. Start the AI server and try again.");
+      notifyAiUnavailable("AI hints are unavailable right now. Check the backend and Mistral configuration.");
     } finally {
       setIsLoading(false);
     }
