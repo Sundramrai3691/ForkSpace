@@ -79,6 +79,9 @@ function getLanguageConfig(language) {
 
 function createDefaultProblemState() {
   return {
+    platform: 'custom',
+    problemCode: '',
+    sourceUrl: '',
     title: 'Untitled Practice Problem',
     prompt: '',
     sampleInput: '',

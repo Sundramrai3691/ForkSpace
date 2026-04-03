@@ -4,12 +4,36 @@ import { Link, useLocation, Navigate, useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
 import { useEffect, useState } from 'react';
 
+const PLATFORM_OPTIONS = [
+    { value: 'custom', label: 'Custom' },
+    { value: 'codeforces', label: 'Codeforces' },
+    { value: 'leetcode', label: 'LeetCode' },
+    { value: 'atcoder', label: 'AtCoder' },
+    { value: 'other', label: 'Other' },
+];
+
+function formatProblemTitle(platform, problemCode, currentTitle) {
+    if (currentTitle && currentTitle !== 'Untitled Practice Problem') {
+        return currentTitle;
+    }
+
+    if (!problemCode.trim()) {
+        return currentTitle || 'Untitled Practice Problem';
+    }
+
+    const platformLabel = PLATFORM_OPTIONS.find((option) => option.value === platform)?.label || 'Practice';
+    return `${platformLabel} ${problemCode.trim()}`;
+}
+
 
 
 function Sidebar({ users = [], roomId, roomState, socketRef }) {
     const location = useLocation();
     const navigate = useNavigate();
     const [problemDraft, setProblemDraft] = useState({
+        platform: 'custom',
+        problemCode: '',
+        sourceUrl: '',
         title: '',
         prompt: '',
         sampleInput: '',
@@ -20,6 +44,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
 
     useEffect(() => {
         setProblemDraft({
+            platform: roomState?.problem?.platform || 'custom',
+            problemCode: roomState?.problem?.problemCode || '',
+            sourceUrl: roomState?.problem?.sourceUrl || '',
             title: roomState?.problem?.title || '',
             prompt: roomState?.problem?.prompt || '',
             sampleInput: roomState?.problem?.sampleInput || '',
@@ -72,6 +99,57 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                     </div>
 
                     <div className="space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <label className="space-y-1.5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Platform
+                                </span>
+                                <select
+                                    value={problemDraft.platform}
+                                    onChange={(event) => {
+                                        const nextPlatform = event.target.value;
+                                        setProblemDraft((prev) => ({
+                                            ...prev,
+                                            platform: nextPlatform,
+                                            title: formatProblemTitle(nextPlatform, prev.problemCode, prev.title),
+                                        }));
+                                    }}
+                                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                >
+                                    {PLATFORM_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Problem Code
+                                </span>
+                                <input
+                                    type="text"
+                                    value={problemDraft.problemCode}
+                                    onChange={(event) => {
+                                        const nextProblemCode = event.target.value;
+                                        setProblemDraft((prev) => ({
+                                            ...prev,
+                                            problemCode: nextProblemCode,
+                                            title: formatProblemTitle(prev.platform, nextProblemCode, prev.title),
+                                        }));
+                                    }}
+                                    placeholder="1885A or 1235"
+                                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                />
+                            </label>
+                        </div>
+                        <input
+                            type="url"
+                            value={problemDraft.sourceUrl}
+                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, sourceUrl: event.target.value }))}
+                            placeholder="Problem link (optional)"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        />
                         <input
                             type="text"
                             value={problemDraft.title}
