@@ -542,6 +542,47 @@ function inferTitleFromStatement(statement = '') {
   return firstLine.length > 0 && firstLine.length < 120 ? firstLine : 'Imported Practice Problem';
 }
 
+function deriveProblemMetadataFromUrl(problemUrl = '') {
+  const parsedUrl = new URL(problemUrl.trim());
+  const hostname = parsedUrl.hostname.replace(/^m1\./i, '');
+
+  if (hostname === 'codeforces.com') {
+    const match = parsedUrl.pathname.match(/\/(?:problemset\/problem|contest)\/(\d+)\/(?:problem\/)?([A-Za-z][A-Za-z0-9]*)/i);
+
+    if (!match) {
+      throw new Error('That Codeforces URL does not look like a problem page.');
+    }
+
+    const problemCode = `${match[1]}${match[2].toUpperCase()}`;
+
+    return {
+      platform: 'codeforces',
+      problemCode,
+      problemUrl: parsedUrl.toString(),
+      sourceUrl: parsedUrl.toString(),
+      title: `Codeforces ${problemCode}`,
+    };
+  }
+
+  if (hostname === 'leetcode.com') {
+    const match = parsedUrl.pathname.match(/\/problems\/([a-z0-9-]+)\//i);
+
+    if (!match) {
+      throw new Error('That LeetCode URL does not look like a problem page.');
+    }
+
+    return {
+      platform: 'leetcode',
+      problemCode: match[1],
+      problemUrl: parsedUrl.toString(),
+      sourceUrl: parsedUrl.toString(),
+      title: `LeetCode ${match[1]}`,
+    };
+  }
+
+  throw new Error('URL import currently supports Codeforces and LeetCode only.');
+}
+
 async function importCodeforcesProblem(problemCode, sourceUrl = '') {
   const normalized = normalizeCodeforcesProblemCode(problemCode);
 
@@ -686,37 +727,19 @@ async function importLeetCodeProblem(problemCode, sourceUrl = '') {
 }
 
 async function importProblemFromUrl(problemUrl) {
-  let parsedUrl;
+  let metadata;
 
   try {
-    parsedUrl = new URL(problemUrl.trim());
+    metadata = deriveProblemMetadataFromUrl(problemUrl);
   } catch {
     throw new Error('Enter a valid Codeforces or LeetCode problem URL.');
   }
 
-  const hostname = parsedUrl.hostname.replace(/^m1\./i, '');
-
-  if (hostname === 'codeforces.com') {
-    const match = parsedUrl.pathname.match(/\/(?:problemset\/problem|contest)\/(\d+)\/(?:problem\/)?([A-Za-z][A-Za-z0-9]*)/i);
-
-    if (!match) {
-      throw new Error('That Codeforces URL does not look like a problem page.');
-    }
-
-    return importCodeforcesProblem(`${match[1]}${match[2].toUpperCase()}`, parsedUrl.toString());
+  if (metadata.platform === 'codeforces') {
+    return importCodeforcesProblem(metadata.problemCode, metadata.problemUrl);
   }
 
-  if (hostname === 'leetcode.com') {
-    const match = parsedUrl.pathname.match(/\/problems\/([a-z0-9-]+)\//i);
-
-    if (!match) {
-      throw new Error('That LeetCode URL does not look like a problem page.');
-    }
-
-    return importLeetCodeProblem(match[1], parsedUrl.toString());
-  }
-
-  throw new Error('URL import currently supports Codeforces and LeetCode only.');
+  return importLeetCodeProblem(metadata.problemCode, metadata.problemUrl);
 }
 
 function importProblemFromText(statement = '') {
@@ -898,9 +921,19 @@ app.post('/api/problem-import-url', async (req, res) => {
     const problem = attachNormalizedSamples(await importProblemFromUrl(problemUrl));
     return res.json({ problem });
   } catch (error) {
-    return res.status(502).json({
-      error: error.message || 'Failed to import the problem from URL.',
-    });
+    try {
+      const metadata = attachNormalizedSamples(deriveProblemMetadataFromUrl(req.body?.problemUrl || ''));
+      const warning = error.message || 'Automatic import failed for this URL.';
+
+      return res.json({
+        problem: metadata,
+        warning: `${warning} We saved the platform and problem code. Paste the statement below and use "Parse pasted statement" to extract the examples.`,
+      });
+    } catch {
+      return res.status(400).json({
+        error: error.message || 'Failed to import the problem from URL.',
+      });
+    }
   }
 });
 

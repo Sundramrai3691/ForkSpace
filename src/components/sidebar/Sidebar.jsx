@@ -149,7 +149,13 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                 ...response.data.problem,
             }));
 
-            toast.success('Problem imported from URL');
+            if (response.data.warning) {
+                toast(response.data.warning, {
+                    icon: '!',
+                });
+            } else {
+                toast.success('Problem imported from URL');
+            }
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to import from URL');
         } finally {
