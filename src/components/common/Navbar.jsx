@@ -52,31 +52,24 @@ function Navbar() {
                         <div className="ml-10 flex items-baseline space-x-8">
                             <button 
                                 type="button"
-                                onClick={() => handleScrollToSection('features')}
+                                onClick={() => handleScrollToSection('how-it-works')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
-                                Features
+                                How It Works
                             </button>
                             <button 
                                 type="button"
-                                onClick={() => handleScrollToSection('demo')}
+                                onClick={() => handleScrollToSection('use-cases')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
-                                Live Demo
+                                Use Cases
                             </button>
                             <button 
                                 type="button"
-                                onClick={() => handleScrollToSection('documentation')}
+                                onClick={() => handleScrollToSection('quick-start')}
                                 className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
                             >
-                                Docs
-                            </button>
-                            <button 
-                                type="button"
-                                onClick={() => handleScrollToSection('pricing')}
-                                className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200"
-                            >
-                                Pricing
+                                Quick Start
                             </button>
                         </div>
                     </div>
@@ -150,7 +143,7 @@ function Navbar() {
                             onClick={handleScrollToJoin}
                             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
                         >
-                            Sign In
+                            Join Room
                         </button>
                         <button
                             type="button"
@@ -189,31 +182,24 @@ function Navbar() {
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
                         <button 
                             type="button"
-                            onClick={() => handleScrollToSection('features')}
+                            onClick={() => handleScrollToSection('how-it-works')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
-                            Features
+                            How It Works
                         </button>
                         <button 
                             type="button"
-                            onClick={() => handleScrollToSection('demo')}
+                            onClick={() => handleScrollToSection('use-cases')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
-                            Live Demo
+                            Use Cases
                         </button>
                         <button 
                             type="button"
-                            onClick={() => handleScrollToSection('documentation')}
+                            onClick={() => handleScrollToSection('quick-start')}
                             className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                         >
-                            Documentation
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => handleScrollToSection('pricing')}
-                            className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
-                        >
-                            Pricing
+                            Quick Start
                         </button>
                         
                         {/* Mobile Actions */}
@@ -273,7 +259,7 @@ function Navbar() {
                                     onClick={handleScrollToJoin}
                                     className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                                 >
-                                    Sign In
+                                    Join Room
                                 </button>
                                 <button
                                     type="button"
