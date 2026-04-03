@@ -68,6 +68,8 @@ function Workspace({ socketRef, roomId, roomState }) {
     const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
     const [stdin, setStdin] = useState("");
     const [lastRunMeta, setLastRunMeta] = useState(null);
+    const sampleInput = roomState?.problem?.sampleInput || "";
+    const expectedOutput = roomState?.problem?.sampleOutput || "";
 
 
     useEffect(() => {
@@ -295,11 +297,15 @@ function Workspace({ socketRef, roomId, roomState }) {
 const runCode = async () => {
   const rawCode = editorRef.current.getValue();
   const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
-  const stdinPreview = stdin.trim();
+  const manualStdin = stdin.trim();
+  const fallbackSampleInput = sampleInput.trim();
+  const effectiveStdin = manualStdin.length > 0 ? stdin : sampleInput;
+  const isUsingSampleInput = manualStdin.length === 0 && fallbackSampleInput.length > 0;
 
   setLastRunMeta({
     languageLabel: languageConfig.label,
-    hasStdin: stdinPreview.length > 0,
+    hasStdin: effectiveStdin.trim().length > 0,
+    inputSource: isUsingSampleInput ? "sample" : manualStdin.length > 0 ? "manual" : "none",
     status: "Running",
     time: null,
     memory: null,
@@ -316,7 +322,7 @@ const runCode = async () => {
   try {
     const response = await axios.post(`${serverUrl}/api/run-code`, {
       code: rawCode,
-      stdin,
+      stdin: effectiveStdin,
       languageId: languageConfig.judge0Id,
     });
 
@@ -328,7 +334,8 @@ const runCode = async () => {
 
     setLastRunMeta({
       languageLabel: languageConfig.label,
-      hasStdin: stdinPreview.length > 0,
+      hasStdin: effectiveStdin.trim().length > 0,
+      inputSource: isUsingSampleInput ? "sample" : manualStdin.length > 0 ? "manual" : "none",
       status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
       time: time || "N/A",
       memory: memory || "N/A",
@@ -372,7 +379,8 @@ const runCode = async () => {
   } catch (error) {
     setLastRunMeta({
       languageLabel: languageConfig.label,
-      hasStdin: stdinPreview.length > 0,
+      hasStdin: effectiveStdin.trim().length > 0,
+      inputSource: isUsingSampleInput ? "sample" : manualStdin.length > 0 ? "manual" : "none",
       status: "Request Failed",
       time: null,
       memory: null,
@@ -599,12 +607,29 @@ const runCode = async () => {
                                     stdin: {lastRunMeta?.hasStdin ? "present" : "empty"}
                                 </div>
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    source: {lastRunMeta?.inputSource || "none"}
+                                </div>
+                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                     status: {lastRunMeta?.status || "idle"}
                                 </div>
                             </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                <span>time: {lastRunMeta?.time ?? "not run yet"}</span>
-                                <span>memory: {lastRunMeta?.memory ?? "not run yet"}</span>
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                        Execution Time
+                                    </p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                        {lastRunMeta?.time ?? "Not run yet"}
+                                    </p>
+                                </div>
+                                <div className="rounded-2xl border border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                        Memory
+                                    </p>
+                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                        {lastRunMeta?.memory ?? "Not run yet"}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -628,17 +653,22 @@ const runCode = async () => {
                                 value={stdin}
                                 onChange={(event) => setStdin(event.target.value)}
                                 className="h-24 w-full rounded-xl border border-gray-200 bg-white p-3 text-sm font-mono text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                placeholder="Optional stdin..."
+                                placeholder={sampleInput ? "Leave empty to use the shared sample input automatically..." : "Optional stdin..."}
                             />
+                            {sampleInput && !stdin.trim() && (
+                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    Running now will use the shared sample input automatically.
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4">
-                            {roomState?.problem?.sampleOutput && (
+                            {expectedOutput && (
                                 <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
                                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                                         Expected Output
                                     </p>
-                                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">{roomState.problem.sampleOutput}</pre>
+                                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">{expectedOutput}</pre>
                                 </div>
                             )}
                             {output ? (
