@@ -74,5 +74,27 @@
       "sampleOutput": "",
       "samples": []
     }
+  },
+  "EXWEWT21": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "problem": {
+      "platform": "leetcode",
+      "problemCode": "555",
+      "problemUrl": "https://leetcode.com/problems/split-concatenated-strings/",
+      "sourceUrl": "https://leetcode.com/problems/split-concatenated-strings/",
+      "title": "Split Concatenated Strings",
+      "prompt": "",
+      "pastedStatement": "",
+      "sampleInput": "[\"abc\",\"xyz\"]\n[\"abc\"]",
+      "sampleOutput": "",
+      "samples": [
+        {
+          "id": "sample-1",
+          "input": "[\"abc\",\"xyz\"]\n[\"abc\"]",
+          "output": ""
+        }
+      ]
+    }
   }
 }

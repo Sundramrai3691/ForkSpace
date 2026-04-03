@@ -24,6 +24,7 @@
 .panel-resize {
   overflow: auto;
   resize: horizontal;
+  flex: 0 0 auto;
   min-width: 280px;
   max-width: 48vw;
 }

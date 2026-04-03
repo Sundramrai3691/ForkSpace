@@ -625,8 +625,8 @@ const runSampleSuite = async () => {
 
     return (
         <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gray-900">
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 px-6 py-4">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-700 dark:bg-gray-900/95 dark:supports-[backdrop-filter]:bg-gray-900/60">
+                <div className="flex flex-wrap items-center gap-3">
                     <button
                         className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 border border-gray-800 dark:border-gray-200 shadow-sm h-9 px-4"
                         onClick={runCode}
@@ -672,7 +672,7 @@ const runSampleSuite = async () => {
                     </button>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2">
                         <label htmlFor="language-select" className="text-sm text-gray-600 dark:text-gray-400">
                             Language
@@ -856,7 +856,7 @@ const runSampleSuite = async () => {
                     />
                 </div>
 
-                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left">
+                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left">
                     <div className="flex h-full min-h-[16rem] flex-col">
                         <div className="flex items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/70">
                             <div className="flex gap-1.5">
