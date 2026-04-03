@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types */
+import axios from 'axios';
 import User from '../common/User';
 import { Link, useLocation, Navigate, useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
@@ -30,6 +31,8 @@ function formatProblemTitle(platform, problemCode, currentTitle) {
 function Sidebar({ users = [], roomId, roomState, socketRef }) {
     const location = useLocation();
     const navigate = useNavigate();
+    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const [isImporting, setIsImporting] = useState(false);
     const [problemDraft, setProblemDraft] = useState({
         platform: 'custom',
         problemCode: '',
@@ -83,6 +86,34 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
 
     const handleGoHome = () => {
         navigate('/');
+    };
+
+    const handleImportProblem = async () => {
+        if (!problemDraft.problemCode.trim()) {
+            toast.error('Add a platform problem code first.');
+            return;
+        }
+
+        setIsImporting(true);
+
+        try {
+            const response = await axios.post(`${serverUrl}/api/problem-import`, {
+                platform: problemDraft.platform,
+                problemCode: problemDraft.problemCode,
+                sourceUrl: problemDraft.sourceUrl,
+            });
+
+            setProblemDraft((prev) => ({
+                ...prev,
+                ...response.data.problem,
+            }));
+
+            toast.success('Problem details imported');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to import the problem');
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     return (
@@ -143,6 +174,14 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                                 />
                             </label>
                         </div>
+                        <button
+                            type="button"
+                            onClick={handleImportProblem}
+                            disabled={isImporting || !problemDraft.problemCode.trim()}
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                        >
+                            {isImporting ? 'Importing problem...' : 'Import problem details'}
+                        </button>
                         <input
                             type="url"
                             value={problemDraft.sourceUrl}

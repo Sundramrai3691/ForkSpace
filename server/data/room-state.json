@@ -27,14 +27,14 @@
   },
   "QANNGTK6": {
     "language": "cpp",
-    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "code": "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        unordered_map<int,int> mpp;\n        int n = nums.size();\n        vector<int> ans;\n        for(int i = 0;i<n;i++) mpp[nums[i]] = i;\n\n        for(int i = 0;i<n;i++){\n            int diff = (target-nums[i]);\n            if(mpp.count(diff)){\n                cout<<2<<endl;\n                if(mpp[diff] != i){\n                    ans = {mpp[diff],i};\n                break;\n                }\n            }\n            \n        }\n        return ans;\n    }\n};",
     "problem": {
-      "platform": "codeforces",
-      "problemCode": "",
+      "platform": "leetcode",
+      "problemCode": "1",
       "sourceUrl": "https://leetcode.com/problems/two-sum/",
-      "title": "LeetCode 1",
-      "prompt": "",
-      "sampleInput": "",
+      "title": "Two Sum",
+      "prompt": "Given an array of integers  nums  and an integer  target , return  indices of the two numbers such that they add up to  target  .\n\n You may assume that each input would have   exactly  one solution , and you may not use the  same  element twice.\n\n You can return the answer in any order.\n\n  Example 1:\n\n Input:  nums = [2,7,11,15], target = 9\n Output:  [0,1]\n Explanation:  Because nums[0] + nums[1] == 9, we return [0, 1].\n\n  Example 2:\n\n Input:  nums = [3,2,4], target = 6\n Output:  [1,2]\n\n  Example 3:\n\n Input:  nums = [3,3], target = 6\n Output:  [0,1]\n\n  Constraints:\n\n\t-  2 <= nums.length <= 10 4\n\n\t-  -10 9  <= nums[i] <= 10 9\n\n\t-  -10 9  <= target <= 10 9\n\n\t-  Only one valid answer exists.\n\n Follow-up:  Can you come up with an algorithm that is less than  O(n 2 )    time complexity?",
+      "sampleInput": "[2,7,11,15]\n9\n[3,2,4]\n6\n[3,3]\n6",
       "sampleOutput": ""
     }
   }

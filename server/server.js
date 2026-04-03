@@ -260,6 +260,184 @@ function buildFallbackHints(code = '', beforeCursor = '', afterCursor = '') {
   return [...new Set(suggestions)].slice(0, 5);
 }
 
+function decodeHtmlEntities(value = '') {
+  const entityMap = {
+    '&lt;': '<',
+    '&gt;': '>',
+    '&amp;': '&',
+    '&quot;': '"',
+    '&#39;': '\'',
+    '&nbsp;': ' ',
+  };
+
+  return value
+    .replace(/&(lt|gt|amp|quot|#39|nbsp);/g, (match) => entityMap[match] || match)
+    .replace(/&#(\d+);/g, (_match, codePoint) => String.fromCharCode(Number(codePoint)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, codePoint) => String.fromCharCode(parseInt(codePoint, 16)));
+}
+
+function stripHtml(value = '') {
+  return decodeHtmlEntities(
+    value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|section|article|li|ul|ol|pre|h1|h2|h3|h4|h5|h6|tr|td)>/gi, '\n')
+      .replace(/<li>/gi, '- ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\r/g, '')
+  )
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function extractPreformattedText(value = '') {
+  return decodeHtmlEntities(
+    value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<div>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\r/g, '')
+  )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeCodeforcesProblemCode(problemCode = '') {
+  const normalized = problemCode.replace(/\s+/g, '').replace(/[-_/]/g, '');
+  const match = normalized.match(/^(\d+)([A-Za-z][A-Za-z0-9]*)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    contestId: match[1],
+    index: match[2].toUpperCase(),
+  };
+}
+
+function extractLeetCodeExampleOutputs(content = '') {
+  const textContent = stripHtml(content);
+  const outputMatches = [...textContent.matchAll(/Output:\s*([\s\S]*?)(?=\n(?:Explanation|Example \d+:|Constraints:|Follow-up:|$))/g)];
+
+  return outputMatches
+    .map((match) => match[1].trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+async function importCodeforcesProblem(problemCode, sourceUrl = '') {
+  const normalized = normalizeCodeforcesProblemCode(problemCode);
+
+  if (!normalized) {
+    throw new Error('Use a Codeforces code like 1885A or 1941B.');
+  }
+
+  const nextSourceUrl = sourceUrl || `https://codeforces.com/problemset/problem/${normalized.contestId}/${normalized.index}`;
+  const response = await axios.get(nextSourceUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 ForkSpace Problem Importer',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+
+  const html = response.data;
+  const titleMatch = html.match(/<div class="title">([\s\S]*?)<\/div>/i);
+  const promptMatch = html.match(/<div class="problem-statement">[\s\S]*?<div class="header">[\s\S]*?<\/div>([\s\S]*?)<div class="sample-test">/i);
+  const sampleMatches = [...html.matchAll(/<div class="input">[\s\S]*?<pre>([\s\S]*?)<\/pre>[\s\S]*?<div class="output">[\s\S]*?<pre>([\s\S]*?)<\/pre>/gi)];
+
+  return {
+    platform: 'codeforces',
+    problemCode: `${normalized.contestId}${normalized.index}`,
+    sourceUrl: nextSourceUrl,
+    title: stripHtml(titleMatch?.[1] || '') || `Codeforces ${normalized.contestId}${normalized.index}`,
+    prompt: stripHtml(promptMatch?.[1] || ''),
+    sampleInput: sampleMatches.map((match) => extractPreformattedText(match[1])).filter(Boolean).join('\n\n'),
+    sampleOutput: sampleMatches.map((match) => extractPreformattedText(match[2])).filter(Boolean).join('\n\n'),
+  };
+}
+
+async function resolveLeetCodeSlug(problemCode = '') {
+  const trimmed = problemCode.trim();
+
+  if (!trimmed) {
+    throw new Error('Add a LeetCode problem id like 1235 or a slug like two-sum.');
+  }
+
+  if (/^[a-z0-9-]+$/i.test(trimmed) && /[a-z]/i.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error('Use a numeric LeetCode id like 1235 or a problem slug.');
+  }
+
+  const response = await axios.get('https://leetcode.com/api/problems/all/', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 ForkSpace Problem Importer',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+
+  const matchingProblem = response.data?.stat_status_pairs?.find((item) => {
+    const frontendId = String(item?.stat?.frontend_question_id || '');
+    const questionId = String(item?.stat?.question_id || '');
+    return frontendId === trimmed || questionId === trimmed;
+  });
+
+  if (!matchingProblem?.stat?.question__title_slug) {
+    throw new Error(`LeetCode problem ${trimmed} was not found.`);
+  }
+
+  return matchingProblem.stat.question__title_slug;
+}
+
+async function importLeetCodeProblem(problemCode, sourceUrl = '') {
+  const slug = await resolveLeetCodeSlug(problemCode);
+  const nextSourceUrl = sourceUrl || `https://leetcode.com/problems/${slug}/`;
+  const response = await axios.post(
+    'https://leetcode.com/graphql/',
+    {
+      query: `
+        query problemImport($titleSlug: String!) {
+          question(titleSlug: $titleSlug) {
+            title
+            content
+            exampleTestcases
+          }
+        }
+      `,
+      variables: {
+        titleSlug: slug,
+      },
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Referer: nextSourceUrl,
+        'User-Agent': 'Mozilla/5.0 ForkSpace Problem Importer',
+      },
+    }
+  );
+
+  const question = response.data?.data?.question;
+
+  if (!question) {
+    throw new Error('Failed to fetch the LeetCode problem details.');
+  }
+
+  return {
+    platform: 'leetcode',
+    problemCode: problemCode.trim(),
+    sourceUrl: nextSourceUrl,
+    title: question.title || `LeetCode ${problemCode.trim()}`,
+    prompt: stripHtml(question.content || ''),
+    sampleInput: (question.exampleTestcases || '').replace(/\r/g, '').trim(),
+    sampleOutput: extractLeetCodeExampleOutputs(question.content || ''),
+  };
+}
+
 app.post('/api/ai-hint', aiLimiter, async (req, res) => {
   try {
     const { prompt, suffix } = req.body;
@@ -377,6 +555,34 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
       error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hints',
       hints: buildFallbackHints(req.body?.code, req.body?.beforeCursor, req.body?.afterCursor),
       source: 'fallback',
+    });
+  }
+});
+
+app.post('/api/problem-import', async (req, res) => {
+  try {
+    const { platform = 'custom', problemCode = '', sourceUrl = '' } = req.body || {};
+
+    if (!problemCode.trim()) {
+      return res.status(400).json({ error: 'Add a problem code before importing.' });
+    }
+
+    let importedProblem = null;
+
+    if (platform === 'codeforces') {
+      importedProblem = await importCodeforcesProblem(problemCode, sourceUrl);
+    } else if (platform === 'leetcode') {
+      importedProblem = await importLeetCodeProblem(problemCode, sourceUrl);
+    } else {
+      return res.status(400).json({
+        error: 'Automatic import is supported for Codeforces and LeetCode right now.',
+      });
+    }
+
+    return res.json({ problem: importedProblem });
+  } catch (error) {
+    return res.status(502).json({
+      error: error.message || 'Failed to import the problem details.',
     });
   }
 });
