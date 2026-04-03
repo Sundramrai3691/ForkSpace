@@ -8,6 +8,8 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { Buffer } from 'buffer';
 import cors from 'cors';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import path from 'path';
 
 loadEnv({ path: new URL('./.env', import.meta.url) });
 
@@ -67,9 +69,66 @@ const SUPPORTED_LANGUAGES = {
 
 const DEFAULT_LANGUAGE = 'cpp';
 const roomStateMap = new Map();
+const dataDirectory = path.join(process.cwd(), 'server', 'data');
+const roomStateFile = path.join(dataDirectory, 'room-state.json');
+let persistTimer = null;
 
 function getLanguageConfig(language) {
   return SUPPORTED_LANGUAGES[language] || SUPPORTED_LANGUAGES[DEFAULT_LANGUAGE];
+}
+
+async function loadPersistedRoomStates() {
+  try {
+    await mkdir(dataDirectory, { recursive: true });
+    const fileContent = await readFile(roomStateFile, 'utf8');
+    const parsed = JSON.parse(fileContent);
+
+    Object.entries(parsed).forEach(([roomId, roomState]) => {
+      const nextLanguage = SUPPORTED_LANGUAGES[roomState?.language] ? roomState.language : DEFAULT_LANGUAGE;
+      const defaultConfig = getLanguageConfig(nextLanguage);
+
+      roomStateMap.set(roomId, {
+        language: nextLanguage,
+        code: typeof roomState?.code === 'string' ? roomState.code : defaultConfig.starterCode,
+      });
+    });
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Failed to load room state persistence:', error.message);
+    }
+  }
+}
+
+async function persistRoomStates() {
+  await mkdir(dataDirectory, { recursive: true });
+  const serializableState = Object.fromEntries(roomStateMap.entries());
+  await writeFile(roomStateFile, JSON.stringify(serializableState, null, 2), 'utf8');
+}
+
+function scheduleRoomStatePersist() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+  }
+
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistRoomStates().catch((error) => {
+      console.error('Failed to persist room state:', error.message);
+    });
+  }, 250);
+}
+
+async function flushRoomStatePersist() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+
+  try {
+    await persistRoomStates();
+  } catch (error) {
+    console.error('Failed to flush room state persistence:', error.message);
+  }
 }
 
 function getOrCreateRoomState(roomId) {
@@ -79,6 +138,7 @@ function getOrCreateRoomState(roomId) {
       language: DEFAULT_LANGUAGE,
       code: defaultConfig.starterCode,
     });
+    scheduleRoomStatePersist();
   }
 
   return roomStateMap.get(roomId);
@@ -330,6 +390,7 @@ io.on('connection', (socket) => {
 socket.on('code-change', ({roomId, code}) => {
   const roomState = getOrCreateRoomState(roomId);
   roomState.code = code;
+  scheduleRoomStatePersist();
   socket.in(roomId).emit('code-change', { code });
 });
 
@@ -338,6 +399,7 @@ socket.on('language-change', ({ roomId, language }) => {
   const nextLanguage = SUPPORTED_LANGUAGES[language] ? language : DEFAULT_LANGUAGE;
 
   roomState.language = nextLanguage;
+  scheduleRoomStatePersist();
 
   io.to(roomId).emit('language-change', {
     language: nextLanguage,
@@ -359,6 +421,18 @@ socket.on('language-change', ({ roomId, language }) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+await loadPersistedRoomStates();
+
+process.on('SIGINT', async () => {
+  await flushRoomStatePersist();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await flushRoomStatePersist();
+  process.exit(0);
+});
 
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
