@@ -15,6 +15,32 @@ import "codemirror/addon/edit/closebrackets";
 import useAIHint from "./AIHint";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
 
+function OutputSection({ tone, title, children }) {
+    const toneClasses = {
+        success: "border-green-200 bg-green-50 text-green-900 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-100",
+        error: "border-red-200 bg-red-50 text-red-900 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-100",
+        warning: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100",
+        info: "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-100",
+    };
+
+    const dotClasses = {
+        success: "bg-green-500",
+        error: "bg-red-500",
+        warning: "bg-amber-500",
+        info: "bg-blue-500",
+    };
+
+    return (
+        <div className={`rounded-lg border p-4 ${toneClasses[tone]}`}>
+            <div className="mb-2 flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${dotClasses[tone]}`}></div>
+                <span className="font-medium">{title}</span>
+            </div>
+            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{children}</pre>
+        </div>
+    );
+}
+
 function Workspace({ socketRef, roomId, roomState }) {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const editorRef = useRef(null);
@@ -40,6 +66,7 @@ function Workspace({ socketRef, roomId, roomState }) {
     const [showSettings, setShowSettings] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
     const [stdin, setStdin] = useState("");
+    const [lastRunMeta, setLastRunMeta] = useState(null);
 
 
     useEffect(() => {
@@ -248,7 +275,15 @@ function Workspace({ socketRef, roomId, roomState }) {
 const runCode = async () => {
   const rawCode = editorRef.current.getValue();
   const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
+  const stdinPreview = stdin.trim();
 
+  setLastRunMeta({
+    languageLabel: languageConfig.label,
+    hasStdin: stdinPreview.length > 0,
+    status: "Running",
+    time: null,
+    memory: null,
+  });
   setOutput(
     <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
       <div className="flex items-center gap-3">
@@ -266,79 +301,62 @@ const runCode = async () => {
     });
 
     const { stdout, stderr, compile_output, message, time, memory } = response.data;
+    const hasCompileError = Boolean(compile_output);
+    const hasRuntimeError = Boolean(stderr);
+    const hasOutput = Boolean(stdout);
+    const hasSystemMessage = Boolean(message);
+
+    setLastRunMeta({
+      languageLabel: languageConfig.label,
+      hasStdin: stdinPreview.length > 0,
+      status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
+      time: time || "N/A",
+      memory: memory || "N/A",
+    });
 
     const finalOutput = (
       <div className="space-y-4 text-sm">
-        {stdout && (
-          <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-green-700 dark:text-green-400 font-medium">Output</span>
-            </div>
-            <pre className="text-green-900 dark:text-green-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{stdout}</pre>
-          </div>
+        {compile_output && (
+          <OutputSection tone="warning" title="Compilation Error">
+            {compile_output}
+          </OutputSection>
         )}
 
         {stderr && (
-          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              <span className="text-red-700 dark:text-red-400 font-medium">Runtime Error</span>
-            </div>
-            <pre className="text-red-900 dark:text-red-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{stderr}</pre>
-          </div>
+          <OutputSection tone="error" title="Runtime Error">
+            {stderr}
+          </OutputSection>
         )}
 
-        {compile_output && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-              <span className="text-amber-700 dark:text-amber-400 font-medium">Compilation Error</span>
-            </div>
-            <pre className="text-amber-900 dark:text-amber-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{compile_output}</pre>
-          </div>
+        {stdout && (
+          <OutputSection tone="success" title="Program Output">
+            {stdout}
+          </OutputSection>
         )}
 
         {message && (
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              <span className="text-blue-700 dark:text-blue-400 font-medium">System Message</span>
-            </div>
-            <pre className="text-blue-900 dark:text-blue-100 whitespace-pre-wrap font-mono text-sm leading-relaxed">{message}</pre>
-          </div>
+          <OutputSection tone="info" title="System Message">
+            {message}
+          </OutputSection>
         )}
 
-        <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 rounded-full bg-slate-500"></div>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">Execution Summary</span>
+        {!hasCompileError && !hasRuntimeError && !hasOutput && !hasSystemMessage && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-700 dark:border-slate-700/50 dark:bg-slate-900/50 dark:text-slate-300">
+            The program finished without compiler messages or stdout output.
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12,6 12,12 16,14"/>
-              </svg>
-              <span className="text-slate-600 dark:text-slate-400">
-                <span className="font-medium text-slate-800 dark:text-slate-200">{time || "N/A"}s</span> execution time
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              </svg>
-              <span className="text-slate-600 dark:text-slate-400">
-                <span className="font-medium text-slate-800 dark:text-slate-200">{memory || "N/A"} KB</span> memory used
-              </span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     );
 
     setOutput(finalOutput);
   } catch (error) {
+    setLastRunMeta({
+      languageLabel: languageConfig.label,
+      hasStdin: stdinPreview.length > 0,
+      status: "Request Failed",
+      time: null,
+      memory: null,
+    });
     setOutput(
       <div className="dark:text-red-200 p-4 text-red-800">
         <p>Error running code: {error.response?.data?.error || error.message}</p>
@@ -539,6 +557,24 @@ const runCode = async () => {
                                 <div className="h-3 w-3 rounded-full bg-green-500"></div>
                             </div>
                             <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400">Output</span>
+                        </div>
+
+                        <div className="border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
+                                </div>
+                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    stdin: {lastRunMeta?.hasStdin ? "present" : "empty"}
+                                </div>
+                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    status: {lastRunMeta?.status || "idle"}
+                                </div>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                                <span>time: {lastRunMeta?.time ?? "not run yet"}</span>
+                                <span>memory: {lastRunMeta?.memory ?? "not run yet"}</span>
+                            </div>
                         </div>
 
                         <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
