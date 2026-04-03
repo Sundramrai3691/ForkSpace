@@ -61,7 +61,7 @@ function FormComp() {
                             Welcome to ForkSpace
                         </h1>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Join or create a coding session
+                            Start a mock interview or DSA mentoring room
                         </p>
                     </div>
 
@@ -71,14 +71,14 @@ function FormComp() {
                                 htmlFor="roomId"
                                 className="block text-sm font-medium text-black dark:text-gray-300"
                             >
-                                Room ID
+                                Practice Room ID
                             </label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     id="roomId"
                                     ref={roomIdRef}
-                                    placeholder="Enter room ID"
+                                    placeholder="Enter practice room ID"
                                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-gray-100"
                                     required
                                 />
@@ -95,14 +95,14 @@ function FormComp() {
                                 htmlFor="username"
                                 className="block text-sm font-medium text-black dark:text-gray-300"
                             >
-                                Username
+                                Display Name
                             </label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     id="username"
                                     ref={usernameRef}
-                                    placeholder="Enter your username"
+                                    placeholder="Enter your name"
                                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-gray-100"
                                     required
                                 />
@@ -119,7 +119,7 @@ function FormComp() {
                                 type="submit"
                                 className="w-full rounded-xl bg-black px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:bg-gray-800 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200 dark:focus:ring-gray-100 dark:focus:ring-offset-gray-800"
                             >
-                                Join Session
+                                Join Practice Room
                             </button>
 
                             <div className="relative">
@@ -142,7 +142,7 @@ function FormComp() {
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                     </svg>
-                                    <span>Generate Room ID</span>
+                                    <span>Generate Practice Room</span>
                                 </div>
                             </button>
                         </div>

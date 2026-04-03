@@ -1,0 +1,10 @@
+{
+  "BAAPUYRX": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n"
+  },
+  "E8ASP8V7": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n"
+  }
+}

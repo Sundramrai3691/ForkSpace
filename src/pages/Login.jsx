@@ -3,38 +3,38 @@ import Navbar from '../components/common/Navbar';
 
 const capabilityCards = [
     {
-        title: 'Shared Editor',
-        description: 'Everyone in the room sees the same code updates in real time with no extra setup.',
+        title: 'Live Practice Editor',
+        description: 'Mentor and learner stay in the same code view, so explanations and edits happen in real time.',
     },
     {
-        title: 'Code Execution',
-        description: 'Run C++ code from the workspace and inspect output without leaving the session.',
+        title: 'DSA Run-and-Check Flow',
+        description: 'Run C++, Python, or JavaScript solutions during practice and inspect the result immediately.',
     },
     {
-        title: 'Room Presence',
-        description: 'Track who is in the room, share the room ID quickly, and keep collaboration focused.',
+        title: 'Room-Based Mentoring',
+        description: 'Share one room code, keep the session focused, and avoid the friction of screen sharing.',
     },
 ];
 
 const useCases = [
     {
-        title: 'Technical Interviews',
-        description: 'Interviewers and candidates can join a room quickly and solve the same problem together.',
+        title: 'Mock Interviews',
+        description: 'Practice DSA rounds with interviewer and candidate in the same room without setup overhead.',
     },
     {
-        title: 'Pair Debugging',
-        description: 'Use a shared room when reproducing a bug or explaining a fix to another developer.',
+        title: '1:1 DSA Mentoring',
+        description: 'Walk through patterns, edge cases, and optimizations live while the learner edits alongside you.',
     },
     {
-        title: 'Teaching Sessions',
-        description: 'Share code live while walking students or teammates through syntax, logic, and output.',
+        title: 'Revision Sessions',
+        description: 'Revisit solved problems, compare approaches, and quickly rerun examples before interviews.',
     },
 ];
 
 const quickStartSteps = [
-    'Create or paste a room ID and enter your username.',
-    'Join the room and share the room ID with the other participant.',
-    'Code together, run the solution, and use room actions to copy or leave the session.',
+    'Create or paste a practice room ID and enter your name.',
+    'Share the room code with your mentor, interviewer, or learner.',
+    'Solve the problem together, run the solution, and iterate on feedback in the same room.',
 ];
 
 function Login() {
@@ -47,15 +47,15 @@ function Login() {
                     <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
                         <div className="space-y-8">
                             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                                Realtime coding rooms for interviews, debugging, and teaching
+                                Realtime rooms for interview practice, DSA mentoring, and revision
                             </div>
 
                             <div className="space-y-5">
                                 <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl">
-                                    A practical collaborative coding room, not a fake SaaS shell.
+                                    Practice interviews and teach DSA live in one shared coding room.
                                 </h1>
                                 <p className="max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                                    ForkSpace helps developers open a room fast, code together live, and run solutions without forcing them through extra product noise.
+                                    ForkSpace helps mentors, interviewers, and learners open a room quickly, solve problems together, and run code without screen sharing or extra setup.
                                 </p>
                             </div>
 
@@ -64,7 +64,7 @@ function Login() {
                                     href="#join-session"
                                     className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
                                 >
-                                    Join or Create a Room
+                                    Start a Practice Room
                                 </a>
                                 <a
                                     href="#quick-start"
@@ -76,16 +76,16 @@ function Login() {
 
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-2xl font-bold">Realtime</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Shared typing and room presence.</p>
+                                    <p className="text-2xl font-bold">Practice</p>
+                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Live interviewer and candidate workflow.</p>
                                 </div>
                                 <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-2xl font-bold">C++ Ready</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Compile and inspect results inside the room.</p>
+                                    <p className="text-2xl font-bold">Mentor</p>
+                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Explain patterns while editing together.</p>
                                 </div>
                                 <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-2xl font-bold">Focused</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">No extra dashboards or fake account flow.</p>
+                                    <p className="text-2xl font-bold">Run</p>
+                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Compile and inspect solutions on the spot.</p>
                                 </div>
                             </div>
                         </div>
@@ -100,9 +100,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">How It Works</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Keep the product promise tight and useful.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">Designed around the interview-practice loop.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                ForkSpace works best when it stays focused on the workflow it already supports well: join a room, code together, and run the solution.
+                                ForkSpace works best when it stays focused on one workflow: open a room, discuss the problem, code together, and run the solution immediately.
                             </p>
                         </div>
 
@@ -121,9 +121,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Use Cases</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Built around developer situations that happen often.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">Built for interview preparation and guided problem solving.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                Instead of broad product claims, the landing page should anchor the tool in real sessions developers already have.
+                                Instead of trying to be a full IDE, the product stays useful by centering on sessions where one person teaches, evaluates, or practices with another.
                             </p>
                         </div>
 
@@ -142,9 +142,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Quick Start</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Three steps, no fake onboarding.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">Three steps to start a mock round or mentoring session.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                This keeps the page grounded in the actual workflow and helps first-time users get into a room quickly.
+                                This keeps the product grounded in the actual practice flow and helps first-time users get into a room quickly.
                             </p>
                         </div>
 

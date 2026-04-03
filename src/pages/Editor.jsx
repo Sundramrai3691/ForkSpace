@@ -101,9 +101,9 @@ function Editor() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V6.75a3.75 3.75 0 117.5 0V9m-8.25 0h8.5A2.25 2.25 0 0118.25 11.25v6.5A2.25 2.25 0 0116 20H8a2.25 2.25 0 01-2.25-2.25v-6.5A2.25 2.25 0 018 9z" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Connecting to your room</h1>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Connecting to your practice room</h1>
               <p className="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-400">
-                The editor will appear as soon as the realtime server on port 5000 responds. Keep `npm run dev:server` running and this page will reconnect automatically.
+                The interview workspace will appear as soon as the realtime server on port 5000 responds. Keep `npm run dev:server` running and this page will reconnect automatically.
               </p>
             </div>
           </div>

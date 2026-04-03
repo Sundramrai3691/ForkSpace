@@ -156,6 +156,88 @@ function extractAiText(responseData) {
   );
 }
 
+function inferLanguageFromCode(code = '') {
+  if (code.includes('#include') || code.includes('using namespace std') || code.includes('int main(')) {
+    return 'cpp';
+  }
+
+  if (code.includes('def ') || code.includes('print(') || code.includes('__name__')) {
+    return 'python';
+  }
+
+  if (code.includes('function ') || code.includes('console.log') || code.includes('const ') || code.includes('let ')) {
+    return 'javascript';
+  }
+
+  return DEFAULT_LANGUAGE;
+}
+
+function buildFallbackHint(prompt = '', suffix = '') {
+  const combined = `${prompt}\n${suffix}`;
+  const language = inferLanguageFromCode(combined);
+
+  if (language === 'cpp') {
+    if (prompt.includes('int main(') && !prompt.includes('return 0;') && suffix.includes('}')) {
+      return '\n    return 0;';
+    }
+
+    if (prompt.trim().endsWith('cout << "Hello, ForkSpace!"')) {
+      return ' << endl;';
+    }
+  }
+
+  if (language === 'javascript') {
+    if (prompt.trim().endsWith('console.log("Hello, ForkSpace!")')) {
+      return ';';
+    }
+
+    if (prompt.includes('function main()') && !prompt.includes('main();')) {
+      return '\n\nmain();';
+    }
+  }
+
+  if (language === 'python') {
+    if (prompt.trim().endsWith('if __name__ == "__main__":')) {
+      return '\n    main()';
+    }
+  }
+
+  return '';
+}
+
+function buildFallbackHints(code = '', beforeCursor = '', afterCursor = '') {
+  const language = inferLanguageFromCode(code || `${beforeCursor}\n${afterCursor}`);
+  const suggestions = [];
+
+  if (language === 'cpp') {
+    if (!code.includes('return 0;') && code.includes('int main(')) {
+      suggestions.push('Add `return 0;` before the closing brace of `main` to make the program exit explicitly.');
+    }
+    if (!code.includes('#include <bits/stdc++.h>') && !code.includes('#include <iostream>')) {
+      suggestions.push('Add the required include directives before using `cout`, containers, or algorithms.');
+    }
+    suggestions.push('For competitive programming, keep input/output fast and move the core logic into a helper function for easier debugging.');
+  }
+
+  if (language === 'javascript') {
+    if (!code.includes('main();') && code.includes('function main()')) {
+      suggestions.push('Call `main();` after defining the function so the program actually runs.');
+    }
+    suggestions.push('Prefer small functions for parsing input, solving the task, and printing output separately.');
+  }
+
+  if (language === 'python') {
+    if (!code.includes('if __name__ == "__main__":')) {
+      suggestions.push('Add an `if __name__ == "__main__":` guard to keep the entry point clear.');
+    }
+    suggestions.push('Keep parsing, solving, and printing in separate functions so the solution is easier to test.');
+  }
+
+  suggestions.push('Test one edge case and one normal case after every small change to catch regressions early.');
+
+  return [...new Set(suggestions)].slice(0, 5);
+}
+
 app.post('/api/ai-hint', aiLimiter, async (req, res) => {
   try {
     const { prompt, suffix } = req.body;
@@ -165,7 +247,7 @@ app.post('/api/ai-hint', aiLimiter, async (req, res) => {
     }
 
     if (!process.env.MISTRAL_API_KEY) {
-      return res.status(503).json({ error: 'AI service is not configured' });
+      return res.json({ hint: buildFallbackHint(prompt, suffix), source: 'fallback' });
     }
 
     const response = await axios.post(
@@ -188,10 +270,11 @@ app.post('/api/ai-hint', aiLimiter, async (req, res) => {
     );
 
     const hint = extractAiText(response.data);
-    return res.json({ hint });
+    return res.json({ hint: hint || buildFallbackHint(prompt, suffix), source: hint ? 'mistral' : 'fallback' });
   } catch (error) {
     return res.json({
-      hint: '',
+      hint: buildFallbackHint(req.body?.prompt, req.body?.suffix),
+      source: 'fallback',
       error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hint',
     });
   }
@@ -206,7 +289,10 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
     }
 
     if (!process.env.MISTRAL_API_KEY) {
-      return res.status(503).json({ error: 'AI service is not configured', hints: [] });
+      return res.json({
+        hints: buildFallbackHints(code, beforeCursor, afterCursor),
+        source: 'fallback',
+      });
     }
 
     const suggestions = [];
@@ -258,11 +344,17 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
       suggestions.push(hint.trim());
     }
 
-    return res.json({ hints: [...new Set(suggestions)].slice(0, 5) });
+    const uniqueSuggestions = [...new Set(suggestions)].slice(0, 5);
+
+    return res.json({
+      hints: uniqueSuggestions.length > 0 ? uniqueSuggestions : buildFallbackHints(code, beforeCursor, afterCursor),
+      source: uniqueSuggestions.length > 0 ? 'mistral' : 'fallback',
+    });
   } catch (error) {
     return res.json({
       error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hints',
-      hints: [],
+      hints: buildFallbackHints(req.body?.code, req.body?.beforeCursor, req.body?.afterCursor),
+      source: 'fallback',
     });
   }
 });

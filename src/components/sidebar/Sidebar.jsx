@@ -32,7 +32,7 @@ function Sidebar({ users = [], roomId }) {
                 <div className="space-y-3 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-                            Participants
+                            Room Members
                         </h2>
                         <div className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-1">
                             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
@@ -48,7 +48,7 @@ function Sidebar({ users = [], roomId }) {
                             <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
                                 <div className="w-3 h-3 rounded-full bg-gray-400 dark:bg-gray-600 animate-pulse"></div>
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Loading participants...</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Loading room members...</p>
                         </div>
                     ) : (
                         <div className="space-y-1">
@@ -69,8 +69,8 @@ function Sidebar({ users = [], roomId }) {
                     <button
                         onClick={handleCopyRoomId}
                         className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                        aria-label="Copy room ID"
-                        title="Copy room ID"
+                        aria-label="Copy practice room ID"
+                        title="Copy practice room ID"
                     >
                         <svg className="h-4 w-4 text-gray-700 dark:text-gray-300 group-hover:text-black dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
                             <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
@@ -82,8 +82,8 @@ function Sidebar({ users = [], roomId }) {
                     <button
                         onClick={handleGoHome}
                         className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                        aria-label="Go to dashboard"
-                        title="Dashboard"
+                        aria-label="Go to home"
+                        title="Home"
                     >
                         <svg className="h-4 w-4 text-gray-700 dark:text-gray-300 group-hover:text-black dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>

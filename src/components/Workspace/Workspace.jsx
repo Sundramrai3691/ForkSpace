@@ -14,6 +14,7 @@ import "codemirror/addon/edit/closetag";
 import "codemirror/addon/edit/closebrackets";
 import useAIHint from "./AIHint";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
+import { formatCode } from "./formatCode";
 
 function OutputSection({ tone, title, children }) {
     const toneClasses = {
@@ -246,6 +247,19 @@ function Workspace({ socketRef, roomId, roomState }) {
       syncCodeToRoom(nextCode);
     };
 
+    const handleFormatCode = () => {
+      const currentCode = editorRef.current?.getValue() ?? "";
+      const formattedCode = formatCode(selectedLanguage, currentCode);
+
+      if (formattedCode !== currentCode) {
+        editorRef.current?.setValue(formattedCode);
+        syncCodeToRoom(formattedCode);
+        toast.success("Code formatted");
+      } else {
+        toast("Code is already formatted enough for the current formatter.");
+      }
+    };
+
     const handleLanguageChange = (event) => {
       const nextLanguage = event.target.value;
       const nextLanguageConfig = LANGUAGE_OPTIONS[nextLanguage];
@@ -392,6 +406,17 @@ const runCode = async () => {
                         </svg>
                         Clear
                     </button>
+                    <button
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm h-9 px-4"
+                        onClick={handleFormatCode}
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 7h10" />
+                            <path d="M4 12h16" />
+                            <path d="M4 17h12" />
+                        </svg>
+                        Format
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -414,11 +439,11 @@ const runCode = async () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Live Session</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Practice Session</span>
                     </div>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Room:</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Practice Room:</span>
                         <code className="relative rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {roomId}
                         </code>
@@ -426,8 +451,8 @@ const runCode = async () => {
                             <button
                                 onClick={() => setShowSettings((current) => !current)}
                                 className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
-                                aria-label="Room settings"
-                                title="Room settings"
+                                aria-label="Practice room settings"
+                                title="Practice room settings"
                             >
                                 <svg className="h-4 w-4 text-gray-600 dark:text-gray-400 group-hover:text-gray-800 dark:group-hover:text-gray-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
                                     <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/>
@@ -438,7 +463,7 @@ const runCode = async () => {
                             {showSettings && (
                                 <div className="absolute right-0 top-10 z-20 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                                     <div className="px-3 py-2">
-                                        <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Room</p>
+                                        <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Practice Room</p>
                                         <p className="font-mono text-sm text-gray-900 dark:text-white">{roomId}</p>
                                     </div>
                                     <button
@@ -451,13 +476,13 @@ const runCode = async () => {
                                         onClick={handleGoHome}
                                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                     >
-                                        Go to home
+                                        Back to home
                                     </button>
                                     <button
                                         onClick={handleLeaveRoom}
                                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
                                     >
-                                        Leave room
+                                        Leave practice room
                                     </button>
                                 </div>
                             )}
@@ -466,8 +491,8 @@ const runCode = async () => {
                             <button 
                                 onClick={fetchAIHints}
                                 className="ai-button inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border border-orange-400 hover:border-orange-500 transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-105 text-sm font-medium"
-                                aria-label="AI Assistant"
-                                title="AI Assistant - Get coding suggestions"
+                                aria-label="AI Practice Coach"
+                                title="AI Practice Coach - Get interview-oriented suggestions"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
                                     <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423L16.5 15.75l.394 1.183a2.25 2.25 0 001.423 1.423L19.5 18.75l-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
@@ -480,7 +505,7 @@ const runCode = async () => {
                                 <div className="ai-dropdown fixed top-20 right-6 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[9999]">
                                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-sm font-medium text-gray-900 dark:text-white">AI Suggestions</h3>
+                                            <h3 className="text-sm font-medium text-gray-900 dark:text-white">AI Practice Suggestions</h3>
                                             <button
                                                 onClick={closeDropdown}
                                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -525,8 +550,8 @@ const runCode = async () => {
                                             </div>
                                         ) : (
                                             <div className="p-4 text-center">
-                                                <div className="text-gray-500 dark:text-gray-400 text-sm">
-                                                    No suggestions available
+                                                    <div className="text-gray-500 dark:text-gray-400 text-sm">
+                                                    No suggestions available right now
                                                 </div>
                                             </div>
                                         )}

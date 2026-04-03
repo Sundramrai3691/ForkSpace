@@ -42,7 +42,7 @@ function Navbar() {
                                 ForkSpace
                             </h1>
                             <span className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
-                                Real-time coding platform
+                                Interview practice and DSA mentoring rooms
                             </span>
                         </div>
                     </div>
@@ -143,7 +143,7 @@ function Navbar() {
                             onClick={handleScrollToJoin}
                             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
                         >
-                            Join Room
+                            Start Practice
                         </button>
                         <button
                             type="button"
@@ -259,7 +259,7 @@ function Navbar() {
                                     onClick={handleScrollToJoin}
                                     className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200"
                                 >
-                                    Join Room
+                                    Start Practice
                                 </button>
                                 <button
                                     type="button"
