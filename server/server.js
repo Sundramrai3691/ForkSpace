@@ -81,11 +81,14 @@ function createDefaultProblemState() {
   return {
     platform: 'custom',
     problemCode: '',
+    problemUrl: '',
     sourceUrl: '',
     title: 'Untitled Practice Problem',
     prompt: '',
+    pastedStatement: '',
     sampleInput: '',
     sampleOutput: '',
+    samples: [],
   };
 }
 
@@ -112,10 +115,7 @@ async function loadPersistedRoomStates() {
       roomStateMap.set(roomId, {
         language: nextLanguage,
         code: typeof roomState?.code === 'string' ? roomState.code : defaultConfig.starterCode,
-        problem: {
-          ...createDefaultProblemState(),
-          ...(roomState?.problem || {}),
-        },
+        problem: attachNormalizedSamples(roomState?.problem || {}),
       });
     });
   } catch (error) {
@@ -303,6 +303,59 @@ function extractPreformattedText(value = '') {
     .trim();
 }
 
+function normalizeWhitespace(value = '') {
+  return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+}
+
+function normalizeForComparison(value = '') {
+  return normalizeWhitespace(value)
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+$/g, ''))
+    .join('\n')
+    .trim();
+}
+
+function buildSamplesFromJoinedText(sampleInput = '', sampleOutput = '') {
+  const inputs = normalizeWhitespace(sampleInput)
+    .split(/\n\s*\n/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const outputs = normalizeWhitespace(sampleOutput)
+    .split(/\n\s*\n/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const length = Math.max(inputs.length, outputs.length);
+
+  return Array.from({ length }, (_, index) => ({
+    id: `sample-${index + 1}`,
+    input: inputs[index] || '',
+    output: outputs[index] || '',
+  })).filter((sample) => sample.input || sample.output);
+}
+
+function attachNormalizedSamples(problem = {}) {
+  const normalizedProblem = {
+    ...createDefaultProblemState(),
+    ...problem,
+  };
+  const samples = Array.isArray(problem?.samples) && problem.samples.length > 0
+    ? problem.samples.map((sample, index) => ({
+      id: sample.id || `sample-${index + 1}`,
+      input: normalizeWhitespace(sample.input || ''),
+      output: normalizeWhitespace(sample.output || ''),
+    })).filter((sample) => sample.input || sample.output)
+    : buildSamplesFromJoinedText(normalizedProblem.sampleInput, normalizedProblem.sampleOutput);
+
+  return {
+    ...normalizedProblem,
+    problemUrl: normalizedProblem.problemUrl || normalizedProblem.sourceUrl || '',
+    pastedStatement: normalizedProblem.pastedStatement || '',
+    sampleInput: normalizeWhitespace(normalizedProblem.sampleInput),
+    sampleOutput: normalizeWhitespace(normalizedProblem.sampleOutput),
+    samples,
+  };
+}
+
 function normalizeCodeforcesProblemCode(problemCode = '') {
   const normalized = problemCode.replace(/\s+/g, '').replace(/[-_/]/g, '');
   const match = normalized.match(/^(\d+)([A-Za-z][A-Za-z0-9]*)$/);
@@ -315,6 +368,34 @@ function normalizeCodeforcesProblemCode(problemCode = '') {
     contestId: match[1],
     index: match[2].toUpperCase(),
   };
+}
+
+function buildCodeforcesCandidateUrls(normalizedProblem, sourceUrl = '') {
+  const urls = [];
+
+  if (sourceUrl?.trim()) {
+    try {
+      const parsedUrl = new URL(sourceUrl.trim());
+      const normalizedHost = parsedUrl.hostname.replace(/^m1\./i, '');
+      const sourceMatch = parsedUrl.pathname.match(/\/(?:problemset\/problem|contest)\/(\d+)\/(?:problem\/)?([A-Za-z][A-Za-z0-9]*)/i);
+
+      if (
+        normalizedHost === 'codeforces.com' &&
+        sourceMatch?.[1] === normalizedProblem.contestId &&
+        sourceMatch?.[2]?.toUpperCase() === normalizedProblem.index
+      ) {
+        parsedUrl.hostname = 'codeforces.com';
+        urls.push(parsedUrl.toString());
+      }
+    } catch {
+      // Ignore malformed source URLs and fall back to canonical Codeforces pages.
+    }
+  }
+
+  urls.push(`https://codeforces.com/problemset/problem/${normalizedProblem.contestId}/${normalizedProblem.index}`);
+  urls.push(`https://codeforces.com/contest/${normalizedProblem.contestId}/problem/${normalizedProblem.index}`);
+
+  return [...new Set(urls)];
 }
 
 function extractLeetCodeExampleOutputs(content = '') {
@@ -360,6 +441,107 @@ function extractCodeforcesSamples(html = '') {
   };
 }
 
+function extractCodeforcesSamplesFromText(html = '') {
+  const text = stripHtml(html);
+  const normalizedText = text.replace(/\n[ \t]+/g, '\n').trim();
+  const pairs = [];
+  const examplesAnchor = normalizedText.search(/(?:^|\n)(?:Examples?|Sample(?:s| Test)?)\s*\n/i);
+  const scanText = examplesAnchor >= 0 ? normalizedText.slice(examplesAnchor) : normalizedText;
+  const lines = scanText.split('\n').map((line) => line.trimEnd());
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^Input$/i.test(lines[index].trim())) {
+      continue;
+    }
+
+    const inputLines = [];
+    const outputLines = [];
+    let cursor = index + 1;
+
+    while (cursor < lines.length && !/^Output$/i.test(lines[cursor].trim())) {
+      inputLines.push(lines[cursor]);
+      cursor += 1;
+    }
+
+    if (cursor >= lines.length) {
+      break;
+    }
+
+    cursor += 1;
+
+    while (
+      cursor < lines.length &&
+      !/^Input$/i.test(lines[cursor].trim()) &&
+      !/^(Note|Notes|Scoring|Tutorial|Explanation|Codeforces)$/i.test(lines[cursor].trim())
+    ) {
+      outputLines.push(lines[cursor]);
+      cursor += 1;
+    }
+
+    pairs.push({
+      input: inputLines.join('\n').trim(),
+      output: outputLines.join('\n').trim(),
+    });
+
+    index = cursor - 1;
+  }
+
+  return {
+    sampleInput: pairs.map((pair) => pair.input).filter(Boolean).join('\n\n'),
+    sampleOutput: pairs.map((pair) => pair.output).filter(Boolean).join('\n\n'),
+  };
+}
+
+function parseExamplesFromText(statement = '') {
+  const lines = normalizeWhitespace(statement).split('\n');
+  const samples = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^Input:?$/i.test(lines[index].trim())) {
+      continue;
+    }
+
+    const inputLines = [];
+    const outputLines = [];
+    let cursor = index + 1;
+
+    while (cursor < lines.length && !/^Output:?$/i.test(lines[cursor].trim())) {
+      inputLines.push(lines[cursor]);
+      cursor += 1;
+    }
+
+    if (cursor >= lines.length) {
+      break;
+    }
+
+    cursor += 1;
+
+    while (
+      cursor < lines.length &&
+      !/^Input:?$/i.test(lines[cursor].trim()) &&
+      !/^(Explanation|Note|Notes|Constraints|Follow-up|Scoring|Tutorial):?$/i.test(lines[cursor].trim())
+    ) {
+      outputLines.push(lines[cursor]);
+      cursor += 1;
+    }
+
+    samples.push({
+      id: `sample-${samples.length + 1}`,
+      input: normalizeWhitespace(inputLines.join('\n')),
+      output: normalizeWhitespace(outputLines.join('\n')),
+    });
+
+    index = cursor - 1;
+  }
+
+  return samples.filter((sample) => sample.input || sample.output);
+}
+
+function inferTitleFromStatement(statement = '') {
+  const [firstLine = 'Imported Practice Problem'] = normalizeWhitespace(statement).split('\n');
+  return firstLine.length > 0 && firstLine.length < 120 ? firstLine : 'Imported Practice Problem';
+}
+
 async function importCodeforcesProblem(problemCode, sourceUrl = '') {
   const normalized = normalizeCodeforcesProblemCode(problemCode);
 
@@ -367,32 +549,58 @@ async function importCodeforcesProblem(problemCode, sourceUrl = '') {
     throw new Error('Use a Codeforces code like 1885A or 1941B.');
   }
 
-  const nextSourceUrl = sourceUrl || `https://codeforces.com/problemset/problem/${normalized.contestId}/${normalized.index}`;
-  const response = await axios.get(nextSourceUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 ForkSpace Problem Importer',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-  });
+  const candidateUrls = buildCodeforcesCandidateUrls(normalized, sourceUrl);
+  let lastErrorMessage = 'Codeforces import failed.';
 
-  const html = response.data;
-  const titleMatch = html.match(/<div class="title">([\s\S]*?)<\/div>/i) || html.match(/<title>[\s\S]*?-\s*([^<]+?)\s*-\s*Codeforces<\/title>/i);
-  const prompt = extractCodeforcesPrompt(html);
-  const { sampleInput, sampleOutput } = extractCodeforcesSamples(html);
+  for (const candidateUrl of candidateUrls) {
+    try {
+      const response = await axios.get(candidateUrl, {
+        timeout: 12000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 ForkSpace Problem Importer',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
 
-  if (!sampleInput && !sampleOutput) {
-    throw new Error('Codeforces samples could not be extracted from this page yet.');
+      const html = response.data;
+      if (/Please wait\. Your browser is being checked/i.test(html)) {
+        lastErrorMessage = `Codeforces temporarily blocked automated access for ${candidateUrl}.`;
+        continue;
+      }
+      const titleMatch = html.match(/<div class="title">([\s\S]*?)<\/div>/i) || html.match(/<title>[\s\S]*?-\s*([^<]+?)\s*-\s*Codeforces<\/title>/i);
+      const prompt = extractCodeforcesPrompt(html);
+      const htmlSamples = extractCodeforcesSamples(html);
+      const textSamples = (!htmlSamples.sampleInput && !htmlSamples.sampleOutput)
+        ? extractCodeforcesSamplesFromText(html)
+        : { sampleInput: '', sampleOutput: '' };
+      const sampleInput = htmlSamples.sampleInput || textSamples.sampleInput;
+      const sampleOutput = htmlSamples.sampleOutput || textSamples.sampleOutput;
+
+      if (!sampleInput && !sampleOutput) {
+        lastErrorMessage = `Fetched ${candidateUrl} but could not extract sample tests.`;
+        continue;
+      }
+
+      return {
+        platform: 'codeforces',
+        problemCode: `${normalized.contestId}${normalized.index}`,
+        problemUrl: candidateUrl,
+        sourceUrl: candidateUrl,
+        title: stripHtml(titleMatch?.[1] || '') || `Codeforces ${normalized.contestId}${normalized.index}`,
+        prompt,
+        sampleInput,
+        sampleOutput,
+        samples: buildSamplesFromJoinedText(sampleInput, sampleOutput),
+      };
+    } catch (error) {
+      const upstreamStatus = error.response?.status;
+      lastErrorMessage = upstreamStatus
+        ? `Codeforces responded with status ${upstreamStatus} for ${candidateUrl}.`
+        : `Could not reach ${candidateUrl}.`;
+    }
   }
 
-  return {
-    platform: 'codeforces',
-    problemCode: `${normalized.contestId}${normalized.index}`,
-    sourceUrl: nextSourceUrl,
-    title: stripHtml(titleMatch?.[1] || '') || `Codeforces ${normalized.contestId}${normalized.index}`,
-    prompt,
-    sampleInput,
-    sampleOutput,
-  };
+  throw new Error(lastErrorMessage);
 }
 
 async function resolveLeetCodeSlug(problemCode = '') {
@@ -467,12 +675,67 @@ async function importLeetCodeProblem(problemCode, sourceUrl = '') {
   return {
     platform: 'leetcode',
     problemCode: problemCode.trim(),
+    problemUrl: nextSourceUrl,
     sourceUrl: nextSourceUrl,
     title: question.title || `LeetCode ${problemCode.trim()}`,
     prompt: stripHtml(question.content || ''),
     sampleInput: (question.exampleTestcases || '').replace(/\r/g, '').trim(),
     sampleOutput: extractLeetCodeExampleOutputs(question.content || ''),
+    samples: buildSamplesFromJoinedText(question.exampleTestcases || '', extractLeetCodeExampleOutputs(question.content || '')),
   };
+}
+
+async function importProblemFromUrl(problemUrl) {
+  let parsedUrl;
+
+  try {
+    parsedUrl = new URL(problemUrl.trim());
+  } catch {
+    throw new Error('Enter a valid Codeforces or LeetCode problem URL.');
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^m1\./i, '');
+
+  if (hostname === 'codeforces.com') {
+    const match = parsedUrl.pathname.match(/\/(?:problemset\/problem|contest)\/(\d+)\/(?:problem\/)?([A-Za-z][A-Za-z0-9]*)/i);
+
+    if (!match) {
+      throw new Error('That Codeforces URL does not look like a problem page.');
+    }
+
+    return importCodeforcesProblem(`${match[1]}${match[2].toUpperCase()}`, parsedUrl.toString());
+  }
+
+  if (hostname === 'leetcode.com') {
+    const match = parsedUrl.pathname.match(/\/problems\/([a-z0-9-]+)\//i);
+
+    if (!match) {
+      throw new Error('That LeetCode URL does not look like a problem page.');
+    }
+
+    return importLeetCodeProblem(match[1], parsedUrl.toString());
+  }
+
+  throw new Error('URL import currently supports Codeforces and LeetCode only.');
+}
+
+function importProblemFromText(statement = '') {
+  const normalizedStatement = normalizeWhitespace(statement);
+
+  if (!normalizedStatement) {
+    throw new Error('Paste a problem statement before parsing.');
+  }
+
+  const samples = parseExamplesFromText(normalizedStatement);
+
+  return attachNormalizedSamples({
+    title: inferTitleFromStatement(normalizedStatement),
+    prompt: normalizedStatement,
+    pastedStatement: normalizedStatement,
+    sampleInput: samples.map((sample) => sample.input).join('\n\n'),
+    sampleOutput: samples.map((sample) => sample.output).join('\n\n'),
+    samples,
+  });
 }
 
 app.post('/api/ai-hint', aiLimiter, async (req, res) => {
@@ -624,6 +887,36 @@ app.post('/api/problem-import', async (req, res) => {
   }
 });
 
+app.post('/api/problem-import-url', async (req, res) => {
+  try {
+    const { problemUrl = '' } = req.body || {};
+
+    if (!problemUrl.trim()) {
+      return res.status(400).json({ error: 'Add a problem URL before importing.' });
+    }
+
+    const problem = attachNormalizedSamples(await importProblemFromUrl(problemUrl));
+    return res.json({ problem });
+  } catch (error) {
+    return res.status(502).json({
+      error: error.message || 'Failed to import the problem from URL.',
+    });
+  }
+});
+
+app.post('/api/problem-import-text', async (req, res) => {
+  try {
+    const { statement = '' } = req.body || {};
+    const problem = importProblemFromText(statement);
+
+    return res.json({ problem });
+  } catch (error) {
+    return res.status(400).json({
+      error: error.message || 'Failed to parse the pasted statement.',
+    });
+  }
+});
+
 function encodeBase64Utf8(value) {
   return Buffer.from(value, 'utf8').toString('base64');
 }
@@ -632,22 +925,7 @@ function decodeBase64Utf8(value) {
   return Buffer.from(value, 'base64').toString('utf8');
 }
 
-app.post('/api/run-code', async (req, res) => {
-  const { code, stdin = '', languageId = getLanguageConfig(DEFAULT_LANGUAGE).id } = req.body;
-  const supportedLanguageIds = new Set(Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id));
-
-  if (!code) {
-    return res.status(400).json({ error: 'Missing code' });
-  }
-
-  if (!supportedLanguageIds.has(languageId)) {
-    return res.status(400).json({ error: 'Unsupported language' });
-  }
-
-  if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
-    return res.status(503).json({ error: 'Judge0 is not configured' });
-  }
-
+async function executeSubmission({ code, stdin = '', languageId = getLanguageConfig(DEFAULT_LANGUAGE).id }) {
   const createOptions = (useBase64 = false) => ({
     method: 'POST',
     url: `${process.env.JUDGE0_API_URL}/submissions`,
@@ -668,36 +946,122 @@ app.post('/api/run-code', async (req, res) => {
     },
   });
 
+  let response;
+
   try {
-    let response;
+    response = await axios.request(createOptions(false));
+  } catch (error) {
+    const apiError = error.response?.data?.error;
+    const shouldRetryWithBase64 =
+      typeof apiError === 'string' && apiError.includes('use base64_encoded=true');
 
-    try {
-      response = await axios.request(createOptions(false));
-    } catch (error) {
-      const apiError = error.response?.data?.error;
-      const shouldRetryWithBase64 =
-        typeof apiError === 'string' && apiError.includes('use base64_encoded=true');
-
-      if (!shouldRetryWithBase64) {
-        throw error;
-      }
-
-      response = await axios.request(createOptions(true));
+    if (!shouldRetryWithBase64) {
+      throw error;
     }
 
-    const usedBase64 = response.config?.params?.base64_encoded === 'true';
-    const payload = response.data;
+    response = await axios.request(createOptions(true));
+  }
 
-    return res.json({
-      ...payload,
-      stdout: usedBase64 && payload.stdout ? decodeBase64Utf8(payload.stdout) : payload.stdout,
-      stderr: usedBase64 && payload.stderr ? decodeBase64Utf8(payload.stderr) : payload.stderr,
-      compile_output: usedBase64 && payload.compile_output ? decodeBase64Utf8(payload.compile_output) : payload.compile_output,
-      message: usedBase64 && payload.message ? decodeBase64Utf8(payload.message) : payload.message,
-    });
+  const usedBase64 = response.config?.params?.base64_encoded === 'true';
+  const payload = response.data;
+
+  return {
+    ...payload,
+    stdout: usedBase64 && payload.stdout ? decodeBase64Utf8(payload.stdout) : payload.stdout,
+    stderr: usedBase64 && payload.stderr ? decodeBase64Utf8(payload.stderr) : payload.stderr,
+    compile_output: usedBase64 && payload.compile_output ? decodeBase64Utf8(payload.compile_output) : payload.compile_output,
+    message: usedBase64 && payload.message ? decodeBase64Utf8(payload.message) : payload.message,
+  };
+}
+
+app.post('/api/run-code', async (req, res) => {
+  const { code, stdin = '', languageId = getLanguageConfig(DEFAULT_LANGUAGE).id } = req.body;
+  const supportedLanguageIds = new Set(Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id));
+
+  if (!code) {
+    return res.status(400).json({ error: 'Missing code' });
+  }
+
+  if (!supportedLanguageIds.has(languageId)) {
+    return res.status(400).json({ error: 'Unsupported language' });
+  }
+
+  if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
+    return res.status(503).json({ error: 'Judge0 is not configured' });
+  }
+
+  try {
+    return res.json(await executeSubmission({ code, stdin, languageId }));
   } catch (error) {
     return res.status(error.response?.status || 500).json({
       error: error.response?.data?.error || error.response?.data?.message || 'Error running code',
+    });
+  }
+});
+
+app.post('/api/run-sample-suite', async (req, res) => {
+  const { code, languageId = getLanguageConfig(DEFAULT_LANGUAGE).id, samples = [] } = req.body || {};
+  const supportedLanguageIds = new Set(Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id));
+
+  if (!code) {
+    return res.status(400).json({ error: 'Missing code' });
+  }
+
+  if (!supportedLanguageIds.has(languageId)) {
+    return res.status(400).json({ error: 'Unsupported language' });
+  }
+
+  if (!Array.isArray(samples) || samples.length === 0) {
+    return res.status(400).json({ error: 'No sample tests are available for this problem yet.' });
+  }
+
+  if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
+    return res.status(503).json({ error: 'Judge0 is not configured' });
+  }
+
+  try {
+    const results = [];
+
+    for (const [index, sample] of samples.entries()) {
+      const execution = await executeSubmission({
+        code,
+        stdin: sample.input || '',
+        languageId,
+      });
+
+      results.push({
+        id: sample.id || `sample-${index + 1}`,
+        index: index + 1,
+        input: sample.input || '',
+        expectedOutput: sample.output || '',
+        actualOutput: execution.stdout || '',
+        passed:
+          !execution.compile_output &&
+          !execution.stderr &&
+          normalizeForComparison(execution.stdout || '') === normalizeForComparison(sample.output || ''),
+        time: execution.time || null,
+        memory: execution.memory || null,
+        compile_output: execution.compile_output || '',
+        stderr: execution.stderr || '',
+        message: execution.message || '',
+      });
+
+      if (execution.compile_output) {
+        break;
+      }
+    }
+
+    return res.json({
+      results,
+      summary: {
+        total: results.length,
+        passed: results.filter((result) => result.passed).length,
+        failed: results.filter((result) => !result.passed).length,
+      },
+    });
+  } catch (error) {
+    return res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error || error.response?.data?.message || 'Error running the sample suite',
     });
   }
 });
@@ -770,11 +1134,10 @@ socket.on('language-change', ({ roomId, language }) => {
 
 socket.on('problem-update', ({ roomId, problem }) => {
   const roomState = getOrCreateRoomState(roomId);
-  roomState.problem = {
-    ...createDefaultProblemState(),
+  roomState.problem = attachNormalizedSamples({
     ...roomState.problem,
     ...(problem || {}),
-  };
+  });
   scheduleRoomStatePersist();
 
   io.to(roomId).emit('problem-update', {

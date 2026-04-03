@@ -26,6 +26,15 @@ function formatProblemTitle(platform, problemCode, currentTitle) {
     return `${platformLabel} ${problemCode.trim()}`;
 }
 
+function shouldResetImportedSource(sourceUrl = '') {
+    try {
+        const parsedUrl = new URL(sourceUrl);
+        return ['codeforces.com', 'm1.codeforces.com', 'leetcode.com'].includes(parsedUrl.hostname);
+    } catch {
+        return false;
+    }
+}
+
 
 
 function Sidebar({ users = [], roomId, roomState, socketRef }) {
@@ -36,11 +45,14 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
     const [problemDraft, setProblemDraft] = useState({
         platform: 'custom',
         problemCode: '',
+        problemUrl: '',
         sourceUrl: '',
         title: '',
         prompt: '',
+        pastedStatement: '',
         sampleInput: '',
         sampleOutput: '',
+        samples: [],
     });
 
     const hasJoinState = Boolean(location.state);
@@ -49,11 +61,14 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
         setProblemDraft({
             platform: roomState?.problem?.platform || 'custom',
             problemCode: roomState?.problem?.problemCode || '',
+            problemUrl: roomState?.problem?.problemUrl || '',
             sourceUrl: roomState?.problem?.sourceUrl || '',
             title: roomState?.problem?.title || '',
             prompt: roomState?.problem?.prompt || '',
+            pastedStatement: roomState?.problem?.pastedStatement || '',
             sampleInput: roomState?.problem?.sampleInput || '',
             sampleOutput: roomState?.problem?.sampleOutput || '',
+            samples: roomState?.problem?.samples || [],
         });
     }, [roomState?.problem]);
 
@@ -116,6 +131,62 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
         }
     };
 
+    const handleImportProblemUrl = async () => {
+        if (!problemDraft.problemUrl.trim()) {
+            toast.error('Add a problem URL first.');
+            return;
+        }
+
+        setIsImporting(true);
+
+        try {
+            const response = await axios.post(`${serverUrl}/api/problem-import-url`, {
+                problemUrl: problemDraft.problemUrl,
+            });
+
+            setProblemDraft((prev) => ({
+                ...prev,
+                ...response.data.problem,
+            }));
+
+            toast.success('Problem imported from URL');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to import from URL');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    const handleParseStatement = async () => {
+        if (!problemDraft.pastedStatement.trim()) {
+            toast.error('Paste a problem statement first.');
+            return;
+        }
+
+        setIsImporting(true);
+
+        try {
+            const response = await axios.post(`${serverUrl}/api/problem-import-text`, {
+                statement: problemDraft.pastedStatement,
+            });
+
+            setProblemDraft((prev) => ({
+                ...prev,
+                ...response.data.problem,
+                platform: prev.platform,
+                problemCode: prev.problemCode,
+                problemUrl: prev.problemUrl,
+                sourceUrl: prev.sourceUrl,
+            }));
+
+            toast.success('Examples parsed from statement');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to parse the pasted statement');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     return (
         <div className="flex h-full w-full flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
             <div className="flex flex-col space-y-4 p-6 flex-1 min-h-0">
@@ -130,6 +201,26 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                     </div>
 
                     <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                Problem URL
+                            </span>
+                            <input
+                                type="url"
+                                value={problemDraft.problemUrl}
+                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
+                                placeholder="https://codeforces.com/problemset/problem/1/A"
+                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleImportProblemUrl}
+                            disabled={isImporting || !problemDraft.problemUrl.trim()}
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                        >
+                            {isImporting ? 'Importing...' : 'Import from URL'}
+                        </button>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <label className="space-y-1.5">
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
@@ -142,6 +233,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                                         setProblemDraft((prev) => ({
                                             ...prev,
                                             platform: nextPlatform,
+                                            sourceUrl: shouldResetImportedSource(prev.sourceUrl) ? '' : prev.sourceUrl,
                                             title: formatProblemTitle(nextPlatform, prev.problemCode, prev.title),
                                         }));
                                     }}
@@ -161,11 +253,15 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                                 <input
                                     type="text"
                                     value={problemDraft.problemCode}
+                                    maxLength={16}
+                                    autoComplete="off"
+                                    spellCheck={false}
                                     onChange={(event) => {
                                         const nextProblemCode = event.target.value;
                                         setProblemDraft((prev) => ({
                                             ...prev,
                                             problemCode: nextProblemCode,
+                                            sourceUrl: shouldResetImportedSource(prev.sourceUrl) ? '' : prev.sourceUrl,
                                             title: formatProblemTitle(prev.platform, nextProblemCode, prev.title),
                                         }));
                                     }}
@@ -189,6 +285,20 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                             placeholder="Problem link (optional)"
                             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         />
+                        <textarea
+                            value={problemDraft.pastedStatement}
+                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, pastedStatement: event.target.value }))}
+                            placeholder="Paste a problem statement here if URL import fails. We will parse Input / Output examples into shared sample tests."
+                            className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleParseStatement}
+                            disabled={isImporting || !problemDraft.pastedStatement.trim()}
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                        >
+                            {isImporting ? 'Parsing statement...' : 'Parse pasted statement'}
+                        </button>
                         <input
                             type="text"
                             value={problemDraft.title}
@@ -216,6 +326,16 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                                 className="h-20 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                             />
                         </div>
+                        {problemDraft.samples?.length > 0 && (
+                            <div className="rounded-xl border border-dashed border-gray-300 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Parsed Samples
+                                </p>
+                                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                                    {problemDraft.samples.length} sample {problemDraft.samples.length === 1 ? 'test' : 'tests'} ready for suite runs.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 

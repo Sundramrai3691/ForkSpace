@@ -46,6 +46,15 @@ function normalizeOutput(value = "") {
     return value.replace(/\r\n/g, "\n").trim();
 }
 
+function normalizeForComparison(value = "") {
+    return value
+        .replace(/\r\n/g, "\n")
+        .split("\n")
+        .map((line) => line.replace(/[ \t]+$/g, ""))
+        .join("\n")
+        .trim();
+}
+
 function Workspace({ socketRef, roomId, roomState }) {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const editorRef = useRef(null);
@@ -72,8 +81,10 @@ function Workspace({ socketRef, roomId, roomState }) {
     const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
     const [stdin, setStdin] = useState("");
     const [lastRunMeta, setLastRunMeta] = useState(null);
+    const [sampleSuiteMeta, setSampleSuiteMeta] = useState(null);
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
+    const roomSamples = Array.isArray(roomState?.problem?.samples) ? roomState.problem.samples : [];
 
 
     useEffect(() => {
@@ -425,6 +436,135 @@ const runCode = async () => {
   }
 };
 
+const runSampleSuite = async () => {
+  const rawCode = editorRef.current.getValue();
+  const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
+
+  if (roomSamples.length === 0) {
+    toast.error("No parsed samples are available yet. Import a URL or parse a pasted statement first.");
+    return;
+  }
+
+  setSampleSuiteMeta({
+    status: "Running",
+    total: roomSamples.length,
+    passed: 0,
+    failed: 0,
+  });
+  setOutput(
+    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-blue-700 dark:text-blue-400 font-medium">Running sample suite...</span>
+      </div>
+    </div>
+  );
+
+  try {
+    const response = await axios.post(`${serverUrl}/api/run-sample-suite`, {
+      code: rawCode,
+      languageId: languageConfig.judge0Id,
+      samples: roomSamples,
+    });
+
+    const { results = [], summary } = response.data;
+
+    setSampleSuiteMeta({
+      status: summary.failed > 0 ? "Completed with failures" : "Passed all samples",
+      total: summary.total,
+      passed: summary.passed,
+      failed: summary.failed,
+    });
+
+    setOutput(
+      <div className="space-y-4 text-sm">
+        <OutputSection tone={summary.failed > 0 ? "warning" : "success"} title="Sample Suite Summary">
+          {summary.passed} of {summary.total} sample tests passed.
+        </OutputSection>
+
+        {results.map((result) => {
+          const comparisonMatched =
+            !result.compile_output &&
+            !result.stderr &&
+            normalizeForComparison(result.actualOutput || "") === normalizeForComparison(result.expectedOutput || "");
+
+          return (
+            <div
+              key={result.id}
+              className={`rounded-xl border p-4 ${
+                result.passed
+                  ? "border-green-200 bg-green-50 dark:border-green-800/50 dark:bg-green-950/20"
+                  : "border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-950/20"
+              }`}
+            >
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-gray-900 dark:text-white">Sample {result.index}</span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                    result.passed
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-200"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200"
+                  }`}
+                >
+                  {result.passed ? "Passed" : "Failed"}
+                </span>
+                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                  time: {result.time || "N/A"}
+                </span>
+                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                  memory: {result.memory || "N/A"}
+                </span>
+              </div>
+
+              {result.compile_output && (
+                <OutputSection tone="warning" title="Compilation Error">
+                  {result.compile_output}
+                </OutputSection>
+              )}
+
+              {result.stderr && (
+                <OutputSection tone="error" title="Runtime Error">
+                  {result.stderr}
+                </OutputSection>
+              )}
+
+              {!result.compile_output && !result.stderr && (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <OutputSection tone="info" title="Expected Output">
+                    {result.expectedOutput || "(empty)"}
+                  </OutputSection>
+                  <OutputSection tone={comparisonMatched ? "success" : "error"} title="Actual Output">
+                    {result.actualOutput || "(empty)"}
+                  </OutputSection>
+                </div>
+              )}
+
+              {result.message && (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+                  {result.message}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  } catch (error) {
+    setSampleSuiteMeta({
+      status: "Request Failed",
+      total: roomSamples.length,
+      passed: 0,
+      failed: roomSamples.length,
+    });
+    setOutput(
+      <div className="dark:text-red-200 p-4 text-red-800">
+        <p>Error running sample suite: {error.response?.data?.error || error.message}</p>
+      </div>
+    );
+    toast.error("Sample suite failed to run.");
+  }
+};
+
     return (
         <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60 px-6 py-4">
@@ -437,6 +577,16 @@ const runCode = async () => {
                             <polygon points="5,3 19,12 5,21"/>
                         </svg>
                         Run
+                    </button>
+                    <button
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm h-9 px-4"
+                        onClick={runSampleSuite}
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>
+                        Run samples
                     </button>
                     <button
                         className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm h-9 px-4"
@@ -660,6 +810,11 @@ const runCode = async () => {
                                                     ? "not checked"
                                                     : "n/a"}
                                 </div>
+                                {sampleSuiteMeta && (
+                                    <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                        suite: {sampleSuiteMeta.passed}/{sampleSuiteMeta.total}
+                                    </div>
+                                )}
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-3">
                                 <div className="rounded-2xl border border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900">
