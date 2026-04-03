@@ -42,6 +42,10 @@ function OutputSection({ tone, title, children }) {
     );
 }
 
+function normalizeOutput(value = "") {
+    return value.replace(/\r\n/g, "\n").trim();
+}
+
 function Workspace({ socketRef, roomId, roomState }) {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const editorRef = useRef(null);
@@ -301,6 +305,7 @@ const runCode = async () => {
   const fallbackSampleInput = sampleInput.trim();
   const effectiveStdin = manualStdin.length > 0 ? stdin : sampleInput;
   const isUsingSampleInput = manualStdin.length === 0 && fallbackSampleInput.length > 0;
+  const normalizedExpectedOutput = normalizeOutput(expectedOutput);
 
   setLastRunMeta({
     languageLabel: languageConfig.label,
@@ -309,6 +314,7 @@ const runCode = async () => {
     status: "Running",
     time: null,
     memory: null,
+    sampleCheck: normalizedExpectedOutput ? "pending" : "not_available",
   });
   setOutput(
     <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
@@ -327,10 +333,21 @@ const runCode = async () => {
     });
 
     const { stdout, stderr, compile_output, message, time, memory } = response.data;
+    const normalizedStdout = normalizeOutput(stdout || "");
     const hasCompileError = Boolean(compile_output);
     const hasRuntimeError = Boolean(stderr);
     const hasOutput = Boolean(stdout);
     const hasSystemMessage = Boolean(message);
+    const sampleMatched =
+      normalizedExpectedOutput &&
+      !hasCompileError &&
+      !hasRuntimeError &&
+      normalizedStdout === normalizedExpectedOutput;
+    const sampleMismatched =
+      normalizedExpectedOutput &&
+      !hasCompileError &&
+      !hasRuntimeError &&
+      normalizedStdout !== normalizedExpectedOutput;
 
     setLastRunMeta({
       languageLabel: languageConfig.label,
@@ -339,10 +356,23 @@ const runCode = async () => {
       status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
       time: time || "N/A",
       memory: memory || "N/A",
+      sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
     });
 
     const finalOutput = (
       <div className="space-y-4 text-sm">
+        {sampleMatched && (
+          <OutputSection tone="success" title="Passed Sample">
+            Actual output matches the expected output for the shared sample test case.
+          </OutputSection>
+        )}
+
+        {sampleMismatched && (
+          <OutputSection tone="error" title="Mismatch">
+            Actual output does not match the expected output for the shared sample test case.
+          </OutputSection>
+        )}
+
         {compile_output && (
           <OutputSection tone="warning" title="Compilation Error">
             {compile_output}
@@ -384,6 +414,7 @@ const runCode = async () => {
       status: "Request Failed",
       time: null,
       memory: null,
+      sampleCheck: normalizedExpectedOutput ? "not_checked" : "not_available",
     });
     setOutput(
       <div className="dark:text-red-200 p-4 text-red-800">
@@ -611,6 +642,23 @@ const runCode = async () => {
                                 </div>
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                     status: {lastRunMeta?.status || "idle"}
+                                </div>
+                                <div className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                                    lastRunMeta?.sampleCheck === "passed"
+                                        ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-200"
+                                        : lastRunMeta?.sampleCheck === "mismatch"
+                                            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200"
+                                            : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                }`}>
+                                    sample: {lastRunMeta?.sampleCheck === "passed"
+                                        ? "passed"
+                                        : lastRunMeta?.sampleCheck === "mismatch"
+                                            ? "mismatch"
+                                            : lastRunMeta?.sampleCheck === "pending"
+                                                ? "checking"
+                                                : lastRunMeta?.sampleCheck === "not_checked"
+                                                    ? "not checked"
+                                                    : "n/a"}
                                 </div>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-3">
