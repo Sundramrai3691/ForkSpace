@@ -305,10 +305,10 @@
   },
   "JVLZ01UK": {
     "language": "cpp",
-    "code": "#include<bits/stdc++.h>\nusing namespace std;\n\nvoid solve(){\n    int n;\n    cin >> n;\n    vector<int> a(n);\n    for(int i=0; i<n; i++)cin >> a[i];\n\n    if(n == 1)cout << 0;\n    else for(int i=0; i<n; i++)cout <<2 <<\" \";\n   cout << endl;\n}\n\nint main(){\n    int t;\n    cin >> t;\n    while(t--)solve();\n}",
+    "code": "#include<bits/stdc++.h>\nusing namespace std;\n\nvoid solve(){\n    int n;\n    cin >> n;\n    vector<int> a(n);\n    for(int i=0; i<n; i++)cin >> a[i];\n\n    if(n == 1)cout << 1;\n    else for(int i=0; i<n; i++)cout <<2 <<\" \";\n   cout << endl;\n}\n\nint main(){\n    int t;\n    cin >> t;\n    while(t--)solve();\n}",
     "session": {
       "mode": "peer_practice",
-      "driverSocketId": "ohWmgUukDI_aWJbWAAAH",
+      "driverSocketId": "",
       "navigatorSocketId": "",
       "approachNotes": "",
       "edgeCaseChecklist": [
@@ -339,6 +339,22 @@
         }
       ],
       "runHistory": [
+        {
+          "id": "b486f073-a20f-43c4-8b13-f4dcd0343780",
+          "timestamp": "2026-04-04T11:43:34.391Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1196,
+          "passed": false
+        },
+        {
+          "id": "0e350728-33bf-489d-9c6e-02191e05dd20",
+          "timestamp": "2026-04-04T11:38:05.960Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1420,
+          "passed": false
+        },
         {
           "id": "fdf58476-b876-457c-a620-c617a9db0e87",
           "timestamp": "2026-04-04T11:34:01.017Z",

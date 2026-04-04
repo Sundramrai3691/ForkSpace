@@ -16,7 +16,7 @@
         "username": "Mickey",
         "problemTitle": "Untitled Practice Problem",
         "problemCode": "",
-        "updatedAt": "2026-04-04T11:35:57.058Z"
+        "updatedAt": "2026-04-04T11:48:57.061Z"
       },
       {
         "roomId": "3O339YX4",
@@ -70,6 +70,24 @@
   },
   "runHistoryByUser": {
     "0b83ddd8-3b6d-4d58-9304-ec96b3957dcc": [
+      {
+        "roomId": "JVLZ01UK",
+        "languageId": 54,
+        "languageLabel": "C++",
+        "problemTitle": "Untitled Practice Problem",
+        "problemCode": "",
+        "status": "completed",
+        "createdAt": "2026-04-04T11:43:34.376Z"
+      },
+      {
+        "roomId": "JVLZ01UK",
+        "languageId": 54,
+        "languageLabel": "C++",
+        "problemTitle": "Untitled Practice Problem",
+        "problemCode": "",
+        "status": "completed",
+        "createdAt": "2026-04-04T11:38:05.941Z"
+      },
       {
         "roomId": "JVLZ01UK",
         "languageId": 54,

@@ -641,30 +641,84 @@ function getGeminiApiKey() {
 
 async function getAiReview(prompt, apiKey, model = "mistral") {
   if (model === "gemini") {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
-    const response = await axios.post(geminiUrl, {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-    });
-    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    try {
+      const response = await axios.post(
+        geminiUrl,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1024,
+            topP: 0.95,
+            topK: 40,
+          },
+        },
+        { timeout: 15000 },
+      );
+
+      if (
+        !response.data ||
+        !response.data.candidates ||
+        response.data.candidates.length === 0
+      ) {
+        console.error("Gemini API: No candidates in response", response.data);
+        return "The AI provider returned an empty response. Please try again.";
+      }
+
+      const candidate = response.data.candidates[0];
+      if (
+        candidate.finishReason === "SAFETY" ||
+        candidate.finishReason === "OTHER"
+      ) {
+        return "The AI response was filtered or blocked by the provider's safety policies.";
+      }
+
+      const text = candidate.content?.parts?.[0]?.text;
+      if (!text) {
+        console.error("Gemini API: No text in candidate content", candidate);
+        return "The AI provider returned a response without text content.";
+      }
+
+      return text;
+    } catch (error) {
+      const errorData = error.response?.data;
+      const errorMessage = error.message;
+      console.error(
+        "Gemini API error detail:",
+        JSON.stringify(errorData || errorMessage),
+      );
+      throw new Error(
+        errorData?.error?.message || errorMessage || "Gemini API call failed",
+      );
+    }
   }
 
   // Default to Mistral
-  const response = await axios.post(
-    "https://codestral.mistral.ai/v1/chat/completions",
-    {
-      model: "codestral-latest",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+  try {
+    const response = await axios.post(
+      "https://codestral.mistral.ai/v1/chat/completions",
+      {
+        model: "codestral-latest",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
       },
-    },
-  );
-  return extractAiText(response.data);
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      },
+    );
+    return extractAiText(response.data);
+  } catch (error) {
+    console.error(
+      "Mistral API error detail:",
+      error.response?.data || error.message,
+    );
+    throw error;
+  }
 }
 
 function upsertRecentRoom(userId, roomEntry) {
@@ -1355,15 +1409,27 @@ app.post("/api/ai-hints", aiLimiter, async (req, res) => {
     const suggestions = [];
 
     if (geminiApiKey) {
-      const prompt = `Code:\n${code}\n\nBefore cursor:\n${beforeCursor}\n\nAfter cursor:\n${afterCursor}\n\nBased on the current code and cursor position, provide 3-5 short, helpful DSA-oriented code completion suggestions or hints. Keep them very brief and in a JSON array format like ["hint1", "hint2"].`;
+      const prompt = `Code:\n${code}\n\nBefore cursor:\n${beforeCursor}\n\nAfter cursor:\n${afterCursor}\n\nBased on the current code and cursor position, provide 3-5 short, helpful DSA-oriented code completion suggestions or hints. Keep them very brief and in a plain JSON array format like ["hint1", "hint2"]. Do not include markdown or explanations.`;
       const review = await getAiReview(prompt, geminiApiKey, "gemini");
       try {
-        const parsed = JSON.parse(
-          review.substring(review.indexOf("["), review.lastIndexOf("]") + 1),
-        );
-        if (Array.isArray(parsed)) suggestions.push(...parsed);
-      } catch {
-        if (review) suggestions.push(review.substring(0, 100));
+        // More robust JSON extraction for AI responses that might include markdown
+        const jsonStart = review.indexOf("[");
+        const jsonEnd = review.lastIndexOf("]") + 1;
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const jsonText = review.substring(jsonStart, jsonEnd);
+          const parsed = JSON.parse(jsonText);
+          if (Array.isArray(parsed)) {
+            suggestions.push(
+              ...parsed.filter((s) => typeof s === "string" && s.trim()),
+            );
+          }
+        } else if (review.trim()) {
+          // Fallback: treat the whole response as one hint if no array found
+          suggestions.push(review.trim().split("\n")[0]);
+        }
+      } catch (err) {
+        console.error("AI hints parse error:", err.message);
+        if (review && review.length < 200) suggestions.push(review.trim());
       }
     } else if (mistralApiKey) {
       if (beforeCursor && afterCursor) {
@@ -1431,11 +1497,11 @@ app.post("/api/ai-hints", aiLimiter, async (req, res) => {
           : "fallback",
     });
   } catch (error) {
+    const errorMsg =
+      error.response?.data?.error?.message || error.message || "Unknown error";
+    console.error("AI hints error:", errorMsg);
     return res.json({
-      warning:
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        "Failed to fetch AI hints",
+      warning: errorMsg,
       hints: buildFallbackHints(
         req.body?.code,
         req.body?.beforeCursor,
@@ -1481,11 +1547,21 @@ Keep it concise and practical for a DSA practice context.`;
     } else {
       review = await getAiReview(prompt, mistralKey, "mistral");
     }
+
+    if (!review) {
+      return res.status(500).json({
+        error:
+          "The AI provider returned an empty response. This might be due to safety filters or a temporary service issue.",
+      });
+    }
+
     res.json(review);
   } catch (error) {
-    console.error("AI review error:", error.response?.data || error.message);
+    const errorMsg =
+      error.response?.data?.error?.message || error.message || "Unknown error";
+    console.error("AI review error:", errorMsg);
     res.status(500).json({
-      error: "Failed to fetch AI review. Check your API keys and quotas.",
+      error: `AI Review failed: ${errorMsg}. Please check your API key and connection.`,
     });
   }
 });

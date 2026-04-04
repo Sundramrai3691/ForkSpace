@@ -43,34 +43,48 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
       return res.status(400).json({ error: "Missing prompt" });
     }
 
-    const response = await axios.post(
-      "https://codestral.mistral.ai/v1/fim/completions",
-      {
-        model: "codestral-latest",
-        prompt: prompt,
-        suffix: suffix || "",
-        max_tokens: 128,
-        temperature: 0.2,
-        stop: ["\n\n"],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-    );
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    const mistralKey = process.env.MISTRAL_API_KEY?.trim();
 
-    const hintText = response.data.choices?.[0]?.message?.content || "";
-    res.json({ hint: hintText });
+    if (!geminiKey && !mistralKey) {
+      return res.status(503).json({ error: "AI services not configured" });
+    }
+
+    let hint = "";
+    if (geminiKey) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const response = await axios.post(geminiUrl, {
+        contents: [{ parts: [{ text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}` }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 64 }
+      });
+      hint = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } else {
+      const response = await axios.post(
+        "https://codestral.mistral.ai/v1/fim/completions",
+        {
+          model: "codestral-latest",
+          prompt: prompt,
+          suffix: suffix || "",
+          max_tokens: 128,
+          temperature: 0.2,
+          stop: ["\n\n"],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${mistralKey}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        },
+      );
+      hint = response.data.choices?.[0]?.message?.content || "";
+    }
+
+    res.json({ hint: hint.trim() });
   } catch (err) {
-    console.error(
-      "AI hint error:",
-      err.response?.status,
-      err.response?.data || err.message,
-    );
-    res.status(500).json({ error: "Failed to fetch AI hint" });
+    const errorMsg = err.response?.data?.error?.message || err.message || "Unknown error";
+    console.error("AI hint error:", errorMsg);
+    res.status(500).json({ error: `Failed to fetch AI hint: ${errorMsg}` });
   }
 });
 
@@ -78,7 +92,10 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
   try {
     const { code, beforeCursor, afterCursor } = req.body;
 
-    if (!code || !process.env.MISTRAL_API_KEY) {
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    const mistralKey = process.env.MISTRAL_API_KEY?.trim();
+
+    if (!code || (!geminiKey && !mistralKey)) {
       return res
         .status(400)
         .json({ error: "Missing code or API key", hints: [] });
@@ -86,60 +103,82 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
 
     const suggestions = [];
 
-    // Generate suggestions based on cursor position
-    if (beforeCursor && afterCursor) {
-      const response = await axios.post(
+    if (geminiKey) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const response = await axios.post(geminiUrl, {
+        contents: [{ parts: [{ text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}` }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 256 }
+      }, { timeout: 10000 });
+      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      try {
+        const jsonStart = text.indexOf("[");
+        const jsonEnd = text.lastIndexOf("]") + 1;
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
+          if (Array.isArray(parsed)) suggestions.push(...parsed);
+        }
+      } catch (e) {
+        if (text) suggestions.push(text.trim().split("\n")[0]);
+      }
+    } else {
+      // Mistral logic... (keeping existing)
+      if (beforeCursor && afterCursor) {
+        const response = await axios.post(
+          "https://codestral.mistral.ai/v1/fim/completions",
+          {
+            model: "codestral-latest",
+            prompt: beforeCursor,
+            suffix: afterCursor,
+            max_tokens: 64,
+            temperature: 0.3,
+            stop: ["\n\n"],
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${mistralKey}`,
+              "Content-Type": "application/json",
+            },
+            timeout: 8000
+          },
+        );
+
+        const hint = response.data.choices?.[0]?.message?.content || "";
+        if (hint.trim()) {
+          suggestions.push(hint.trim());
+        }
+      }
+
+      // Generate general completion suggestion
+      const response2 = await axios.post(
         "https://codestral.mistral.ai/v1/fim/completions",
         {
           model: "codestral-latest",
-          prompt: beforeCursor,
-          suffix: afterCursor,
+          prompt: code,
+          suffix: "",
           max_tokens: 64,
-          temperature: 0.3,
-          stop: ["\n\n"],
+          temperature: 0.4,
         },
         {
           headers: {
-            Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
+            Authorization: `Bearer ${mistralKey}`,
             "Content-Type": "application/json",
           },
+          timeout: 8000
         },
       );
 
-      const hint = response.data.choices?.[0]?.message?.content || "";
-      if (hint.trim()) {
-        suggestions.push(hint.trim());
+      const hint2 = response2.data.choices?.[0]?.message?.content || "";
+      if (hint2.trim()) {
+        suggestions.push(hint2.trim());
       }
-    }
-
-    // Generate general completion suggestion
-    const response2 = await axios.post(
-      "https://codestral.mistral.ai/v1/fim/completions",
-      {
-        model: "codestral-latest",
-        prompt: code,
-        suffix: "",
-        max_tokens: 64,
-        temperature: 0.4,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    const hint2 = response2.data.choices?.[0]?.message?.content || "";
-    if (hint2.trim()) {
-      suggestions.push(hint2.trim());
     }
 
     const uniqueSuggestions = [...new Set(suggestions)].slice(0, 5);
     res.json({ hints: uniqueSuggestions });
   } catch (err) {
-    console.error("AI hints error:", err.message);
-    res.status(500).json({ error: "Failed to fetch AI hints", hints: [] });
+    const errorMsg = err.response?.data?.error?.message || err.message || "Unknown error";
+    console.error("AI hints error:", errorMsg);
+    res.status(500).json({ error: `Failed to fetch AI hints: ${errorMsg}`, hints: [] });
   }
 });
 
