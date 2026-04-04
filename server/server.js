@@ -29,6 +29,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
 }));
+
 app.use(express.json());
 const server = http.createServer(app);
 
@@ -178,12 +179,31 @@ function createDefaultProblemState() {
   };
 }
 
+function createDefaultSessionState() {
+  return {
+    mode: 'peer_practice',
+    driverSocketId: '',
+    navigatorSocketId: '',
+  };
+}
+
+function attachNormalizedSession(session = {}) {
+  return {
+    ...createDefaultSessionState(),
+    ...(session || {}),
+    mode: typeof session?.mode === 'string' && session.mode.trim() ? session.mode : 'peer_practice',
+    driverSocketId: typeof session?.driverSocketId === 'string' ? session.driverSocketId : '',
+    navigatorSocketId: typeof session?.navigatorSocketId === 'string' ? session.navigatorSocketId : '',
+  };
+}
+
 function createDefaultRoomState() {
   const defaultConfig = getLanguageConfig(DEFAULT_LANGUAGE);
 
   return {
     language: DEFAULT_LANGUAGE,
     code: defaultConfig.starterCode,
+    session: createDefaultSessionState(),
     problem: createDefaultProblemState(),
   };
 }
@@ -201,6 +221,7 @@ async function loadPersistedRoomStates() {
       roomStateMap.set(roomId, {
         language: nextLanguage,
         code: typeof roomState?.code === 'string' ? roomState.code : defaultConfig.starterCode,
+        session: attachNormalizedSession(roomState?.session || {}),
         problem: attachNormalizedSamples(roomState?.problem || {}),
       });
     });
@@ -1437,7 +1458,7 @@ function getUsersInRoom(roomId) {
 io.on('connection', (socket) => {
   // console.log('socket connected', socket.id); // remove in prod
 
-  socket.on('join', ({ roomId, username, role, authToken }) => {
+  socket.on('join', ({ roomId, username, role, authToken, sessionMode }) => {
     const roomState = getOrCreateRoomState(roomId);
     const authPayload = authToken ? verifyAuthToken(authToken) : null;
     const authenticatedUser = authPayload?.userId
@@ -1451,6 +1472,14 @@ io.on('connection', (socket) => {
       userId: authenticatedUser?.id || null,
     };
     socket.join(roomId);
+
+    if (sessionMode && roomState.session.mode !== sessionMode) {
+      roomState.session = attachNormalizedSession({
+        ...roomState.session,
+        mode: sessionMode,
+      });
+      scheduleRoomStatePersist();
+    }
 
 
     const users = getUsersInRoom(roomId);
@@ -1524,9 +1553,44 @@ socket.on('problem-update', ({ roomId, problem }) => {
   });
 });
 
+socket.on('session-update', ({ roomId, session }) => {
+  const roomState = getOrCreateRoomState(roomId);
+  roomState.session = attachNormalizedSession({
+    ...roomState.session,
+    ...(session || {}),
+  });
+  scheduleRoomStatePersist();
+
+  io.to(roomId).emit('session-update', {
+    session: roomState.session,
+  });
+});
+
   socket.on('disconnecting', () => {
     const rooms = [...socket.rooms];
     rooms.forEach((roomId) => {
+      const roomState = roomStateMap.get(roomId);
+
+      if (roomState?.session) {
+        const nextSession = attachNormalizedSession({
+          ...roomState.session,
+          driverSocketId: roomState.session.driverSocketId === socket.id ? '' : roomState.session.driverSocketId,
+          navigatorSocketId: roomState.session.navigatorSocketId === socket.id ? '' : roomState.session.navigatorSocketId,
+        });
+
+        const sessionChanged =
+          nextSession.driverSocketId !== roomState.session.driverSocketId ||
+          nextSession.navigatorSocketId !== roomState.session.navigatorSocketId;
+
+        if (sessionChanged) {
+          roomState.session = nextSession;
+          scheduleRoomStatePersist();
+          socket.in(roomId).emit('session-update', {
+            session: roomState.session,
+          });
+        }
+      }
+
       socket.in(roomId).emit('left',{
         socketId: socket.id,
         username: userSocketMap[socket.id]?.username,

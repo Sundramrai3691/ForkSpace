@@ -37,7 +37,13 @@ function shouldResetImportedSource(sourceUrl = '') {
 
 
 
-function Sidebar({ users = [], roomId, roomState, socketRef }) {
+const SESSION_MODE_OPTIONS = [
+    { value: 'peer_practice', label: 'Peer Practice' },
+    { value: 'mock_interview', label: 'Mock Interview' },
+    { value: 'mentoring', label: 'Mentoring' },
+];
+
+function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) {
     const location = useLocation();
     const navigate = useNavigate();
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
@@ -56,6 +62,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
     });
 
     const hasJoinState = Boolean(location.state);
+    const session = roomState?.session || { mode: 'peer_practice', driverSocketId: '', navigatorSocketId: '' };
+    const driver = users.find((user) => user.socketId === session.driverSocketId);
+    const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
 
     useEffect(() => {
         setProblemDraft({
@@ -100,6 +109,23 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
 
     const handleGoHome = () => {
         navigate('/');
+    };
+
+    const handleSessionUpdate = (partialSession) => {
+        socketRef?.current?.emit('session-update', {
+            roomId,
+            session: {
+                ...session,
+                ...partialSession,
+            },
+        });
+    };
+
+    const handleToggleSessionClaim = (claimKey) => {
+        const currentValue = session[claimKey];
+        handleSessionUpdate({
+            [claimKey]: currentValue === currentSocketId ? '' : currentSocketId,
+        });
     };
 
     const handleImportProblem = async () => {
@@ -183,6 +209,71 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                     </div>
 
                     <div className="space-y-3">
+                        <div className="rounded-2xl border border-gray-200 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                            <div className="mb-3 flex items-center justify-between">
+                                <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Session Setup
+                                </h4>
+                                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                                    Shared
+                                </span>
+                            </div>
+                            <div className="space-y-3">
+                                <label className="space-y-1.5">
+                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                        Mode
+                                    </span>
+                                    <select
+                                        value={session.mode}
+                                        onChange={(event) => handleSessionUpdate({ mode: event.target.value })}
+                                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    >
+                                        {SESSION_MODE_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleSessionClaim('driverSocketId')}
+                                        className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                            session.driverSocketId === currentSocketId
+                                                ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
+                                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
+                                        }`}
+                                    >
+                                        {session.driverSocketId === currentSocketId ? 'Release Driver' : 'Make me Driver'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleSessionClaim('navigatorSocketId')}
+                                        className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                            session.navigatorSocketId === currentSocketId
+                                                ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
+                                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
+                                        }`}
+                                    >
+                                        {session.navigatorSocketId === currentSocketId ? 'Release Navigator' : 'Make me Navigator'}
+                                    </button>
+                                </div>
+
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Driver</p>
+                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{driver?.username || 'Unassigned'}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Navigator</p>
+                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{navigatorUser?.username || 'Unassigned'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="rounded-xl border border-blue-200 bg-blue-50/90 p-3 text-sm leading-6 text-blue-900 dark:border-blue-800/60 dark:bg-blue-950/30 dark:text-blue-100">
                             LeetCode stays available for collaborative discussion, but this room is optimized for Codeforces-style input/output practice.
                         </div>
@@ -349,14 +440,21 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                         ) : (
                             <div className="space-y-1">
                                 {users.map((user) => (
-                                    <User
-                                        key={user.socketId}
-                                        username={user.username}
-                                        role={user.role}
-                                        isOnline={true}
-                                    />
-                                ))}
-                            </div>
+                                <User
+                                    key={user.socketId}
+                                    username={user.username}
+                                    role={user.role}
+                                    isOnline={true}
+                                    pairLabel={
+                                        user.socketId === session.driverSocketId
+                                            ? 'Driver'
+                                            : user.socketId === session.navigatorSocketId
+                                                ? 'Navigator'
+                                                : ''
+                                    }
+                                />
+                            ))}
+                        </div>
                         )}
                     </div>
                 </div>

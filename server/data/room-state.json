@@ -2,6 +2,11 @@
   "5CDI17JO": {
     "language": "cpp",
     "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "session": {
+      "mode": "peer_practice",
+      "driverSocketId": "",
+      "navigatorSocketId": ""
+    },
     "problem": {
       "platform": "leetcode",
       "problemCode": "1",
@@ -24,6 +29,11 @@
   "3HTFQCPS": {
     "language": "cpp",
     "code": "#include <bits/stdc++.h>\nusing namespace std;\nusing ll = long long;\n\nvoid solve(){\n  int n, k, x;\n  cin >> n >> k >> x;\n\n  if(x != 1){\n    cout << \"YES\\n\";\n    cout << n << \"\\n\";\n    for(int i = 0; i < n; i++) cout << 1 << \" \";\n    cout << \"\\n\";\n    return;\n  }\n\nif(k == 1 || n == 1){\n  cout << \"NO\\n\";\n  return;\n}\n\nif(n % 2 == 0){\n  cout << \"YES\\n\";\n  cout << n/2 << \"\\n\";\n  for(int i = 0; i < n/2; i++) cout << 2 << \" \";\n  cout << \"\\n\";\n} else {\nif(k < 3){\n  cout << \"NO\\n\";\n  return;\n}\ncout << \"YES\\n\";\ncout << (n - 3)/2 + 1 << \"\\n\";\ncout << 3 << \" \";\nfor(int i = 0; i < (n - 3)/2; i++) cout << 2 << \" \";\ncout << \"\\n\";\n}\n}\n\nint main() {\n  ios::sync_with_stdio(false);\n  cin.tie(nullptr);\n\n  int t;\n  cin >> t;\n  while(t--){\n    solve();\n  }\nreturn 0;\n}\n",
+    "session": {
+      "mode": "peer_practice",
+      "driverSocketId": "",
+      "navigatorSocketId": ""
+    },
     "problem": {
       "platform": "leetcode",
       "problemCode": "1",
@@ -46,6 +56,11 @@
   "PQVV0P3L": {
     "language": "cpp",
     "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "session": {
+      "mode": "peer_practice",
+      "driverSocketId": "",
+      "navigatorSocketId": ""
+    },
     "problem": {
       "platform": "leetcode",
       "problemCode": "3",
@@ -68,6 +83,11 @@
   "NTKCZB09": {
     "language": "cpp",
     "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "session": {
+      "mode": "peer_practice",
+      "driverSocketId": "",
+      "navigatorSocketId": ""
+    },
     "problem": {
       "platform": "custom",
       "problemCode": "",
@@ -84,6 +104,11 @@
   "3O339YX4": {
     "language": "cpp",
     "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "session": {
+      "mode": "peer_practice",
+      "driverSocketId": "",
+      "navigatorSocketId": ""
+    },
     "problem": {
       "platform": "custom",
       "problemCode": "",

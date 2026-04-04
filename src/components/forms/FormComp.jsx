@@ -10,6 +10,7 @@ function FormComp() {
     const roomIdRef = useRef(null);
     const usernameRef = useRef(null);
     const roleRef = useRef(null);
+    const sessionModeRef = useRef(null);
     const { theme } = useContext(ThemeContext);
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [authMode, setAuthMode] = useState('login');
@@ -98,6 +99,7 @@ function FormComp() {
             state: {
                 username,
                 role,
+                sessionMode: sessionModeRef.current?.value?.trim() || 'peer_practice',
             }
         });
     };
@@ -257,6 +259,25 @@ function FormComp() {
                                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-gray-100"
                                     required
                                 />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="sessionMode"
+                                    className="block text-sm font-medium text-black dark:text-gray-300"
+                                >
+                                    Session Mode
+                                </label>
+                                <select
+                                    id="sessionMode"
+                                    ref={sessionModeRef}
+                                    defaultValue="peer_practice"
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 outline-none transition-all duration-200 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
+                                >
+                                    <option value="peer_practice">Peer Practice</option>
+                                    <option value="mock_interview">Mock Interview</option>
+                                    <option value="mentoring">Mentoring</option>
+                                </select>
                             </div>
 
                             <div className="space-y-2">

@@ -80,7 +80,13 @@ const TIMER_PRESETS = [
     { label: "60m", value: 60 * 60 },
 ];
 
-function Workspace({ socketRef, roomId, roomState }) {
+const SESSION_MODE_LABELS = {
+    peer_practice: 'Peer Practice',
+    mock_interview: 'Mock Interview',
+    mentoring: 'Mentoring',
+};
+
+function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const editorRef = useRef(null);
     const settingsRef = useRef(null);
@@ -110,6 +116,13 @@ function Workspace({ socketRef, roomId, roomState }) {
     const [isTimerRunning, setIsTimerRunning] = useState(false);
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
+    const session = roomState?.session || { mode: 'peer_practice', driverSocketId: '', navigatorSocketId: '' };
+    const participationLabel =
+        session.driverSocketId === currentSocketId
+            ? 'Driver'
+            : session.navigatorSocketId === currentSocketId
+                ? 'Navigator'
+                : 'Observer';
 
 
     useEffect(() => {
@@ -570,7 +583,13 @@ const runCode = async () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Practice Session</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
+                    </div>
+                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
+                    <div className="flex items-center gap-2">
+                        <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.12em] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                            {participationLabel}
+                        </span>
                     </div>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
                     <div className="flex items-center gap-2">

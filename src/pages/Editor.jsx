@@ -13,9 +13,11 @@ function Editor() {
   const { state } = useLocation();
   const enteredUsername = state?.username;
   const enteredRole = state?.role || 'Peer';
+  const enteredSessionMode = state?.sessionMode || 'peer_practice';
   const [socketConnected, setSocketConnected] = useState(false);
   const [users, setUsers] = useState([]); // Add this to track users
   const [roomState, setRoomState] = useState(null);
+  const [currentSocketId, setCurrentSocketId] = useState('');
   const hasShownConnectionError = useRef(false);
   const username = enteredUsername || 'Anonymous';
   
@@ -36,6 +38,7 @@ function Editor() {
         socketRef.current.on('connect_error', handleErrors);
         socketRef.current.on('connect', () => {
           setSocketConnected(true);
+          setCurrentSocketId(socketRef.current.id);
           hasShownConnectionError.current = false;
 
           socketRef.current.emit('join', {
@@ -43,10 +46,12 @@ function Editor() {
             username,
             role: enteredRole,
             authToken: getAuthToken(),
+            sessionMode: enteredSessionMode,
           });
         });
         socketRef.current.on('disconnect', () => {
           setSocketConnected(false);
+          setCurrentSocketId('');
         });
         socketRef.current.on('room-state', (nextRoomState) => {
           setRoomState(nextRoomState);
@@ -55,6 +60,12 @@ function Editor() {
           setRoomState((prev) => ({
             ...(prev || {}),
             problem,
+          }));
+        });
+        socketRef.current.on('session-update', ({ session }) => {
+          setRoomState((prev) => ({
+            ...(prev || {}),
+            session,
           }));
         });
 
@@ -84,12 +95,13 @@ function Editor() {
         socketRef.current.off('disconnect');
         socketRef.current.off('room-state');
         socketRef.current.off('problem-update');
+        socketRef.current.off('session-update');
         socketRef.current.off('joined');
         socketRef.current.off('left');
         socketRef.current.disconnect();
       }
     };
-  }, [roomId, enteredRole, enteredUsername, username]);
+  }, [roomId, enteredRole, enteredSessionMode, enteredUsername, username]);
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-white dark:bg-gray-900 lg:h-screen lg:overflow-hidden lg:flex-row">
@@ -100,11 +112,12 @@ function Editor() {
           socketConnected={socketConnected} 
           users={users}
           roomState={roomState}
+          currentSocketId={currentSocketId}
         />
       </aside>
       <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-white dark:bg-gray-900 lg:min-h-0 lg:h-screen">
         {socketConnected ? (
-          <Workspace socketRef={socketRef} roomId={roomId} roomState={roomState} />
+          <Workspace socketRef={socketRef} roomId={roomId} roomState={roomState} currentSocketId={currentSocketId} />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-16">
             <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-gray-50/90 p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800/60">
