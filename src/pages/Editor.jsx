@@ -92,8 +92,8 @@ function Editor() {
   }, [roomId, enteredRole, enteredUsername, username]);
 
   return (
-    <div className="flex min-h-screen flex-col overflow-hidden bg-white dark:bg-gray-900 lg:flex-row">
-      <aside className="w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 lg:w-80 lg:min-w-[320px] lg:max-w-[420px] lg:flex-none lg:border-b-0 lg:border-r lg:panel-resize">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-white dark:bg-gray-900 lg:h-screen lg:overflow-hidden lg:flex-row">
+      <aside className="w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 lg:h-screen lg:w-80 lg:min-w-[320px] lg:max-w-[420px] lg:flex-none lg:border-b-0 lg:border-r lg:panel-resize">
         <Sidebar 
           socketRef={socketRef} 
           roomId={roomId} 
@@ -102,7 +102,7 @@ function Editor() {
           roomState={roomState}
         />
       </aside>
-      <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-white dark:bg-gray-900">
+      <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-white dark:bg-gray-900 lg:min-h-0 lg:h-screen">
         {socketConnected ? (
           <Workspace socketRef={socketRef} roomId={roomId} roomState={roomState} />
         ) : (

@@ -170,8 +170,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
 
     return (
         <div className="flex h-full w-full flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
-            <div className="flex flex-col space-y-4 p-6 flex-1 min-h-0">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-800/40">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="flex flex-col space-y-4 p-6">
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-800/40">
                     <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                             Problem Brief
@@ -322,41 +323,42 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                             </div>
                         )}
                     </div>
-                </div>
-
-                <div className="space-y-3 flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-                            Room Members
-                        </h2>
-                        <div className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-1">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{users.length}</span>
-                        </div>
                     </div>
-                    <div className="h-px bg-gradient-to-r from-gray-200 dark:from-gray-700 via-gray-200/50 dark:via-gray-700/50 to-transparent"></div>
-                </div>
-                
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                    {users.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-                                <div className="w-3 h-3 rounded-full bg-gray-400 dark:bg-gray-600 animate-pulse"></div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
+                                Room Members
+                            </h2>
+                            <div className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-1">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{users.length}</span>
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Loading room members...</p>
                         </div>
-                    ) : (
-                        <div className="space-y-1">
-                            {users.map((user) => (
-                                <User
-                                    key={user.socketId}
-                                    username={user.username}
-                                    role={user.role}
-                                    isOnline={true}
-                                />
-                            ))}
-                        </div>
-                    )}
+                        <div className="h-px bg-gradient-to-r from-gray-200 dark:from-gray-700 via-gray-200/50 dark:via-gray-700/50 to-transparent"></div>
+                    </div>
+
+                    <div>
+                        {users.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                                    <div className="h-3 w-3 animate-pulse rounded-full bg-gray-400 dark:bg-gray-600"></div>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Loading room members...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-1">
+                                {users.map((user) => (
+                                    <User
+                                        key={user.socketId}
+                                        username={user.username}
+                                        role={user.role}
+                                        isOnline={true}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             

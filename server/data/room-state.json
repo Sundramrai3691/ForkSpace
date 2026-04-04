@@ -64,5 +64,37 @@
         }
       ]
     }
+  },
+  "NTKCZB09": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "problem": {
+      "platform": "custom",
+      "problemCode": "",
+      "problemUrl": "",
+      "sourceUrl": "",
+      "title": "Untitled Practice Problem",
+      "prompt": "",
+      "pastedStatement": "",
+      "sampleInput": "",
+      "sampleOutput": "",
+      "samples": []
+    }
+  },
+  "3O339YX4": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "problem": {
+      "platform": "custom",
+      "problemCode": "",
+      "problemUrl": "",
+      "sourceUrl": "",
+      "title": "Untitled Practice Problem",
+      "prompt": "",
+      "pastedStatement": "",
+      "sampleInput": "",
+      "sampleOutput": "",
+      "samples": []
+    }
   }
 }
