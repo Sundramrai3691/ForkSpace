@@ -42,5 +42,27 @@
         }
       ]
     }
+  },
+  "PQVV0P3L": {
+    "language": "cpp",
+    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "problem": {
+      "platform": "leetcode",
+      "problemCode": "3",
+      "problemUrl": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+      "sourceUrl": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+      "title": "Longest Substring Without Repeating Characters",
+      "prompt": "Given a string  s , find the length of the  longest    substring   without duplicate characters.\n\n  Example 1:\n\n Input:  s = \"abcabcbb\"\n Output:  3\n Explanation:  The answer is \"abc\", with the length of 3. Note that  \"bca\"  and  \"cab\"  are also correct answers.\n\n  Example 2:\n\n Input:  s = \"bbbbb\"\n Output:  1\n Explanation:  The answer is \"b\", with the length of 1.\n\n  Example 3:\n\n Input:  s = \"pwwkew\"\n Output:  3\n Explanation:  The answer is \"wke\", with the length of 3.\nNotice that the answer must be a substring, \"pwke\" is a subsequence and not a substring.\n\n  Constraints:\n\n\t-  0 <= s.length <= 5 * 10 4\n\n\t-  s  consists of English letters, digits, symbols and spaces.",
+      "pastedStatement": "",
+      "sampleInput": "\"abcabcbb\"\n\"bbbbb\"\n\"pwwkew\"",
+      "sampleOutput": "",
+      "samples": [
+        {
+          "id": "sample-1",
+          "input": "\"abcabcbb\"\n\"bbbbb\"\n\"pwwkew\"",
+          "output": ""
+        }
+      ]
+    }
   }
 }

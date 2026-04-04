@@ -43,6 +43,12 @@ const quickStartSteps = [
     'Solve the problem together, run the solution, and iterate on feedback in the same room.',
 ];
 
+const heroSessionPoints = [
+    'One shared problem brief',
+    'One editor for both peers',
+    'One visible sample check',
+];
+
 function Login() {
     return (
         <div className="min-h-screen bg-stone-50 text-slate-900 dark:bg-slate-950 dark:text-white">
@@ -92,6 +98,40 @@ function Login() {
                                 <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
                                     <p className="text-2xl font-bold">Run</p>
                                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Compile and inspect solutions on the spot.</p>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                                <div className="rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
+                                        In One Session
+                                    </p>
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                        {heroSessionPoints.map((point, index) => (
+                                            <div key={point} className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                                    {`0${index + 1}`}
+                                                </p>
+                                                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{point}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
+                                        Best For
+                                    </p>
+                                    <div className="mt-4 space-y-3">
+                                        <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                                            <p className="text-sm font-medium text-slate-900 dark:text-white">Codeforces pair practice</p>
+                                            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">Discuss the approach, edit together, then verify against shared samples.</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                                            <p className="text-sm font-medium text-slate-900 dark:text-white">Mentor-led DSA sessions</p>
+                                            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">Keep explanation, coding, and output review in one place.</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
