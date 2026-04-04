@@ -78,16 +78,19 @@ export default function useAIHint(editorRef, socketRef, roomId) {
         suffix: afterCursor,
       });
 
-      const { hint, error } = res.data; 
+      const { hint, error, warning } = res.data;
 
-      if (error) {
-        notifyAiUnavailable("AI hints are temporarily unavailable. The editor will keep working without them.");
+      if (hint && hint.trim()) {
+        if (error || warning) {
+          notifyAiUnavailable("AI suggestions are running in fallback mode right now.");
+        }
+        hasShownAiError.current = false;
+        showGhostHint(hint);
         return;
       }
 
-      if (hint && hint.trim()) {
-        hasShownAiError.current = false;
-        showGhostHint(hint);
+      if (error || warning) {
+        notifyAiUnavailable("AI hints are temporarily unavailable. The editor will keep working without them.");
       }
     } catch {
       notifyAiUnavailable("AI hints are unavailable right now. Check the backend and Mistral configuration.");
@@ -114,21 +117,21 @@ export default function useAIHint(editorRef, socketRef, roomId) {
         afterCursor: afterCursor,
       });
 
-      const { hints, error } = res.data;
+      const { hints, error, warning } = res.data;
+      const nextHints = Array.isArray(hints) ? hints.filter((hint) => typeof hint === "string" && hint.trim()) : [];
 
-      if (error) {
-        setAiHints([]);
-        setShowDropdown(false);
-        notifyAiUnavailable("AI hints are temporarily unavailable. The editor will keep working without them.");
-        return;
-      }
-
-      hasShownAiError.current = false;
-
-      if (hints && Array.isArray(hints)) {
-        setAiHints(hints);
+      if (nextHints.length > 0) {
+        if (error || warning) {
+          notifyAiUnavailable("AI suggestions are running in fallback mode right now.");
+        }
+        hasShownAiError.current = false;
+        setAiHints(nextHints);
       } else {
         setAiHints([]);
+        if (error || warning) {
+          setShowDropdown(false);
+          notifyAiUnavailable("AI hints are temporarily unavailable. The editor will keep working without them.");
+        }
       }
     } catch {
       setAiHints([]);

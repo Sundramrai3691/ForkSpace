@@ -502,6 +502,16 @@ function buildFallbackHints(code = '', beforeCursor = '', afterCursor = '') {
   return [...new Set(suggestions)].slice(0, 5);
 }
 
+function getMistralApiKey() {
+  const apiKey = process.env.MISTRAL_API_KEY?.trim();
+
+  if (!apiKey || apiKey.toLowerCase().includes('your_')) {
+    return '';
+  }
+
+  return apiKey;
+}
+
 function upsertRecentRoom(userId, roomEntry) {
   const roomHistory = Array.isArray(userState.roomHistoryByUser[userId]) ? userState.roomHistoryByUser[userId] : [];
   const nextHistory = [
@@ -1039,7 +1049,9 @@ app.post('/api/ai-hint', aiLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Missing prompt' });
     }
 
-    if (!process.env.MISTRAL_API_KEY) {
+    const mistralApiKey = getMistralApiKey();
+
+    if (!mistralApiKey) {
       return res.json({ hint: buildFallbackHint(prompt, suffix), source: 'fallback' });
     }
 
@@ -1055,10 +1067,11 @@ app.post('/api/ai-hint', aiLimiter, async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
+          Authorization: `Bearer ${mistralApiKey}`,
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
+        timeout: 8000,
       }
     );
 
@@ -1068,7 +1081,7 @@ app.post('/api/ai-hint', aiLimiter, async (req, res) => {
     return res.json({
       hint: buildFallbackHint(req.body?.prompt, req.body?.suffix),
       source: 'fallback',
-      error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hint',
+      warning: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hint',
     });
   }
 });
@@ -1081,7 +1094,9 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Missing code', hints: [] });
     }
 
-    if (!process.env.MISTRAL_API_KEY) {
+    const mistralApiKey = getMistralApiKey();
+
+    if (!mistralApiKey) {
       return res.json({
         hints: buildFallbackHints(code, beforeCursor, afterCursor),
         source: 'fallback',
@@ -1103,9 +1118,10 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
         },
         {
           headers: {
-            Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
+            Authorization: `Bearer ${mistralApiKey}`,
             'Content-Type': 'application/json',
           },
+          timeout: 8000,
         }
       );
 
@@ -1126,9 +1142,10 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.MISTRAL_API_KEY}`,
+          Authorization: `Bearer ${mistralApiKey}`,
           'Content-Type': 'application/json',
         },
+        timeout: 8000,
       }
     );
 
@@ -1145,7 +1162,7 @@ app.post('/api/ai-hints', aiLimiter, async (req, res) => {
     });
   } catch (error) {
     return res.json({
-      error: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hints',
+      warning: error.response?.data?.error || error.response?.data?.message || 'Failed to fetch AI hints',
       hints: buildFallbackHints(req.body?.code, req.body?.beforeCursor, req.body?.afterCursor),
       source: 'fallback',
     });
