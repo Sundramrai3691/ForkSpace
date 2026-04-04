@@ -42,6 +42,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
     const navigate = useNavigate();
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [isImporting, setIsImporting] = useState(false);
+    const [importNotice, setImportNotice] = useState('');
     const [problemDraft, setProblemDraft] = useState({
         platform: 'custom',
         problemCode: '',
@@ -110,6 +111,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
         }
 
         setIsImporting(true);
+        setImportNotice('');
 
         try {
             const response = await axios.post(`${serverUrl}/api/problem-import`, {
@@ -123,6 +125,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                 ...response.data.problem,
             }));
 
+            setImportNotice('Problem details imported into the shared brief.');
             toast.success('Problem details imported');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to import the problem');
@@ -138,6 +141,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
         }
 
         setIsImporting(true);
+        setImportNotice('');
 
         try {
             const response = await axios.post(`${serverUrl}/api/problem-import-url`, {
@@ -150,10 +154,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
             }));
 
             if (response.data.warning) {
+                setImportNotice(response.data.warning);
                 toast(response.data.warning, {
                     icon: '!',
                 });
             } else {
+                setImportNotice('Problem details imported from the URL.');
                 toast.success('Problem imported from URL');
             }
         } catch (error) {
@@ -170,6 +176,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
         }
 
         setIsImporting(true);
+        setImportNotice('');
 
         try {
             const response = await axios.post(`${serverUrl}/api/problem-import-text`, {
@@ -185,6 +192,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                 sourceUrl: prev.sourceUrl,
             }));
 
+            setImportNotice('Examples were parsed from the pasted statement.');
             toast.success('Examples parsed from statement');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to parse the pasted statement');
@@ -207,6 +215,21 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                     </div>
 
                     <div className="space-y-3">
+                        <div className="rounded-xl border border-gray-200 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/60">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                Recommended Flow
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-gray-700 dark:text-gray-300">
+                                Import from a problem URL first. If Codeforces blocks the fetch, paste the statement below and parse the examples.
+                            </p>
+                        </div>
+
+                        {importNotice && (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-sm leading-6 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                                {importNotice}
+                            </div>
+                        )}
+
                         <div className="space-y-1.5">
                             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                 Problem URL
@@ -227,7 +250,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                         >
                             {isImporting ? 'Importing...' : 'Import from URL'}
                         </button>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
                             <label className="space-y-1.5">
                                 <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                     Platform
@@ -284,18 +307,11 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                         >
                             {isImporting ? 'Importing problem...' : 'Import problem details'}
                         </button>
-                        <input
-                            type="url"
-                            value={problemDraft.sourceUrl}
-                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, sourceUrl: event.target.value }))}
-                            placeholder="Problem link (optional)"
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                        />
                         <textarea
                             value={problemDraft.pastedStatement}
                             onChange={(event) => setProblemDraft((prev) => ({ ...prev, pastedStatement: event.target.value }))}
-                            placeholder="Paste a problem statement here if URL import fails. We will parse Input / Output examples into shared sample tests."
-                            className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            placeholder="Paste the visible problem statement here if the site blocks import. We will parse Input / Output examples into shared sample tests."
+                            className="h-28 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         />
                         <button
                             type="button"
@@ -333,13 +349,18 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                             />
                         </div>
                         {problemDraft.samples?.length > 0 && (
-                            <div className="rounded-xl border border-dashed border-gray-300 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Parsed Samples
-                                </p>
-                                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                                    {problemDraft.samples.length} sample {problemDraft.samples.length === 1 ? 'test' : 'tests'} ready for suite runs.
-                                </p>
+                            <div className="flex items-center justify-between rounded-xl border border-dashed border-gray-300 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                        Parsed Samples
+                                    </p>
+                                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                                        {problemDraft.samples.length} sample {problemDraft.samples.length === 1 ? 'test' : 'tests'} ready for suite runs.
+                                    </p>
+                                </div>
+                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                                    Ready
+                                </span>
                             </div>
                         )}
                     </div>
