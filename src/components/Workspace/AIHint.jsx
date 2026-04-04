@@ -3,7 +3,11 @@ import { useState, useRef } from "react";
 import toast from "react-hot-toast";
 
 export default function useAIHint(editorRef, socketRef, roomId) {
-  const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+  const rawServerUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+  const serverUrl = (rawServerUrl.includes(":5173") && !import.meta.env.VITE_SERVER_URL) 
+    ? rawServerUrl.replace(":5173", ":5000") 
+    : rawServerUrl;
+
   const [ghostHint, setGhostHint] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [aiHints, setAiHints] = useState([]);

@@ -5,7 +5,37 @@
     "session": {
       "mode": "peer_practice",
       "driverSocketId": "",
-      "navigatorSocketId": ""
+      "navigatorSocketId": "",
+      "approachNotes": "",
+      "edgeCaseChecklist": [
+        {
+          "id": "empty",
+          "label": "Empty input",
+          "checked": false
+        },
+        {
+          "id": "single",
+          "label": "Single element",
+          "checked": false
+        },
+        {
+          "id": "duplicates",
+          "label": "Duplicates",
+          "checked": false
+        },
+        {
+          "id": "limits",
+          "label": "Limits (min/max)",
+          "checked": false
+        },
+        {
+          "id": "overflow",
+          "label": "Potential overflow",
+          "checked": false
+        }
+      ],
+      "runHistory": [],
+      "mentorNotes": ""
     },
     "problem": {
       "platform": "leetcode",
@@ -32,7 +62,37 @@
     "session": {
       "mode": "peer_practice",
       "driverSocketId": "",
-      "navigatorSocketId": ""
+      "navigatorSocketId": "",
+      "approachNotes": "",
+      "edgeCaseChecklist": [
+        {
+          "id": "empty",
+          "label": "Empty input",
+          "checked": false
+        },
+        {
+          "id": "single",
+          "label": "Single element",
+          "checked": false
+        },
+        {
+          "id": "duplicates",
+          "label": "Duplicates",
+          "checked": false
+        },
+        {
+          "id": "limits",
+          "label": "Limits (min/max)",
+          "checked": false
+        },
+        {
+          "id": "overflow",
+          "label": "Potential overflow",
+          "checked": false
+        }
+      ],
+      "runHistory": [],
+      "mentorNotes": ""
     },
     "problem": {
       "platform": "leetcode",
@@ -59,7 +119,37 @@
     "session": {
       "mode": "peer_practice",
       "driverSocketId": "",
-      "navigatorSocketId": ""
+      "navigatorSocketId": "",
+      "approachNotes": "",
+      "edgeCaseChecklist": [
+        {
+          "id": "empty",
+          "label": "Empty input",
+          "checked": false
+        },
+        {
+          "id": "single",
+          "label": "Single element",
+          "checked": false
+        },
+        {
+          "id": "duplicates",
+          "label": "Duplicates",
+          "checked": false
+        },
+        {
+          "id": "limits",
+          "label": "Limits (min/max)",
+          "checked": false
+        },
+        {
+          "id": "overflow",
+          "label": "Potential overflow",
+          "checked": false
+        }
+      ],
+      "runHistory": [],
+      "mentorNotes": ""
     },
     "problem": {
       "platform": "leetcode",
@@ -86,7 +176,37 @@
     "session": {
       "mode": "peer_practice",
       "driverSocketId": "",
-      "navigatorSocketId": ""
+      "navigatorSocketId": "",
+      "approachNotes": "",
+      "edgeCaseChecklist": [
+        {
+          "id": "empty",
+          "label": "Empty input",
+          "checked": false
+        },
+        {
+          "id": "single",
+          "label": "Single element",
+          "checked": false
+        },
+        {
+          "id": "duplicates",
+          "label": "Duplicates",
+          "checked": false
+        },
+        {
+          "id": "limits",
+          "label": "Limits (min/max)",
+          "checked": false
+        },
+        {
+          "id": "overflow",
+          "label": "Potential overflow",
+          "checked": false
+        }
+      ],
+      "runHistory": [],
+      "mentorNotes": ""
     },
     "problem": {
       "platform": "custom",
@@ -103,11 +223,66 @@
   },
   "3O339YX4": {
     "language": "cpp",
-    "code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, ForkSpace!\";\n    return 0;\n}\n",
+    "code": "#include<bits/stdc++.h>\nusing namespace std;\n\nvoid solve(){\n    int n;\n    cin >> n;\n    vector<int> a(n);\n    for(int i=0; i<n; i++)cin >> a[i];\n\n    if(n == 1)cout << 1;\n    else for(int i=0; i<n; i++)cout <<2 <<\" \";\n   cout << endl;\n}\n\nint main(){\n    int t;\n    cin >> t;\n    while(t--)solve();\n}",
     "session": {
       "mode": "peer_practice",
-      "driverSocketId": "",
-      "navigatorSocketId": ""
+      "driverSocketId": "UIaRlHHbmKCKuIJ6AAAH",
+      "navigatorSocketId": "",
+      "approachNotes": "",
+      "edgeCaseChecklist": [
+        {
+          "id": "empty",
+          "label": "Empty input",
+          "checked": false
+        },
+        {
+          "id": "single",
+          "label": "Single element",
+          "checked": false
+        },
+        {
+          "id": "duplicates",
+          "label": "Duplicates",
+          "checked": false
+        },
+        {
+          "id": "limits",
+          "label": "Limits (min/max)",
+          "checked": false
+        },
+        {
+          "id": "overflow",
+          "label": "Potential overflow",
+          "checked": false
+        }
+      ],
+      "runHistory": [
+        {
+          "id": "213e874f-4380-488d-a68e-d2cfdb6d872f",
+          "timestamp": "2026-04-04T11:25:51.567Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1064,
+          "passed": true
+        },
+        {
+          "id": "2b89defe-9342-4227-92b4-5dd98367f8cf",
+          "timestamp": "2026-04-04T11:19:26.185Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1052,
+          "passed": true
+        },
+        {
+          "id": "72e1f7f3-e8c3-4300-aa6b-75084f45703d",
+          "timestamp": "2026-04-04T11:12:37.278Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1384,
+          "passed": ""
+        }
+      ],
+      "mentorNotes": ""
     },
     "problem": {
       "platform": "custom",
@@ -117,9 +292,113 @@
       "title": "Untitled Practice Problem",
       "prompt": "",
       "pastedStatement": "",
-      "sampleInput": "",
-      "sampleOutput": "",
-      "samples": []
+      "sampleInput": "2\n1\n1\n3\n2 1 3",
+      "sampleOutput": "1\n2 2 2",
+      "samples": [
+        {
+          "id": "sample-1",
+          "input": "2\n1\n1\n3\n2 1 3",
+          "output": ""
+        }
+      ]
+    }
+  },
+  "JVLZ01UK": {
+    "language": "cpp",
+    "code": "#include<bits/stdc++.h>\nusing namespace std;\n\nvoid solve(){\n    int n;\n    cin >> n;\n    vector<int> a(n);\n    for(int i=0; i<n; i++)cin >> a[i];\n\n    if(n == 1)cout << 0;\n    else for(int i=0; i<n; i++)cout <<2 <<\" \";\n   cout << endl;\n}\n\nint main(){\n    int t;\n    cin >> t;\n    while(t--)solve();\n}",
+    "session": {
+      "mode": "peer_practice",
+      "driverSocketId": "ohWmgUukDI_aWJbWAAAH",
+      "navigatorSocketId": "",
+      "approachNotes": "",
+      "edgeCaseChecklist": [
+        {
+          "id": "empty",
+          "label": "Empty input",
+          "checked": false
+        },
+        {
+          "id": "single",
+          "label": "Single element",
+          "checked": false
+        },
+        {
+          "id": "duplicates",
+          "label": "Duplicates",
+          "checked": false
+        },
+        {
+          "id": "limits",
+          "label": "Limits (min/max)",
+          "checked": false
+        },
+        {
+          "id": "overflow",
+          "label": "Potential overflow",
+          "checked": false
+        }
+      ],
+      "runHistory": [
+        {
+          "id": "fdf58476-b876-457c-a620-c617a9db0e87",
+          "timestamp": "2026-04-04T11:34:01.017Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1012,
+          "passed": false
+        },
+        {
+          "id": "cdfdce59-7f4f-4c1e-a233-cb2d399ac79b",
+          "timestamp": "2026-04-04T11:33:47.636Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1256,
+          "passed": true
+        },
+        {
+          "id": "d525afb0-9c0a-4716-bff8-af703163734d",
+          "timestamp": "2026-04-04T11:30:29.982Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1240,
+          "passed": true
+        },
+        {
+          "id": "e683e70b-99f2-46a9-b6a9-49a1f1e1b5cc",
+          "timestamp": "2026-04-04T11:30:09.575Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1480,
+          "passed": true
+        },
+        {
+          "id": "61e3fdd8-99eb-43ed-8ef1-de1c3e7d21c2",
+          "timestamp": "2026-04-04T11:26:43.116Z",
+          "status": "Completed",
+          "time": "0.003",
+          "memory": 1200,
+          "passed": ""
+        }
+      ],
+      "mentorNotes": ""
+    },
+    "problem": {
+      "platform": "custom",
+      "problemCode": "",
+      "problemUrl": "",
+      "sourceUrl": "",
+      "title": "Untitled Practice Problem",
+      "prompt": "",
+      "pastedStatement": "",
+      "sampleInput": "2\n1\n1\n3\n2 1 3",
+      "sampleOutput": "1\n2 2 2",
+      "samples": [
+        {
+          "id": "sample-1",
+          "input": "2\n1\n1\n3\n2 1 3",
+          "output": ""
+        }
+      ]
     }
   }
 }

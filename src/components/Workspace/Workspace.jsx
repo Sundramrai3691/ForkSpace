@@ -44,19 +44,44 @@ function OutputSection({ tone, title, children }) {
 }
 
 function ComparisonPanel({ expectedOutput, actualOutput }) {
+    const expectedLines = (expectedOutput || "").split('\n');
+    const actualLines = (actualOutput || "").split('\n');
+    let firstDiffLine = -1;
+
+    for (let i = 0; i < Math.max(expectedLines.length, actualLines.length); i++) {
+        if (normalizeOutput(expectedLines[i] || "") !== normalizeOutput(actualLines[i] || "")) {
+            firstDiffLine = i + 1;
+            break;
+        }
+    }
+
+    const getPossibleCause = () => {
+        if (actualLines.length < expectedLines.length) return "Output is shorter than expected. Missing data?";
+        if (actualLines.length > expectedLines.length) return "Output is longer than expected. Extra prints or wrong logic?";
+        if (firstDiffLine !== -1) return "Data mismatch. Check your logic for the given line.";
+        return null;
+    };
+
     return (
-        <div className="grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl border border-red-200 bg-white/90 p-4 dark:border-red-800/50 dark:bg-gray-900/70">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">
-                    Expected Output
-                </p>
-                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{expectedOutput || "No expected output provided."}</pre>
-            </div>
-            <div className="rounded-xl border border-amber-200 bg-white/90 p-4 dark:border-amber-800/50 dark:bg-gray-900/70">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
-                    Your Output
-                </p>
-                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{actualOutput || "No stdout produced."}</pre>
+        <div className="space-y-3">
+            {firstDiffLine !== -1 && (
+                <div className="rounded-lg bg-amber-50 p-2 text-xs font-medium text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                    <span className="font-bold">Hint:</span> First difference found at line {firstDiffLine}. {getPossibleCause()}
+                </div>
+            )}
+            <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-red-200 bg-white/90 p-4 dark:border-red-800/50 dark:bg-gray-900/70">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">
+                        Expected Output
+                    </p>
+                    <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{expectedOutput || "No expected output provided."}</pre>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-white/90 p-4 dark:border-amber-800/50 dark:bg-gray-900/70">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                        Your Output
+                    </p>
+                    <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{actualOutput || "No stdout produced."}</pre>
+                </div>
             </div>
         </div>
     );
@@ -87,7 +112,12 @@ const SESSION_MODE_LABELS = {
 };
 
 function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
-    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const rawServerUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    // Fallback for development if frontend is on 5173 and backend is on 5000
+    const serverUrl = (rawServerUrl.includes(":5173") && !import.meta.env.VITE_SERVER_URL) 
+        ? rawServerUrl.replace(":5173", ":5000") 
+        : rawServerUrl;
+
     const editorRef = useRef(null);
     const settingsRef = useRef(null);
     const selectedLanguageRef = useRef(DEFAULT_LANGUAGE);
@@ -114,15 +144,79 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
     const [timerDuration, setTimerDuration] = useState(45 * 60);
     const [timeRemaining, setTimeRemaining] = useState(45 * 60);
     const [isTimerRunning, setIsTimerRunning] = useState(false);
+    const [showReview, setShowReview] = useState(false);
+    const [reviewContent, setReviewContent] = useState(null);
+    const [isReviewLoading, setIsReviewLoading] = useState(false);
+
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
-    const session = roomState?.session || { mode: 'peer_practice', driverSocketId: '', navigatorSocketId: '' };
+    const session = roomState?.session || { 
+      mode: 'peer_practice', 
+      driverSocketId: '', 
+      navigatorSocketId: '',
+      approachNotes: '',
+      edgeCaseChecklist: [],
+      runHistory: [],
+      mentorNotes: '',
+    };
+
+    const isMentorOrInterviewer = session.mode === 'mock_interview' || session.mode === 'mentoring';
+
     const participationLabel =
         session.driverSocketId === currentSocketId
             ? 'Driver'
             : session.navigatorSocketId === currentSocketId
                 ? 'Navigator'
                 : 'Observer';
+
+    const handleSwapRoles = () => {
+        socketRef.current?.emit('swap-roles', { roomId });
+    };
+
+    const updateApproachNotes = (notes) => {
+        socketRef.current?.emit('session-update', {
+            roomId,
+            session: { ...session, approachNotes: notes },
+        });
+    };
+
+    const toggleEdgeCase = (id) => {
+        const nextChecklist = session.edgeCaseChecklist.map((item) =>
+            item.id === id ? { ...item, checked: !item.checked } : item
+        );
+        socketRef.current?.emit('session-update', {
+            roomId,
+            session: { ...session, edgeCaseChecklist: nextChecklist },
+        });
+    };
+
+    const updateMentorNotes = (notes) => {
+        socketRef.current?.emit('session-update', {
+            roomId,
+            session: { ...session, mentorNotes: notes },
+        });
+    };
+
+    const reviewSolution = async () => {
+        setIsReviewLoading(true);
+        setShowReview(true);
+        try {
+            const code = editorRef.current?.getValue() || "";
+            const response = await axios.post(`${serverUrl}/api/ai/review`, {
+                code,
+                problem: roomState?.problem,
+                language: selectedLanguage,
+            }, {
+                headers: getAuthHeaders(),
+            });
+            setReviewContent(response.data);
+        } catch (error) {
+            toast.error("Failed to get review");
+            setShowReview(false);
+        } finally {
+            setIsReviewLoading(false);
+        }
+    };
 
 
     useEffect(() => {
@@ -166,15 +260,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
         setSelectedLanguage(nextLanguage);
         editorRef.current.setOption("mode", LANGUAGE_OPTIONS[nextLanguage].editorMode);
 
-        if (typeof roomState.code === "string" && editorRef.current.getValue() !== roomState.code) {
-            const cursor = editorRef.current.getCursor();
-            const scrollInfo = editorRef.current.getScrollInfo();
-
+        // Only set the value if the editor is currently empty (initial load)
+        const currentCode = editorRef.current.getValue();
+        if (typeof roomState.code === "string" && !currentCode.trim() && roomState.code.trim()) {
             editorRef.current.setValue(roomState.code);
-            editorRef.current.setCursor(cursor);
-            editorRef.current.scrollTo(scrollInfo.left, scrollInfo.top);
         }
-    }, [roomState]);
+    }, [roomState, roomId]);
 
     useEffect(() => {
         const socket = socketRef.current;
@@ -183,13 +274,16 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
 
         const handleCodeChange = ({ code }) => {
             if (code !== null && editorRef.current) {
-                const cursor = editorRef.current.getCursor();
-                const scrollInfo = editorRef.current.getScrollInfo();
+                const currentCode = editorRef.current.getValue();
+                if (code !== currentCode) {
+                    const cursor = editorRef.current.getCursor();
+                    const scrollInfo = editorRef.current.getScrollInfo();
 
-                editorRef.current.setValue(code);
+                    editorRef.current.setValue(code);
 
-                editorRef.current.setCursor(cursor);
-                editorRef.current.scrollTo(scrollInfo.left, scrollInfo.top);
+                    editorRef.current.setCursor(cursor);
+                    editorRef.current.scrollTo(scrollInfo.left, scrollInfo.top);
+                }
             }
         };
 
@@ -445,6 +539,16 @@ const runCode = async () => {
       sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
     });
 
+    socketRef.current?.emit('run-history-update', {
+      roomId,
+      run: {
+        status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
+        time: time || "N/A",
+        memory: memory || "N/A",
+        passed: sampleMatched,
+      },
+    });
+
     const finalOutput = (
       <div className="space-y-4 text-sm">
         {sampleMatched && (
@@ -561,6 +665,15 @@ const runCode = async () => {
                         </svg>
                         Format
                     </button>
+                    <button
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800/50 shadow-sm h-9 px-4"
+                        onClick={reviewSolution}
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Review Solution
+                    </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -583,13 +696,30 @@ const runCode = async () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
                     <div className="flex items-center gap-2">
-                        <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.12em] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                        <span className={`rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em] uppercase ${
+                            participationLabel === 'Driver' 
+                                ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200'
+                                : participationLabel === 'Navigator'
+                                    ? 'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800/50 dark:bg-purple-950/30 dark:text-purple-200'
+                                    : 'border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+                        }`}>
                             {participationLabel}
                         </span>
+                        {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
+                            <button
+                                onClick={handleSwapRoles}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                                title="Swap Roles"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
                     <div className="flex items-center gap-2">
@@ -753,18 +883,18 @@ const runCode = async () => {
                     />
                 </div>
 
-                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left">
-                    <div className="flex h-full min-h-[16rem] flex-col">
-                        <div className="flex items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/70">
+                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left overflow-hidden">
+                    <div className="flex h-full flex-col min-h-0">
+                        <div className="flex flex-none items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/70">
                             <div className="flex gap-1.5">
                                 <div className="h-3 w-3 rounded-full bg-red-500"></div>
                                 <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
                                 <div className="h-3 w-3 rounded-full bg-green-500"></div>
                             </div>
-                            <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400">Output</span>
+                            <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Output</span>
                         </div>
 
-                        <div className="border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                        <div className="flex-none border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                     {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
@@ -813,7 +943,107 @@ const runCode = async () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6">
+                            {/* Session Content */}
+                            <div className="space-y-6">
+                                {/* Approach Notes */}
+                                <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Approach Notes</h3>
+                                        <span className="text-[10px] text-gray-400">Shared with partner</span>
+                                    </div>
+                                    <textarea
+                                        value={session.approachNotes}
+                                        onChange={(e) => updateApproachNotes(e.target.value)}
+                                        placeholder="Idea, brute force, optimized approach, edge cases..."
+                                        className="w-full min-h-[100px] rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-900 outline-none focus:border-blue-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500"
+                                    />
+                                </div>
+
+                                {/* Edge Case Checklist */}
+                                <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {session.edgeCaseChecklist.map((item) => (
+                                            <label key={item.id} className="flex items-center gap-3 cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={item.checked}
+                                                    onChange={() => toggleEdgeCase(item.id)}
+                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                                                />
+                                                <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                    {item.label}
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Run History */}
+                                {session.runHistory.length > 0 && (
+                                    <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Run History</h3>
+                                        <div className="space-y-2">
+                                            {session.runHistory.map((run) => (
+                                                <div key={run.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-white/80 p-2 text-xs dark:border-gray-700 dark:bg-gray-800/60">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`h-1.5 w-1.5 rounded-full ${run.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                        <span className="font-medium text-gray-700 dark:text-gray-300">{run.status}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span>{run.time}</span>
+                                                        <span>{run.memory}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Mentor Notes */}
+                                {isMentorOrInterviewer && (
+                                    <div className="rounded-2xl border border-purple-200 bg-purple-50/30 p-4 dark:border-purple-800/30 dark:bg-purple-900/10">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">Private Mentor Notes</h3>
+                                            <span className="text-[10px] text-purple-400">Visible only to you</span>
+                                        </div>
+                                        <textarea
+                                            value={session.mentorNotes}
+                                            onChange={(e) => updateMentorNotes(e.target.value)}
+                                            placeholder="Confusion points, next topic, score/rubric..."
+                                            className="w-full min-h-[100px] rounded-lg border border-purple-100 bg-white p-3 text-sm text-gray-900 outline-none focus:border-purple-400 dark:border-purple-800/50 dark:bg-gray-800 dark:text-white dark:focus:border-purple-500"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="h-px bg-gray-200 dark:bg-gray-700 my-2"></div>
+
+                            {/* Output Content */}
+                            {showReview && (
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-4 dark:border-amber-800/30 dark:bg-amber-900/10">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Solution Review</h3>
+                                        <button onClick={() => setShowReview(false)} className="text-gray-400 hover:text-gray-600">
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    {isReviewLoading ? (
+                                        <div className="flex items-center gap-2 py-4 justify-center">
+                                            <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                            <span className="text-sm text-amber-700 dark:text-amber-400">Analyzing solution...</span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                            {reviewContent}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {sampleInput && (
                                 <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
                                     <div className="mb-2 flex items-center justify-between gap-3">
