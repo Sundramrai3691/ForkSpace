@@ -16,6 +16,12 @@ const capabilityCards = [
     },
 ];
 
+const recommendedFlow = [
+    'Open or paste a Codeforces problem URL to keep the room anchored to one problem.',
+    'Fill the shared sample input and expected output manually so everyone runs against the same visible test case.',
+    'Code together, run the solution, and use the mismatch view to discuss what changed.',
+];
+
 const useCases = [
     {
         title: 'Mock Interviews',
@@ -113,6 +119,27 @@ function Login() {
                                     <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{card.description}</p>
                                 </article>
                             ))}
+                        </div>
+
+                        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                            <div className="max-w-3xl space-y-3">
+                                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Recommended Flow</p>
+                                <h3 className="text-2xl font-semibold tracking-tight">Keep the session practical instead of over-automated.</h3>
+                                <p className="text-sm leading-7 text-slate-600 dark:text-slate-400">
+                                    ForkSpace is strongest when it acts like a shared problem-solving room, especially for Codeforces-style practice where pairs want one editor, one test case source, and one place to compare outputs.
+                                </p>
+                            </div>
+
+                            <div className="mt-6 grid gap-4 md:grid-cols-3">
+                                {recommendedFlow.map((step, index) => (
+                                    <div key={step} className="rounded-2xl border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-800 dark:bg-slate-950/60">
+                                        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
+                                            Flow {index + 1}
+                                        </p>
+                                        <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{step}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </section>

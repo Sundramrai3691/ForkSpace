@@ -50,7 +50,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
         sourceUrl: '',
         title: '',
         prompt: '',
-        pastedStatement: '',
         sampleInput: '',
         sampleOutput: '',
         samples: [],
@@ -66,7 +65,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
             sourceUrl: roomState?.problem?.sourceUrl || '',
             title: roomState?.problem?.title || '',
             prompt: roomState?.problem?.prompt || '',
-            pastedStatement: roomState?.problem?.pastedStatement || '',
             sampleInput: roomState?.problem?.sampleInput || '',
             sampleOutput: roomState?.problem?.sampleOutput || '',
             samples: roomState?.problem?.samples || [],
@@ -154,8 +152,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
             }));
 
             if (response.data.warning) {
-                setImportNotice(response.data.warning);
-                toast(response.data.warning, {
+                const nextNotice = 'Automatic import was limited for this problem. Keep the URL and title for context, then paste the sample input and expected output manually below.';
+                setImportNotice(nextNotice);
+                toast(nextNotice, {
                     icon: '!',
                 });
             } else {
@@ -164,38 +163,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
             }
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to import from URL');
-        } finally {
-            setIsImporting(false);
-        }
-    };
-
-    const handleParseStatement = async () => {
-        if (!problemDraft.pastedStatement.trim()) {
-            toast.error('Paste a problem statement first.');
-            return;
-        }
-
-        setIsImporting(true);
-        setImportNotice('');
-
-        try {
-            const response = await axios.post(`${serverUrl}/api/problem-import-text`, {
-                statement: problemDraft.pastedStatement,
-            });
-
-            setProblemDraft((prev) => ({
-                ...prev,
-                ...response.data.problem,
-                platform: prev.platform,
-                problemCode: prev.problemCode,
-                problemUrl: prev.problemUrl,
-                sourceUrl: prev.sourceUrl,
-            }));
-
-            setImportNotice('Examples were parsed from the pasted statement.');
-            toast.success('Examples parsed from statement');
-        } catch (error) {
-            toast.error(error.response?.data?.error || 'Failed to parse the pasted statement');
         } finally {
             setIsImporting(false);
         }
@@ -215,15 +182,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                     </div>
 
                     <div className="space-y-3">
-                        <div className="rounded-xl border border-gray-200 bg-white/80 p-3 dark:border-gray-700 dark:bg-gray-900/60">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                Recommended Flow
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-gray-700 dark:text-gray-300">
-                                Use Codeforces as the primary workflow. Import the URL for context, then keep the shared sample input and expected output filled manually so the room can run and compare solutions reliably.
-                            </p>
-                        </div>
-
                         <div className="rounded-xl border border-blue-200 bg-blue-50/90 p-3 text-sm leading-6 text-blue-900 dark:border-blue-800/60 dark:bg-blue-950/30 dark:text-blue-100">
                             LeetCode stays available for collaborative discussion, but this room is optimized for Codeforces-style input/output practice.
                         </div>
@@ -310,20 +268,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                             className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                         >
                             {isImporting ? 'Importing problem...' : 'Import problem details'}
-                        </button>
-                        <textarea
-                            value={problemDraft.pastedStatement}
-                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, pastedStatement: event.target.value }))}
-                            placeholder="Paste the visible statement here if import is blocked. We will try to parse the sample Input / Output sections into shared tests."
-                            className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                        />
-                        <button
-                            type="button"
-                            onClick={handleParseStatement}
-                            disabled={isImporting || !problemDraft.pastedStatement.trim()}
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                        >
-                            {isImporting ? 'Parsing statement...' : 'Parse pasted statement'}
                         </button>
                         <input
                             type="text"
