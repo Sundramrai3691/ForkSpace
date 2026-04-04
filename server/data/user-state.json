@@ -16,7 +16,7 @@
         "username": "Mickey",
         "problemTitle": "Two Sum",
         "problemCode": "1",
-        "updatedAt": "2026-04-04T06:13:09.273Z"
+        "updatedAt": "2026-04-04T06:17:28.219Z"
       },
       {
         "roomId": "5CDI17JO",
@@ -38,6 +38,15 @@
   },
   "runHistoryByUser": {
     "0b83ddd8-3b6d-4d58-9304-ec96b3957dcc": [
+      {
+        "roomId": "3HTFQCPS",
+        "languageId": 54,
+        "languageLabel": "C++",
+        "problemTitle": "Two Sum",
+        "problemCode": "1",
+        "status": "completed",
+        "createdAt": "2026-04-04T06:17:49.276Z"
+      },
       {
         "roomId": "5CDI17JO",
         "languageId": 54,

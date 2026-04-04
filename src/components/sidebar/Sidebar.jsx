@@ -6,9 +6,9 @@ import toast from 'react-hot-toast';
 import { useEffect, useState } from 'react';
 
 const PLATFORM_OPTIONS = [
-    { value: 'custom', label: 'Custom' },
     { value: 'codeforces', label: 'Codeforces' },
-    { value: 'leetcode', label: 'LeetCode' },
+    { value: 'custom', label: 'Custom / Other' },
+    { value: 'leetcode', label: 'LeetCode (discussion)' },
     { value: 'atcoder', label: 'AtCoder' },
     { value: 'other', label: 'Other' },
 ];
@@ -44,7 +44,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
     const [isImporting, setIsImporting] = useState(false);
     const [importNotice, setImportNotice] = useState('');
     const [problemDraft, setProblemDraft] = useState({
-        platform: 'custom',
+        platform: 'codeforces',
         problemCode: '',
         problemUrl: '',
         sourceUrl: '',
@@ -60,7 +60,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
 
     useEffect(() => {
         setProblemDraft({
-            platform: roomState?.problem?.platform || 'custom',
+            platform: roomState?.problem?.platform || 'codeforces',
             problemCode: roomState?.problem?.problemCode || '',
             problemUrl: roomState?.problem?.problemUrl || '',
             sourceUrl: roomState?.problem?.sourceUrl || '',
@@ -220,8 +220,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                                 Recommended Flow
                             </p>
                             <p className="mt-2 text-sm leading-6 text-gray-700 dark:text-gray-300">
-                                Import from a problem URL first. If Codeforces blocks the fetch, paste the statement below and parse the examples.
+                                Use Codeforces as the primary workflow. Import the URL for context, then keep the shared sample input and expected output filled manually so the room can run and compare solutions reliably.
                             </p>
+                        </div>
+
+                        <div className="rounded-xl border border-blue-200 bg-blue-50/90 p-3 text-sm leading-6 text-blue-900 dark:border-blue-800/60 dark:bg-blue-950/30 dark:text-blue-100">
+                            LeetCode stays available for collaborative discussion, but this room is optimized for Codeforces-style input/output practice.
                         </div>
 
                         {importNotice && (
@@ -294,7 +298,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                                             title: formatProblemTitle(prev.platform, nextProblemCode, prev.title),
                                         }));
                                     }}
-                                    placeholder="1885A or 1235"
+                                    placeholder="1885A"
                                     className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                                 />
                             </label>
@@ -310,8 +314,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                         <textarea
                             value={problemDraft.pastedStatement}
                             onChange={(event) => setProblemDraft((prev) => ({ ...prev, pastedStatement: event.target.value }))}
-                            placeholder="Paste the visible problem statement here if the site blocks import. We will parse Input / Output examples into shared sample tests."
-                            className="h-28 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            placeholder="Paste the visible statement here if import is blocked. We will try to parse the sample Input / Output sections into shared tests."
+                            className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         />
                         <button
                             type="button"
@@ -335,18 +339,28 @@ function Sidebar({ users = [], roomId, roomState, socketRef }) {
                             className="h-24 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         />
                         <div className="grid gap-3">
-                            <textarea
-                                value={problemDraft.sampleInput}
-                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
-                                placeholder="Sample input"
-                                className="h-20 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                            />
-                            <textarea
-                                value={problemDraft.sampleOutput}
-                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
-                                placeholder="Expected output"
-                                className="h-20 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                            />
+                            <label className="space-y-1.5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Sample Input
+                                </span>
+                                <textarea
+                                    value={problemDraft.sampleInput}
+                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
+                                    placeholder="Paste the Codeforces sample input here"
+                                    className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                />
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Expected Output
+                                </span>
+                                <textarea
+                                    value={problemDraft.sampleOutput}
+                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
+                                    placeholder="Paste the expected output here"
+                                    className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                />
+                            </label>
                         </div>
                         {problemDraft.samples?.length > 0 && (
                             <div className="flex items-center justify-between rounded-xl border border-dashed border-gray-300 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/50">

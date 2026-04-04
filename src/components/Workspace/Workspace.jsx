@@ -43,6 +43,25 @@ function OutputSection({ tone, title, children }) {
     );
 }
 
+function ComparisonPanel({ expectedOutput, actualOutput }) {
+    return (
+        <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-red-200 bg-white/90 p-4 dark:border-red-800/50 dark:bg-gray-900/70">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">
+                    Expected Output
+                </p>
+                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{expectedOutput || "No expected output provided."}</pre>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-white/90 p-4 dark:border-amber-800/50 dark:bg-gray-900/70">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                    Your Output
+                </p>
+                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{actualOutput || "No stdout produced."}</pre>
+            </div>
+        </div>
+    );
+}
+
 function normalizeOutput(value = "") {
     return value.replace(/\r\n/g, "\n").trim();
 }
@@ -94,7 +113,6 @@ function Workspace({ socketRef, roomId, roomState }) {
     const [output, setOutput] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
-    const [stdin, setStdin] = useState("");
     const [lastRunMeta, setLastRunMeta] = useState(null);
     const [sampleSuiteMeta, setSampleSuiteMeta] = useState(null);
     const [timerDuration, setTimerDuration] = useState(45 * 60);
@@ -336,12 +354,6 @@ function Workspace({ socketRef, roomId, roomState }) {
       }
     };
 
-    const handleUseSampleInput = () => {
-      const sampleInput = roomState?.problem?.sampleInput || "";
-      setStdin(sampleInput);
-      toast.success("Sample input copied into stdin");
-    };
-
     const handleLanguageChange = (event) => {
       const nextLanguage = event.target.value;
       const nextLanguageConfig = LANGUAGE_OPTIONS[nextLanguage];
@@ -371,16 +383,15 @@ function Workspace({ socketRef, roomId, roomState }) {
 const runCode = async () => {
   const rawCode = editorRef.current.getValue();
   const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
-  const manualStdin = stdin.trim();
   const fallbackSampleInput = sampleInput.trim();
-  const effectiveStdin = manualStdin.length > 0 ? stdin : sampleInput;
-  const isUsingSampleInput = manualStdin.length === 0 && fallbackSampleInput.length > 0;
+  const effectiveStdin = sampleInput;
+  const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
   const normalizedExpectedOutput = normalizeOutput(expectedOutput);
 
   setLastRunMeta({
     languageLabel: languageConfig.label,
     hasStdin: effectiveStdin.trim().length > 0,
-    inputSource: isUsingSampleInput ? "sample" : manualStdin.length > 0 ? "manual" : "none",
+    inputSource,
     status: "Running",
     time: null,
     memory: null,
@@ -425,7 +436,7 @@ const runCode = async () => {
     setLastRunMeta({
       languageLabel: languageConfig.label,
       hasStdin: effectiveStdin.trim().length > 0,
-      inputSource: isUsingSampleInput ? "sample" : manualStdin.length > 0 ? "manual" : "none",
+      inputSource,
       status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
       time: time || "N/A",
       memory: memory || "N/A",
@@ -441,9 +452,22 @@ const runCode = async () => {
         )}
 
         {sampleMismatched && (
-          <OutputSection tone="error" title="Mismatch">
-            Actual output does not match the expected output for the shared sample test case.
-          </OutputSection>
+          <>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-100">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">Sample Check Failed</p>
+                  <p className="mt-1 text-sm leading-6">
+                    Your program ran, but the output does not match the expected output for the shared sample test.
+                  </p>
+                </div>
+                <span className="rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
+                  Mismatch
+                </span>
+              </div>
+            </div>
+            <ComparisonPanel expectedOutput={expectedOutput} actualOutput={stdout} />
+          </>
         )}
 
         {compile_output && (
@@ -483,7 +507,7 @@ const runCode = async () => {
     setLastRunMeta({
       languageLabel: languageConfig.label,
       hasStdin: effectiveStdin.trim().length > 0,
-      inputSource: isUsingSampleInput ? "sample" : manualStdin.length > 0 ? "manual" : "none",
+      inputSource,
       status: "Request Failed",
       time: null,
       memory: null,
@@ -880,9 +904,6 @@ const runSampleSuite = async () => {
                                     {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
                                 </div>
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                    stdin: {lastRunMeta?.hasStdin ? "present" : "empty"}
-                                </div>
-                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                     source: {lastRunMeta?.inputSource || "none"}
                                 </div>
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
@@ -931,36 +952,20 @@ const runSampleSuite = async () => {
                             </div>
                         </div>
 
-                        <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                                <label htmlFor="stdin" className="block text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                                    Standard Input
-                                </label>
-                                {roomState?.problem?.sampleInput && (
-                                    <button
-                                        type="button"
-                                        onClick={handleUseSampleInput}
-                                        className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:text-white"
-                                    >
-                                        Use sample input
-                                    </button>
-                                )}
-                            </div>
-                            <textarea
-                                id="stdin"
-                                value={stdin}
-                                onChange={(event) => setStdin(event.target.value)}
-                                className="h-24 w-full rounded-xl border border-gray-200 bg-white p-3 text-sm font-mono text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                placeholder={sampleInput ? "Leave empty to use the shared sample input automatically..." : "Optional stdin..."}
-                            />
-                            {sampleInput && !stdin.trim() && (
-                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    Running now will use the shared sample input automatically.
-                                </p>
-                            )}
-                        </div>
-
                         <div className="flex-1 overflow-y-auto p-4">
+                            {sampleInput && (
+                                <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                            Shared Sample Input
+                                        </p>
+                                        <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                            Used by Run
+                                        </span>
+                                    </div>
+                                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">{sampleInput}</pre>
+                                </div>
+                            )}
                             {expectedOutput && (
                                 <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
                                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
