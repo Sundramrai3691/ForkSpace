@@ -11,14 +11,51 @@
   "roomHistoryByUser": {
     "0b83ddd8-3b6d-4d58-9304-ec96b3957dcc": [
       {
+        "roomId": "3HTFQCPS",
+        "role": "Peer",
+        "username": "Mickey",
+        "problemTitle": "Codeforces 1845A",
+        "problemCode": "1845A",
+        "updatedAt": "2026-04-04T06:01:03.466Z"
+      },
+      {
+        "roomId": "5CDI17JO",
+        "role": "Peer",
+        "username": "Mickey",
+        "problemTitle": "Two Sum",
+        "problemCode": "1",
+        "updatedAt": "2026-04-04T05:58:35.742Z"
+      },
+      {
         "roomId": "7W6ZKW4C",
         "role": "Peer",
         "username": "Mickey",
         "problemTitle": "Untitled Practice Problem",
         "problemCode": "",
-        "updatedAt": "2026-04-03T20:49:24.140Z"
+        "updatedAt": "2026-04-03T20:52:56.010Z"
       }
     ]
   },
-  "runHistoryByUser": {}
+  "runHistoryByUser": {
+    "0b83ddd8-3b6d-4d58-9304-ec96b3957dcc": [
+      {
+        "roomId": "5CDI17JO",
+        "languageId": 54,
+        "languageLabel": "C++",
+        "problemTitle": "Untitled Practice Problem",
+        "problemCode": "",
+        "status": "completed",
+        "createdAt": "2026-04-04T05:58:25.943Z"
+      },
+      {
+        "roomId": "7W6ZKW4C",
+        "languageId": 54,
+        "languageLabel": "C++",
+        "problemTitle": "Untitled Practice Problem",
+        "problemCode": "",
+        "status": "completed",
+        "createdAt": "2026-04-03T20:49:51.738Z"
+      }
+    ]
+  }
 }
