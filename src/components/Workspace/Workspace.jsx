@@ -983,7 +983,7 @@ const runCode = async () => {
                     )}
                 </OverlayPanel>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-3 dark:border-gray-700/80 dark:bg-[#081121]">
+            <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3 border-b border-gray-200/80 bg-white px-5 py-3 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-800 bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-200 dark:bg-white dark:text-black dark:hover:bg-gray-100"
@@ -1033,9 +1033,9 @@ const runCode = async () => {
                     </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5">
-                    <div className="flex items-center gap-2">
-                        <label htmlFor="language-select" className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex flex-1 flex-wrap items-center justify-end gap-2.5">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                        <label htmlFor="language-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
                         </label>
                         <select
@@ -1043,7 +1043,7 @@ const runCode = async () => {
                             value={selectedLanguage}
                             onChange={handleLanguageChange}
                             disabled={!editorUnlocked}
-                            className="h-9 rounded-xl border border-gray-200 bg-white/92 px-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
+                            className="h-8 min-w-[110px] rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-[#111d33] dark:text-white"
                         >
                             {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
                                 <option key={languageKey} value={languageKey}>
@@ -1052,12 +1052,11 @@ const runCode = async () => {
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                             <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
-                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <span className={`rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em] uppercase ${
                             participationLabel === 'Driver' 
                                 ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200'
@@ -1096,16 +1095,18 @@ const runCode = async () => {
                             </button>
                         )}
                     </div>
-                    <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-                    <div className="flex items-center gap-2">
+                    <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                        {controlMessage}
+                    </div>
+                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <span className="text-sm text-gray-600 dark:text-gray-400">Room:</span>
-                        <code className="relative rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
+                        <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {roomId}
                         </code>
                         <div className="relative" ref={settingsRef}>
                             <button
                                 onClick={() => setShowSettings((current) => !current)}
-                                className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="group relative inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-[#111d33] hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
                                 aria-label="Practice room settings"
                                 title="Practice room settings"
                             >
@@ -1141,9 +1142,6 @@ const runCode = async () => {
                                     </button>
                                 </div>
                             )}
-                        </div>
-                        <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                            {controlMessage}
                         </div>
                         <div className="relative group">
                             <button 
@@ -1219,7 +1217,7 @@ const runCode = async () => {
                             )}
                         </div>
                         {isMockMode && (
-                            <div className="flex items-center gap-2 border-l border-gray-200 pl-2.5 dark:border-gray-700">
+                            <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                                 <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
                                     {formatTimerLabel(timeRemaining)}
                                 </span>
@@ -1260,15 +1258,6 @@ const runCode = async () => {
                         ? 'border-emerald-200/80 dark:border-emerald-800/40'
                         : 'border-rose-200/80 dark:border-rose-800/40'
                 } bg-white dark:bg-[#0a1324]`}>
-                    <div className="pointer-events-none absolute left-4 top-3 z-10 flex items-center gap-2">
-                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                            editorUnlocked
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200'
-                                : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200'
-                        }`}>
-                            {editorUnlocked ? 'Typing enabled' : 'Read only'}
-                        </span>
-                    </div>
                     <textarea 
                         id="realtimeEditor" 
                         className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
