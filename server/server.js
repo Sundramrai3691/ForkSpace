@@ -631,10 +631,16 @@ function getGeminiApiKey() {
   return apiKey;
 }
 
+function getGroqApiKey() {
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  if (!apiKey || apiKey.toLowerCase().includes("your_")) return "";
+  return apiKey;
+}
+
 async function getAiReview(prompt, apiKey, model = "mistral") {
   if (model === "gemini") {
-    // Use gemini-1.5-flash-latest to ensure we're hitting the correct endpoint for v1beta
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    // Use gemini-1.5-flash with v1 API (more stable than v1beta)
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     try {
       const response = await axios.post(
         geminiUrl,
@@ -643,8 +649,6 @@ async function getAiReview(prompt, apiKey, model = "mistral") {
           generationConfig: {
             temperature: 0.2,
             maxOutputTokens: 1024,
-            topP: 0.95,
-            topK: 40,
           },
         },
         { timeout: 15000 },
@@ -684,6 +688,34 @@ async function getAiReview(prompt, apiKey, model = "mistral") {
       throw new Error(
         errorData?.error?.message || errorMessage || "Gemini API call failed",
       );
+    }
+  }
+
+  if (model === "groq") {
+    const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
+    try {
+      const response = await axios.post(
+        groqUrl,
+        {
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        },
+      );
+      return response.data?.choices?.[0]?.message?.content || "";
+    } catch (error) {
+      console.error(
+        "Groq API error detail:",
+        error.response?.data || error.message,
+      );
+      throw error;
     }
   }
 
@@ -1528,12 +1560,13 @@ app.post("/api/ai/review", aiLimiter, async (req, res) => {
   const { code, problem, language } = req.body || {};
   const mistralKey = getMistralApiKey();
   const geminiKey = getGeminiApiKey();
+  const groqKey = getGroqApiKey();
 
   if (!code) return res.status(400).json({ error: "Missing code" });
-  if (!mistralKey && !geminiKey) {
+  if (!mistralKey && !geminiKey && !groqKey) {
     return res.status(503).json({
       error:
-        "AI services are not configured. Please add MISTRAL_API_KEY or GEMINI_API_KEY to your .env file.",
+        "AI services are not configured. Please add GEMINI_API_KEY, GROQ_API_KEY, or MISTRAL_API_KEY to your .env file.",
     });
   }
 
@@ -1557,16 +1590,31 @@ ${code}
 
   try {
     let review;
-    if (geminiKey) {
-      review = await getAiReview(prompt, geminiKey, "gemini");
-    } else {
+    // Priority: Groq -> Gemini -> Mistral
+    if (groqKey) {
+      try {
+        review = await getAiReview(prompt, groqKey, "groq");
+      } catch (e) {
+        console.warn("Groq failed, falling back to other AI if available");
+      }
+    }
+
+    if (!review && geminiKey) {
+      try {
+        review = await getAiReview(prompt, geminiKey, "gemini");
+      } catch (e) {
+        console.warn("Gemini failed, falling back to Mistral if available");
+      }
+    }
+
+    if (!review && mistralKey) {
       review = await getAiReview(prompt, mistralKey, "mistral");
     }
 
     if (!review) {
       return res.status(500).json({
         error:
-          "The AI provider returned an empty response. This might be due to safety filters or a temporary service issue.",
+          "All configured AI providers failed or returned an empty response. This might be due to safety filters or service issues.",
       });
     }
 

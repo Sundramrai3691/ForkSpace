@@ -45,28 +45,65 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
 
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     const mistralKey = process.env.MISTRAL_API_KEY?.trim();
+    const groqKey = process.env.GROQ_API_KEY?.trim();
 
-    if (!geminiKey && !mistralKey) {
+    if (!geminiKey && !mistralKey && !groqKey) {
       return res.status(503).json({ error: "AI services not configured" });
     }
 
     let hint = "";
-    if (geminiKey) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
-      const response = await axios.post(geminiUrl, {
-        contents: [
+    if (groqKey) {
+      try {
+        const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
+        const response = await axios.post(
+          groqUrl,
           {
-            parts: [
+            model: "llama-3.3-70b-versatile",
+            messages: [
               {
-                text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
+                role: "user",
+                content: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
               },
             ],
+            temperature: 0.2,
+            max_tokens: 64,
           },
-        ],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 64 },
-      });
-      hint = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } else {
+          {
+            headers: {
+              Authorization: `Bearer ${groqKey}`,
+              "Content-Type": "application/json",
+            },
+            timeout: 5000,
+          },
+        );
+        hint = response.data?.choices?.[0]?.message?.content || "";
+      } catch (e) {
+        console.warn("Groq hint failed, falling back...");
+      }
+    }
+
+    if (!hint && geminiKey) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+        const response = await axios.post(geminiUrl, {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 64 },
+        });
+        hint = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } catch (e) {
+        console.warn("Gemini hint failed, falling back...");
+      }
+    }
+
+    if (!hint && mistralKey) {
       const response = await axios.post(
         "https://codestral.mistral.ai/v1/fim/completions",
         {
@@ -103,8 +140,9 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
 
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     const mistralKey = process.env.MISTRAL_API_KEY?.trim();
+    const groqKey = process.env.GROQ_API_KEY?.trim();
 
-    if (!code || (!geminiKey && !mistralKey)) {
+    if (!code || (!geminiKey && !mistralKey && !groqKey)) {
       return res
         .status(400)
         .json({ error: "Missing code or API key", hints: [] });
@@ -112,37 +150,83 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
 
     const suggestions = [];
 
-    if (geminiKey) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
-      const response = await axios.post(
-        geminiUrl,
-        {
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
-                },
-              ],
-            },
-          ],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
-        },
-        { timeout: 10000 },
-      );
-      const text =
-        response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (groqKey) {
       try {
-        const jsonStart = text.indexOf("[");
-        const jsonEnd = text.lastIndexOf("]") + 1;
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
-          if (Array.isArray(parsed)) suggestions.push(...parsed);
+        const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
+        const response = await axios.post(
+          groqUrl,
+          {
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              {
+                role: "user",
+                content: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
+              },
+            ],
+            temperature: 0.3,
+            max_tokens: 256,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${groqKey}`,
+              "Content-Type": "application/json",
+            },
+            timeout: 5000,
+          },
+        );
+        const text = response.data?.choices?.[0]?.message?.content || "";
+        try {
+          const jsonStart = text.indexOf("[");
+          const jsonEnd = text.lastIndexOf("]") + 1;
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
+            if (Array.isArray(parsed)) suggestions.push(...parsed);
+          }
+        } catch (e) {
+          if (text) suggestions.push(text.trim().split("\n")[0]);
         }
       } catch (e) {
-        if (text) suggestions.push(text.trim().split("\n")[0]);
+        console.warn("Groq hints failed, falling back...");
       }
-    } else {
+    }
+
+    if (suggestions.length === 0 && geminiKey) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+        const response = await axios.post(
+          geminiUrl,
+          {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
+          },
+          { timeout: 10000 },
+        );
+        const text =
+          response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        try {
+          const jsonStart = text.indexOf("[");
+          const jsonEnd = text.lastIndexOf("]") + 1;
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
+            if (Array.isArray(parsed)) suggestions.push(...parsed);
+          }
+        } catch (e) {
+          if (text) suggestions.push(text.trim().split("\n")[0]);
+        }
+      } catch (e) {
+        console.warn("Gemini hints failed, falling back...");
+      }
+    }
+
+    if (suggestions.length === 0 && mistralKey) {
       // Mistral logic... (keeping existing)
       if (beforeCursor && afterCursor) {
         const response = await axios.post(
