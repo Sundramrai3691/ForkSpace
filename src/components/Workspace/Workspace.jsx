@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import Codemirror from "codemirror";
@@ -221,6 +221,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             edgeCaseChecklist: [],
             runHistory: [],
             mentorNotes: '',
+            mockSummary: null,
+            mockLocked: false,
         }
     ), [roomState?.session]);
     const normalizedRole = (currentRole || 'Peer').toLowerCase();
@@ -252,8 +254,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 : hasAssignedDriver
                     ? isDriver
                     : true;
+    const editorUnlocked = canEdit && !session.mockLocked;
 
-    const controlTone = canEdit
+    const controlTone = editorUnlocked
         ? isDriver
             ? 'driver'
             : isMentoringMode
@@ -273,15 +276,17 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 : 'Observer';
 
     const controlMessage = isMentoringMode
-        ? canEdit
+        ? editorUnlocked
             ? 'Mentor controls the editor in mentoring mode.'
             : 'Learners stay read-only while the mentor guides the session.'
         : isMockMode
-            ? canEdit
-                ? 'Candidate has the keyboard during the mock round.'
-                : 'Observers and interviewers stay read-only during the mock round.'
+            ? session.mockLocked
+                ? 'Time is up. The mock editor is locked until the round is reset.'
+                : editorUnlocked
+                    ? 'Candidate has the keyboard during the mock round.'
+                    : 'Observers and interviewers stay read-only during the mock round.'
             : hasAssignedDriver
-                ? canEdit
+                ? editorUnlocked
                     ? 'You currently control the editor as Driver.'
                     : 'The editor is locked while the Driver types.'
                 : 'Peer mode stays collaborative until someone claims Driver.';
@@ -313,6 +318,21 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             session: { ...session, mentorNotes: notes },
         });
     };
+
+    const createMockSummaryShare = useCallback(async (summaryPayload) => {
+        try {
+            const response = await axios.post(`${serverUrl}/api/mock-summary`, {
+                roomId,
+                summary: summaryPayload,
+            }, {
+                headers: getAuthHeaders(),
+            });
+
+            return response.data.summaryId;
+        } catch {
+            return null;
+        }
+    }, [roomId, serverUrl]);
 
     const reviewSolution = async () => {
         setIsReviewLoading(true);
@@ -374,7 +394,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         if (!editorRef.current) return;
 
         const wrapper = editorRef.current.getWrapperElement();
-        editorRef.current.setOption("readOnly", canEdit ? false : "nocursor");
+        editorRef.current.setOption("readOnly", editorUnlocked ? false : "nocursor");
 
         if (wrapper) {
             wrapper.classList.remove(
@@ -387,7 +407,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             );
             wrapper.classList.add(`forkspace-editor-${controlTone}`);
         }
-    }, [canEdit, controlTone]);
+    }, [controlTone, editorUnlocked]);
 
     useEffect(() => {
         if (!editorRef.current || !roomState) return;
@@ -505,43 +525,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         }
 
         const intervalId = window.setInterval(() => {
-            setTimeRemaining((currentValue) => {
-                if (currentValue <= 1) {
-                    window.clearInterval(intervalId);
-                    setIsTimerRunning(false);
-                    if (isMockMode) {
-                        const snapshot = {
-                            capturedAt: new Date().toISOString(),
-                            durationLabel: formatTimerLabel(timerDuration),
-                            timerFinished: true,
-                            candidate: isCandidateRole ? currentUsername : driverUser?.username || currentUsername,
-                            interviewer: isInterviewerRole ? currentUsername : navigatorUser?.username || 'Not assigned',
-                            problemTitle: roomState?.problem?.title || 'Untitled Practice Problem',
-                            latestRunStatus: lastRunMeta?.status || 'Not run yet',
-                            latestSampleCheck: lastRunMeta?.sampleCheck || 'n/a',
-                            codeLength: (editorRef.current?.getValue() || '').trim().length,
-                        };
-
-                        socketRef.current?.emit('session-update', {
-                            roomId,
-                            session: {
-                                ...session,
-                                mockSummary: snapshot,
-                            },
-                        });
-                        toast.success("Mock timer complete. Session snapshot saved.");
-                    } else {
-                        toast.success("Timer complete");
-                    }
-                    return 0;
-                }
-
-                return currentValue - 1;
-            });
+            setTimeRemaining((currentValue) => (currentValue <= 1 ? 0 : currentValue - 1));
         }, 1000);
 
         return () => window.clearInterval(intervalId);
     }, [
+        createMockSummaryShare,
         currentUsername,
         driverUser?.username,
         isCandidateRole,
@@ -551,10 +540,69 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         lastRunMeta?.sampleCheck,
         lastRunMeta?.status,
         navigatorUser?.username,
+        output,
         roomId,
         roomState?.problem?.title,
         session,
         socketRef,
+        timerDuration,
+    ]);
+
+    useEffect(() => {
+        if (!isMockMode || timeRemaining !== 0 || !isTimerRunning) {
+            return;
+        }
+
+        const finishMockRound = async () => {
+            setIsTimerRunning(false);
+
+            const snapshot = {
+                capturedAt: new Date().toISOString(),
+                durationLabel: formatTimerLabel(timerDuration),
+                timerFinished: true,
+                candidate: isCandidateRole ? currentUsername : driverUser?.username || currentUsername,
+                interviewer: isInterviewerRole ? currentUsername : navigatorUser?.username || 'Not assigned',
+                problemTitle: roomState?.problem?.title || 'Untitled Practice Problem',
+                latestRunStatus: lastRunMeta?.status || 'Not run yet',
+                latestSampleCheck: lastRunMeta?.sampleCheck || 'n/a',
+                codeLength: (editorRef.current?.getValue() || '').trim().length,
+                linesWritten: editorRef.current?.lineCount?.() || 0,
+                finalOutputPreview: typeof output === 'string' ? output : '',
+            };
+            const shareId = await createMockSummaryShare(snapshot);
+
+            socketRef.current?.emit('session-update', {
+                roomId,
+                session: {
+                    ...session,
+                    mockLocked: true,
+                    mockSummary: {
+                        ...snapshot,
+                        shareId,
+                    },
+                },
+            });
+            toast.success("Mock timer complete. Session snapshot saved.");
+        };
+
+        finishMockRound();
+    }, [
+        createMockSummaryShare,
+        currentUsername,
+        driverUser?.username,
+        isCandidateRole,
+        isInterviewerRole,
+        isMockMode,
+        isTimerRunning,
+        lastRunMeta?.sampleCheck,
+        lastRunMeta?.status,
+        navigatorUser?.username,
+        output,
+        roomId,
+        roomState?.problem?.title,
+        session,
+        socketRef,
+        timeRemaining,
         timerDuration,
     ]);
 
@@ -584,6 +632,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         setTimerDuration(nextDuration);
         setTimeRemaining(nextDuration);
         setIsTimerRunning(false);
+        if (isMockMode && session.mockLocked) {
+            socketRef.current?.emit('session-update', {
+                roomId,
+                session: {
+                    ...session,
+                    mockLocked: false,
+                },
+            });
+        }
     };
 
     const handleTimerToggle = () => {
@@ -597,6 +654,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const handleTimerReset = () => {
         setIsTimerRunning(false);
         setTimeRemaining(timerDuration);
+        if (isMockMode && session.mockLocked) {
+            socketRef.current?.emit('session-update', {
+                roomId,
+                session: {
+                    ...session,
+                    mockLocked: false,
+                },
+            });
+        }
     };
 
     const syncCodeToRoom = (nextCode) => {
@@ -722,8 +788,9 @@ const runCode = async () => {
         memory: memory || "N/A",
         passed: sampleMatched,
         languageLabel: languageConfig.label,
-        outputPreview: normalizeOutput(stdout || "").slice(0, 240),
-        expectedPreview: normalizedExpectedOutput.slice(0, 240),
+        stdin: effectiveStdin,
+        stdout: normalizeOutput(stdout || ""),
+        expectedOutput: normalizedExpectedOutput,
         sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : "not_checked",
       },
     });
@@ -930,8 +997,8 @@ const runCode = async () => {
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
                         onClick={handleResetCode}
-                        disabled={!canEdit}
-                        title={canEdit ? 'Reset the shared editor' : 'Only the active editor owner can clear code right now'}
+                        disabled={!editorUnlocked}
+                        title={editorUnlocked ? 'Reset the shared editor' : 'Only the active editor owner can clear code right now'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h18"/>
@@ -945,8 +1012,8 @@ const runCode = async () => {
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
                         onClick={handleFormatCode}
-                        disabled={!canEdit}
-                        title={canEdit ? 'Format the shared code' : 'Only the active editor owner can format code right now'}
+                        disabled={!editorUnlocked}
+                        title={editorUnlocked ? 'Format the shared code' : 'Only the active editor owner can format code right now'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M4 7h10" />
@@ -975,7 +1042,7 @@ const runCode = async () => {
                             id="language-select"
                             value={selectedLanguage}
                             onChange={handleLanguageChange}
-                            disabled={!canEdit}
+                            disabled={!editorUnlocked}
                             className="h-9 rounded-xl border border-gray-200 bg-white/92 px-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
                         >
                             {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
@@ -1001,12 +1068,12 @@ const runCode = async () => {
                             {participationLabel}
                         </span>
                         <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${
-                            canEdit
+                            editorUnlocked
                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200'
                                 : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200'
                         }`}>
                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {canEdit ? (
+                                {editorUnlocked ? (
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 113.182 3.182L7.5 20.213 3 21l.787-4.5L16.862 4.487z" />
                                 ) : (
                                     <>
@@ -1015,7 +1082,7 @@ const runCode = async () => {
                                     </>
                                 )}
                             </svg>
-                            {canEdit ? 'Editor control' : 'Read only'}
+                            {editorUnlocked ? 'Editor control' : 'Read only'}
                         </span>
                         {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
                             <button
@@ -1189,17 +1256,17 @@ const runCode = async () => {
 
             <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem]">
                 <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${
-                    canEdit
+                    editorUnlocked
                         ? 'border-emerald-200/80 dark:border-emerald-800/40'
                         : 'border-rose-200/80 dark:border-rose-800/40'
                 } bg-white dark:bg-[#0a1324]`}>
                     <div className="pointer-events-none absolute left-4 top-3 z-10 flex items-center gap-2">
                         <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                            canEdit
+                            editorUnlocked
                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200'
                                 : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200'
                         }`}>
-                            {canEdit ? 'Typing enabled' : 'Read only'}
+                            {editorUnlocked ? 'Typing enabled' : 'Read only'}
                         </span>
                     </div>
                     <textarea 
@@ -1350,12 +1417,19 @@ const runCode = async () => {
                                                             <span>{run.memory}</span>
                                                         </div>
                                                     </div>
-                                                    {run.outputPreview && (
-                                                        <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                                                            <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{run.outputPreview}</pre>
-                                                            {run.expectedPreview ? (
-                                                                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{run.expectedPreview}</pre>
+                                                    {(run.stdin || run.stdout || run.expectedOutput) && (
+                                                        <div className="mt-2 space-y-2">
+                                                            {run.stdin ? (
+                                                                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`stdin\n${run.stdin}`}</pre>
                                                             ) : null}
+                                                            <div className="grid gap-2 lg:grid-cols-2">
+                                                                {run.stdout ? (
+                                                                    <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`stdout\n${run.stdout}`}</pre>
+                                                                ) : null}
+                                                                {run.expectedOutput ? (
+                                                                    <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`expected\n${run.expectedOutput}`}</pre>
+                                                                ) : null}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1384,7 +1458,21 @@ const runCode = async () => {
                                     <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
                                         <div className="mb-3 flex items-center justify-between">
                                             <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Mock Summary</h3>
-                                            <span className="text-[10px] text-amber-500">Saved at time-up</span>
+                                            <div className="flex items-center gap-2">
+                                                {session.mockSummary.shareId ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            await navigator.clipboard.writeText(`${window.location.origin}/summary/${session.mockSummary.shareId}`);
+                                                            toast.success('Mock summary link copied');
+                                                        }}
+                                                        className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:border-amber-800/40 dark:bg-slate-900/60 dark:text-amber-200"
+                                                    >
+                                                        Share
+                                                    </button>
+                                                ) : null}
+                                                <span className="text-[10px] text-amber-500">Saved at time-up</span>
+                                            </div>
                                         </div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">

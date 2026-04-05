@@ -19,6 +19,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "./models/User.js";
 import Room from "./models/Room.js";
+import Analysis from "./models/Analysis.js";
+import MockSummary from "./models/MockSummary.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
 
@@ -295,6 +297,7 @@ function createDefaultSessionState() {
     runHistory: [],
     mentorNotes: "",
     mockSummary: null,
+    mockLocked: false,
   };
 }
 
@@ -333,6 +336,10 @@ function attachNormalizedSession(session = {}) {
       session?.mockSummary && typeof session.mockSummary === "object"
         ? session.mockSummary
         : defaults.mockSummary,
+    mockLocked:
+      typeof session?.mockLocked === "boolean"
+        ? session.mockLocked
+        : defaults.mockLocked,
   };
 }
 
@@ -480,6 +487,25 @@ async function getUserFromAuthHeader(req) {
     return await User.findById(decoded.userId);
   } catch (err) {
     return null;
+  }
+}
+
+async function persistRoomDocument(roomId, roomState) {
+  try {
+    await Room.findOneAndUpdate(
+      { roomId },
+      {
+        roomId,
+        code: roomState.code,
+        language: roomState.language,
+        problem: roomState.problem,
+        session: roomState.session,
+        updatedAt: new Date(),
+      },
+      { upsert: true },
+    );
+  } catch (err) {
+    console.error("Error saving room to MongoDB:", err);
   }
 }
 
@@ -1717,6 +1743,186 @@ ${code}
   }
 });
 
+app.post("/api/analysis", aiLimiter, async (req, res) => {
+  const { code, language = DEFAULT_LANGUAGE, prompt = "" } = req.body || {};
+  const geminiKey = getGeminiApiKey();
+  const groqKey = getGroqApiKey();
+  const mistralKey = getMistralApiKey();
+
+  if (!code?.trim()) {
+    return res.status(400).json({ error: "Missing code" });
+  }
+
+  if (!geminiKey && !groqKey && !mistralKey) {
+    return res.status(503).json({
+      error:
+        "AI services are not configured. Please add GEMINI_API_KEY, GROQ_API_KEY, or MISTRAL_API_KEY to your .env file.",
+    });
+  }
+
+  const analysisPrompt = `You are reviewing a DSA solution pasted into ForkSpace.
+Language: ${language}
+Optional problem context: ${prompt || "Not provided"}
+
+Return ONLY valid JSON in this exact shape:
+{
+  "bugs": ["specific edge case or bug 1", "specific edge case or bug 2", "specific edge case or bug 3"],
+  "time_complexity": "O(n)",
+  "space_complexity": "O(1)",
+  "complexity_reasoning": "one or two sentences explaining why those complexities apply to this exact solution",
+  "style_issues": ["optional readability issue"],
+  "optimization_suggestion": {
+    "before": "a short before snippet or description from the current code",
+    "after": "a short after snippet or concrete change",
+    "benefit": "why the change improves complexity, clarity, or robustness"
+  },
+  "summary": "one sentence describing how good this solution currently is"
+}
+
+Rules:
+- Be specific to the pasted code.
+- Do not invent a different algorithm unless needed for the optimization suggestion.
+- Keep bug findings concrete and interview-relevant.
+- If the code is already good, say what remains risky.
+
+Code:
+\`\`\`${language}
+${code}
+\`\`\``;
+
+  try {
+    let review = "";
+
+    if (geminiKey) {
+      try {
+        review = await getAiReview(analysisPrompt, geminiKey, "gemini");
+      } catch {
+        console.warn("Gemini failed for analysis, falling back");
+      }
+    }
+
+    if (!review && groqKey) {
+      try {
+        review = await getAiReview(analysisPrompt, groqKey, "groq");
+      } catch {
+        console.warn("Groq failed for analysis, falling back");
+      }
+    }
+
+    if (!review && mistralKey) {
+      review = await getAiReview(analysisPrompt, mistralKey, "mistral");
+    }
+
+    if (!review) {
+      return res.status(500).json({
+        error: "All configured AI providers failed or returned an empty response.",
+      });
+    }
+
+    let parsed;
+    try {
+      const jsonStart = review.indexOf("{");
+      const jsonEnd = review.lastIndexOf("}") + 1;
+      parsed =
+        jsonStart !== -1 && jsonEnd !== -1
+          ? JSON.parse(review.substring(jsonStart, jsonEnd))
+          : JSON.parse(review);
+    } catch {
+      parsed = {
+        bugs: [],
+        time_complexity: "N/A",
+        space_complexity: "N/A",
+        complexity_reasoning: "",
+        style_issues: [],
+        optimization_suggestion: null,
+        summary: review,
+      };
+    }
+
+    const analysis = await Analysis.create({
+      code,
+      language,
+      prompt,
+      result: parsed,
+    });
+
+    res.status(201).json({
+      analysisId: analysis._id.toString(),
+      analysis: parsed,
+    });
+  } catch (error) {
+    const errorMsg =
+      error.response?.data?.error?.message || error.message || "Unknown error";
+    console.error("Standalone analysis error:", errorMsg);
+    res.status(500).json({
+      error: `Analysis failed: ${errorMsg}`,
+    });
+  }
+});
+
+app.get("/api/analysis/:analysisId", async (req, res) => {
+  try {
+    const analysis = await Analysis.findById(req.params.analysisId).lean();
+    if (!analysis) {
+      return res.status(404).json({ error: "Analysis not found" });
+    }
+
+    res.json({
+      analysis: {
+        id: analysis._id.toString(),
+        code: analysis.code,
+        language: analysis.language,
+        prompt: analysis.prompt,
+        result: analysis.result,
+        createdAt: analysis.createdAt,
+      },
+    });
+  } catch {
+    res.status(404).json({ error: "Analysis not found" });
+  }
+});
+
+app.post("/api/mock-summary", async (req, res) => {
+  const { roomId = "", summary = null } = req.body || {};
+
+  if (!roomId.trim() || !summary || typeof summary !== "object") {
+    return res.status(400).json({ error: "Missing room summary payload" });
+  }
+
+  try {
+    const record = await MockSummary.create({
+      roomId: roomId.trim(),
+      summary,
+    });
+
+    res.status(201).json({
+      summaryId: record._id.toString(),
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to save mock summary" });
+  }
+});
+
+app.get("/api/mock-summary/:summaryId", async (req, res) => {
+  try {
+    const summary = await MockSummary.findById(req.params.summaryId).lean();
+    if (!summary) {
+      return res.status(404).json({ error: "Summary not found" });
+    }
+
+    res.json({
+      summary: {
+        id: summary._id.toString(),
+        roomId: summary.roomId,
+        createdAt: summary.createdAt,
+        ...summary.summary,
+      },
+    });
+  } catch {
+    res.status(404).json({ error: "Summary not found" });
+  }
+});
+
 app.post("/api/problem-import", async (req, res) => {
   try {
     const {
@@ -2148,6 +2354,7 @@ io.on("connection", (socket) => {
       ...(problem || {}),
     });
     scheduleRoomStatePersist();
+    persistRoomDocument(roomId, roomState);
 
     const authenticatedUsers = getUsersInRoom(roomId)
       .map((user) => userSocketMap[user.socketId]?.userId)
@@ -2175,6 +2382,7 @@ io.on("connection", (socket) => {
       ...(session || {}),
     });
     scheduleRoomStatePersist();
+    persistRoomDocument(roomId, roomState);
 
     io.to(roomId).emit("session-update", {
       session: roomState.session,
@@ -2191,6 +2399,7 @@ io.on("connection", (socket) => {
       navigatorSocketId: driverSocketId,
     });
     scheduleRoomStatePersist();
+    persistRoomDocument(roomId, roomState);
 
     io.to(roomId).emit("session-update", {
       session: roomState.session,
@@ -2210,6 +2419,7 @@ io.on("connection", (socket) => {
       ...roomState.session.runHistory,
     ].slice(0, 5);
     scheduleRoomStatePersist();
+    persistRoomDocument(roomId, roomState);
 
     io.to(roomId).emit("session-update", {
       session: roomState.session,
@@ -2223,19 +2433,7 @@ io.on("connection", (socket) => {
 
       if (roomState) {
         // Save to MongoDB on disconnect
-        try {
-          await Room.findOneAndUpdate(
-            { roomId },
-            {
-              code: roomState.code,
-              language: roomState.language,
-              updatedAt: new Date(),
-            },
-            { upsert: true },
-          );
-        } catch (err) {
-          console.error("Error saving room to MongoDB:", err);
-        }
+        await persistRoomDocument(roomId, roomState);
 
         if (roomState.session) {
           const nextSession = attachNormalizedSession({

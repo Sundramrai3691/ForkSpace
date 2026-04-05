@@ -1,32 +1,15 @@
 /* eslint-disable react/prop-types */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import toast from 'react-hot-toast';
 import { LANGUAGE_OPTIONS, DEFAULT_LANGUAGE } from '../components/Workspace/languages';
-
-function encodeSharePayload(payload) {
-    try {
-        return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    } catch {
-        return '';
-    }
-}
-
-function decodeSharePayload(payload) {
-    try {
-        return JSON.parse(decodeURIComponent(escape(atob(payload))));
-    } catch {
-        return null;
-    }
-}
 
 function InsightCard({ label, value, tone = 'default' }) {
     const toneClasses = {
         default: 'border-stone-200 bg-white dark:border-slate-800 dark:bg-slate-900',
         blue: 'border-blue-200 bg-blue-50/80 dark:border-blue-800/40 dark:bg-blue-950/20',
         emerald: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-800/40 dark:bg-emerald-950/20',
-        amber: 'border-amber-200 bg-amber-50/80 dark:border-amber-800/40 dark:bg-amber-950/20',
     };
 
     return (
@@ -39,13 +22,36 @@ function InsightCard({ label, value, tone = 'default' }) {
 
 function SolutionAnalyzer() {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
-    const [searchParams, setSearchParams] = useSearchParams();
-    const sharedState = useMemo(() => decodeSharePayload(searchParams.get('share') || ''), [searchParams]);
-    const [language, setLanguage] = useState(sharedState?.language || DEFAULT_LANGUAGE);
-    const [code, setCode] = useState(sharedState?.code || '');
-    const [prompt, setPrompt] = useState(sharedState?.prompt || '');
-    const [analysis, setAnalysis] = useState(sharedState?.analysis || null);
+    const { analysisId } = useParams();
+    const navigate = useNavigate();
+    const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
+    const [code, setCode] = useState('');
+    const [prompt, setPrompt] = useState('');
+    const [analysis, setAnalysis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isFetchingShared, setIsFetchingShared] = useState(false);
+
+    useEffect(() => {
+        if (!analysisId) return;
+
+        const loadSharedAnalysis = async () => {
+            setIsFetchingShared(true);
+            try {
+                const response = await axios.get(`${serverUrl}/api/analysis/${analysisId}`);
+                const sharedAnalysis = response.data.analysis;
+                setLanguage(sharedAnalysis.language || DEFAULT_LANGUAGE);
+                setCode(sharedAnalysis.code || '');
+                setPrompt(sharedAnalysis.prompt || '');
+                setAnalysis(sharedAnalysis.result || null);
+            } catch {
+                toast.error('Analysis link not found');
+            } finally {
+                setIsFetchingShared(false);
+            }
+        };
+
+        loadSharedAnalysis();
+    }, [analysisId, serverUrl]);
 
     const handleAnalyse = async () => {
         if (!code.trim()) {
@@ -55,21 +61,14 @@ function SolutionAnalyzer() {
 
         setIsLoading(true);
         try {
-            const response = await axios.post(`${serverUrl}/api/ai/review`, {
+            const response = await axios.post(`${serverUrl}/api/analysis`, {
                 code,
                 language,
-                problem: {
-                    title: 'Standalone solution analysis',
-                    prompt: prompt || 'No specific problem statement provided.',
-                },
+                prompt,
             });
 
-            const nextAnalysis = response.data;
-            setAnalysis(nextAnalysis);
-            const share = encodeSharePayload({ code, language, prompt, analysis: nextAnalysis });
-            if (share) {
-                setSearchParams({ share });
-            }
+            setAnalysis(response.data.analysis);
+            navigate(`/analysis/${response.data.analysisId}`);
             toast.success('Analysis ready');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to analyse solution');
@@ -79,8 +78,7 @@ function SolutionAnalyzer() {
     };
 
     const handleCopyShare = async () => {
-        const share = searchParams.get('share');
-        if (!share) {
+        if (!analysisId) {
             toast.error('Run an analysis first.');
             return;
         }
@@ -97,7 +95,7 @@ function SolutionAnalyzer() {
                         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-amber-600 dark:text-amber-400">Standalone Tool</p>
                         <h1 className="mt-2 text-4xl font-bold tracking-tight">Solution Analyser</h1>
                         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-400">
-                            Paste any DSA solution, inspect its complexity and risks, and generate a shareable analysis link without opening a room.
+                            Paste any DSA solution, inspect its complexity and risks, and generate a public shareable analysis link without opening a room.
                         </p>
                     </div>
                     <div className="flex gap-3">
@@ -162,7 +160,11 @@ function SolutionAnalyzer() {
                     </section>
 
                     <section className="space-y-4">
-                        {analysis ? (
+                        {isFetchingShared ? (
+                            <div className="rounded-[2rem] border border-dashed border-stone-300 bg-white/70 p-8 text-sm leading-7 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                                Loading shared analysis...
+                            </div>
+                        ) : analysis ? (
                             <>
                                 <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                                     <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{analysis.summary}</p>
@@ -176,7 +178,7 @@ function SolutionAnalyzer() {
                                 </div>
                                 {analysis.bugs?.length > 0 ? (
                                     <div className="rounded-[2rem] border border-rose-200 bg-rose-50/80 p-6 shadow-sm dark:border-rose-800/40 dark:bg-rose-950/20">
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300">Bugs and missed edge cases</p>
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300">Specific missed edge cases</p>
                                         <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-rose-900 dark:text-rose-100">
                                             {analysis.bugs.slice(0, 3).map((bug, index) => <li key={`${bug}-${index}`}>{bug}</li>)}
                                         </ul>
@@ -188,11 +190,11 @@ function SolutionAnalyzer() {
                                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                                             <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
                                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
-                                                <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{analysis.optimization_suggestion.before}</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800 dark:text-slate-200">{analysis.optimization_suggestion.before}</p>
                                             </div>
                                             <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
                                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
-                                                <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{analysis.optimization_suggestion.after}</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800 dark:text-slate-200">{analysis.optimization_suggestion.after}</p>
                                             </div>
                                         </div>
                                         <p className="mt-4 text-sm leading-7 text-amber-900 dark:text-amber-100">{analysis.optimization_suggestion.benefit}</p>
