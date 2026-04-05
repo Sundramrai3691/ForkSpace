@@ -49,12 +49,153 @@ const SESSION_MODE_HELP = {
     mentoring: 'Mentor leads the editor. Learner stays read-only and focuses on the approach.',
 };
 
+function ImportProblemModal({
+    isOpen,
+    onClose,
+    problemDraft,
+    setProblemDraft,
+    isImporting,
+    importNotice,
+    onImportProblem,
+    onImportProblemUrl,
+}) {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl overflow-hidden rounded-[1.8rem] border border-stone-200 bg-white shadow-[0_28px_120px_-42px_rgba(15,23,42,0.5)] dark:border-slate-700 dark:bg-[#081121]">
+                <div className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-4 dark:border-slate-700">
+                    <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Import Helper</p>
+                        <h3 className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">Import Problem</h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                            Keep import as a helper, then continue editing the shared brief manually.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                        aria-label="Close import modal"
+                    >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="space-y-4 p-5">
+                    {importNotice && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-sm leading-6 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                            {importNotice}
+                        </div>
+                    )}
+
+                    <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                        <div className="space-y-1.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                Problem URL
+                            </span>
+                            <input
+                                type="url"
+                                value={problemDraft.problemUrl}
+                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
+                                placeholder="https://codeforces.com/problemset/problem/1/A"
+                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onImportProblemUrl}
+                            disabled={isImporting || !problemDraft.problemUrl.trim()}
+                            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                        >
+                            {isImporting ? 'Importing...' : 'Import from Link'}
+                        </button>
+                    </div>
+
+                    <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
+                            <label className="space-y-1.5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Platform
+                                </span>
+                                <select
+                                    value={problemDraft.platform}
+                                    onChange={(event) => {
+                                        const nextPlatform = event.target.value;
+                                        setProblemDraft((prev) => ({
+                                            ...prev,
+                                            platform: nextPlatform,
+                                            sourceUrl: shouldResetImportedSource(prev.sourceUrl) ? '' : prev.sourceUrl,
+                                            title: formatProblemTitle(nextPlatform, prev.problemCode, prev.title),
+                                        }));
+                                    }}
+                                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                >
+                                    {PLATFORM_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Problem Code
+                                </span>
+                                <input
+                                    type="text"
+                                    value={problemDraft.problemCode}
+                                    maxLength={16}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    onChange={(event) => {
+                                        const nextProblemCode = event.target.value;
+                                        setProblemDraft((prev) => ({
+                                            ...prev,
+                                            problemCode: nextProblemCode,
+                                            sourceUrl: shouldResetImportedSource(prev.sourceUrl) ? '' : prev.sourceUrl,
+                                            title: formatProblemTitle(prev.platform, nextProblemCode, prev.title),
+                                        }));
+                                    }}
+                                    placeholder="1885A"
+                                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                />
+                            </label>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onImportProblem}
+                            disabled={isImporting || !problemDraft.problemCode.trim()}
+                            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                        >
+                            {isImporting ? 'Importing problem...' : 'Import by Platform + Code'}
+                        </button>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                        >
+                            Back to brief
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) {
     const location = useLocation();
     const navigate = useNavigate();
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [isImporting, setIsImporting] = useState(false);
     const [importNotice, setImportNotice] = useState('');
+    const [showImportModal, setShowImportModal] = useState(false);
     const [problemDraft, setProblemDraft] = useState({
         platform: 'codeforces',
         problemCode: '',
@@ -178,6 +319,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
 
             setImportNotice('Problem details imported into the shared brief.');
             toast.success('Problem details imported');
+            setShowImportModal(false);
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to import the problem');
         } finally {
@@ -213,6 +355,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
             } else {
                 setImportNotice('Problem details imported from the URL.');
                 toast.success('Problem imported from URL');
+                setShowImportModal(false);
             }
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to import from URL');
@@ -223,6 +366,16 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
 
     return (
         <div className="flex h-full w-full flex-col border-r border-stone-200/80 bg-transparent dark:border-slate-700/80 dark:bg-transparent">
+            <ImportProblemModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                problemDraft={problemDraft}
+                setProblemDraft={setProblemDraft}
+                isImporting={isImporting}
+                importNotice={importNotice}
+                onImportProblem={handleImportProblem}
+                onImportProblemUrl={handleImportProblemUrl}
+            />
             <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="flex flex-col space-y-3 p-5">
                     <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-4 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
@@ -310,82 +463,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                             </div>
                         )}
 
-                        <div className="space-y-1.5">
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                Problem URL
-                            </span>
-                            <input
-                                type="url"
-                                value={problemDraft.problemUrl}
-                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
-                                placeholder="https://codeforces.com/problemset/problem/1/A"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </div>
                         <button
                             type="button"
-                            onClick={handleImportProblemUrl}
-                            disabled={isImporting || !problemDraft.problemUrl.trim()}
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            onClick={() => setShowImportModal(true)}
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                         >
-                            {isImporting ? 'Importing...' : 'Import from URL'}
-                        </button>
-                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
-                            <label className="space-y-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Platform
-                                </span>
-                                <select
-                                    value={problemDraft.platform}
-                                    onChange={(event) => {
-                                        const nextPlatform = event.target.value;
-                                        setProblemDraft((prev) => ({
-                                            ...prev,
-                                            platform: nextPlatform,
-                                            sourceUrl: shouldResetImportedSource(prev.sourceUrl) ? '' : prev.sourceUrl,
-                                            title: formatProblemTitle(nextPlatform, prev.problemCode, prev.title),
-                                        }));
-                                    }}
-                                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                >
-                                    {PLATFORM_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label className="space-y-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Problem Code
-                                </span>
-                                <input
-                                    type="text"
-                                    value={problemDraft.problemCode}
-                                    maxLength={16}
-                                    autoComplete="off"
-                                    spellCheck={false}
-                                    onChange={(event) => {
-                                        const nextProblemCode = event.target.value;
-                                        setProblemDraft((prev) => ({
-                                            ...prev,
-                                            problemCode: nextProblemCode,
-                                            sourceUrl: shouldResetImportedSource(prev.sourceUrl) ? '' : prev.sourceUrl,
-                                            title: formatProblemTitle(prev.platform, nextProblemCode, prev.title),
-                                        }));
-                                    }}
-                                    placeholder="1885A"
-                                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                            </label>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleImportProblem}
-                            disabled={isImporting || !problemDraft.problemCode.trim()}
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                        >
-                            {isImporting ? 'Importing problem...' : 'Import problem details'}
+                            Import Problem
                         </button>
                         <div className="space-y-3 rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
                             <div>
