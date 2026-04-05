@@ -210,7 +210,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
                 headers: getAuthHeaders(),
             });
             setReviewContent(response.data);
-        } catch (error) {
+        } catch {
             toast.error("Failed to get review");
             setShowReview(false);
         } finally {
@@ -630,8 +630,8 @@ const runCode = async () => {
 
     return (
         <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gray-900">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-gray-200 bg-white/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-700 dark:bg-gray-900/95 dark:supports-[backdrop-filter]:bg-gray-900/60">
-                <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 bg-white/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-700 dark:bg-gray-900/95 dark:supports-[backdrop-filter]:bg-gray-900/60">
+                <div className="flex flex-wrap items-center gap-2.5">
                     <button
                         className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 border border-gray-800 dark:border-gray-200 shadow-sm h-9 px-4"
                         onClick={runCode}
@@ -676,7 +676,7 @@ const runCode = async () => {
                     </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
                     <div className="flex items-center gap-2">
                         <label htmlFor="language-select" className="text-sm text-gray-600 dark:text-gray-400">
                             Language
@@ -723,7 +723,7 @@ const runCode = async () => {
                     </div>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Practice Room:</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Room:</span>
                         <code className="relative rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {roomId}
                         </code>
@@ -840,7 +840,7 @@ const runCode = async () => {
                                 document.body
                             )}
                         </div>
-                        <div className="flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700">
+                        <div className="flex items-center gap-2 border-l border-gray-200 pl-2.5 dark:border-gray-700">
                             <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.12em] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
                                 {formatTimerLabel(timeRemaining)}
                             </span>
@@ -885,7 +885,7 @@ const runCode = async () => {
 
                 <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left overflow-hidden">
                     <div className="flex h-full flex-col min-h-0">
-                        <div className="flex flex-none items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/70">
+                        <div className="flex flex-none items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900/70">
                             <div className="flex gap-1.5">
                                 <div className="h-3 w-3 rounded-full bg-red-500"></div>
                                 <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
@@ -894,7 +894,7 @@ const runCode = async () => {
                             <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Output</span>
                         </div>
 
-                        <div className="flex-none border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                        <div className="flex-none border-b border-gray-200 bg-gray-50/80 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                     {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}

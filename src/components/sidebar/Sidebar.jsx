@@ -197,7 +197,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
     return (
         <div className="flex h-full w-full flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
             <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="flex flex-col space-y-4 p-6">
+                <div className="flex flex-col space-y-3 p-5">
                     <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-800/40">
                     <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
@@ -272,10 +272,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="rounded-xl border border-blue-200 bg-blue-50/90 p-3 text-sm leading-6 text-blue-900 dark:border-blue-800/60 dark:bg-blue-950/30 dark:text-blue-100">
-                            LeetCode stays available for collaborative discussion, but this room is optimized for Codeforces-style input/output practice.
                         </div>
 
                         {importNotice && (
