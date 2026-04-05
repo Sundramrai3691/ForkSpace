@@ -12,7 +12,31 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
+import { createAdapter } from "@socket.io/redis-adapter";
+import { Redis } from "ioredis";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import User from "./models/User.js";
+import Room from "./models/Room.js";
+
 loadEnv({ path: new URL("./.env", import.meta.url) });
+
+const redisUrl = process.env.REDIS_URL;
+let pubClient, subClient;
+
+if (redisUrl) {
+  pubClient = new Redis(redisUrl);
+  subClient = pubClient.duplicate();
+}
+
+// Connect to MongoDB
+const MONGODB_URI =
+  process.env.MONGODB_URI || "mongodb://localhost:27017/forkspace";
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -44,99 +68,96 @@ const io = new Server(server, {
   transports: ["polling", "websocket"],
 });
 
+if (pubClient && subClient) {
+  io.adapter(createAdapter(pubClient, subClient));
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   const { name = "", email = "", password = "" } = req.body || {};
-  const normalizedName = name.trim();
   const normalizedEmail = email.trim().toLowerCase();
 
-  if (!normalizedName || !normalizedEmail || !password) {
-    return res
-      .status(400)
-      .json({ error: "Name, email, and password are required." });
+  try {
+    let user = await User.findOne({ email: normalizedEmail });
+    if (user) {
+      return res
+        .status(409)
+        .json({ error: "An account with this email already exists." });
+    }
+
+    user = new User({ name, email: normalizedEmail, password });
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || "secret",
+      { expiresIn: "7d" },
+    );
+
+    res.status(201).json({
+      token,
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to register user" });
   }
-
-  if (password.length < 6) {
-    return res
-      .status(400)
-      .json({ error: "Password must be at least 6 characters." });
-  }
-
-  if (userState.users.some((user) => user.email === normalizedEmail)) {
-    return res
-      .status(409)
-      .json({ error: "An account with this email already exists." });
-  }
-
-  const user = {
-    id: crypto.randomUUID(),
-    name: normalizedName,
-    email: normalizedEmail,
-    passwordHash: createPasswordHash(password),
-    createdAt: new Date().toISOString(),
-  };
-
-  userState.users.push(user);
-  scheduleUserStatePersist();
-
-  const token = signAuthToken({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-  });
-
-  return res.status(201).json({
-    token,
-    user: sanitizeUser(user),
-  });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { email = "", password = "" } = req.body || {};
   const normalizedEmail = email.trim().toLowerCase();
-  const user = userState.users.find((entry) => entry.email === normalizedEmail);
 
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    return res.status(401).json({ error: "Invalid email or password." });
+  try {
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || "secret",
+      { expiresIn: "7d" },
+    );
+
+    res.json({
+      token,
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to login" });
   }
-
-  const token = signAuthToken({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-  });
-
-  return res.json({
-    token,
-    user: sanitizeUser(user),
-  });
 });
 
-app.get("/api/auth/me", (req, res) => {
-  const user = getUserFromAuthHeader(req);
+app.get("/api/auth/me", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
+    const user = await User.findById(decoded.userId);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    res.json({
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (err) {
+    res.status(401).json({ error: "Unauthorized" });
+  }
+});
+
+app.get("/api/auth/history", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
 
   if (!user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   return res.json({
-    user: sanitizeUser(user),
-  });
-});
-
-app.get("/api/auth/history", (req, res) => {
-  const user = getUserFromAuthHeader(req);
-
-  if (!user) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  return res.json({
-    rooms: userState.roomHistoryByUser[user.id] || [],
-    runs: userState.runHistoryByUser[user.id] || [],
+    rooms: user.roomHistory || [],
+    runs: user.runHistory || [],
   });
 });
 
@@ -470,25 +491,23 @@ function verifyAuthToken(token) {
   }
 }
 
-function getUserFromAuthHeader(req) {
+async function getUserFromAuthHeader(req) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  const payload = token ? verifyAuthToken(token) : null;
+  if (!token) return null;
 
-  if (!payload?.userId) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
+    return await User.findById(decoded.userId);
+  } catch (err) {
     return null;
   }
-
-  return userState.users.find((user) => user.id === payload.userId) || null;
 }
 
 function sanitizeUser(user) {
-  if (!user) {
-    return null;
-  }
-
+  if (!user) return null;
   return {
-    id: user.id,
+    id: user._id,
     name: user.name,
     email: user.email,
     createdAt: user.createdAt,
@@ -721,36 +740,45 @@ async function getAiReview(prompt, apiKey, model = "mistral") {
   }
 }
 
-function upsertRecentRoom(userId, roomEntry) {
-  const roomHistory = Array.isArray(userState.roomHistoryByUser[userId])
-    ? userState.roomHistoryByUser[userId]
-    : [];
-  const nextHistory = [
-    {
-      ...roomEntry,
-      updatedAt: new Date().toISOString(),
-    },
-    ...roomHistory.filter((entry) => entry.roomId !== roomEntry.roomId),
-  ].slice(0, 12);
+async function upsertRecentRoom(userId, roomEntry) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
 
-  userState.roomHistoryByUser[userId] = nextHistory;
-  scheduleUserStatePersist();
+    const nextHistory = [
+      {
+        ...roomEntry,
+        updatedAt: new Date(),
+      },
+      ...(user.roomHistory || []).filter(
+        (entry) => entry.roomId !== roomEntry.roomId,
+      ),
+    ].slice(0, 12);
+
+    user.roomHistory = nextHistory;
+    await user.save();
+  } catch (err) {
+    console.error("Error updating room history:", err);
+  }
 }
 
-function appendRunHistory(userId, runEntry) {
-  const runHistory = Array.isArray(userState.runHistoryByUser[userId])
-    ? userState.runHistoryByUser[userId]
-    : [];
+async function appendRunHistory(userId, runEntry) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
 
-  userState.runHistoryByUser[userId] = [
-    {
-      ...runEntry,
-      createdAt: new Date().toISOString(),
-    },
-    ...runHistory,
-  ].slice(0, 30);
+    user.runHistory = [
+      {
+        ...runEntry,
+        createdAt: new Date(),
+      },
+      ...(user.runHistory || []),
+    ].slice(0, 30);
 
-  scheduleUserStatePersist();
+    await user.save();
+  } catch (err) {
+    console.error("Error updating run history:", err);
+  }
 }
 
 function decodeHtmlEntities(value = "") {
@@ -1528,17 +1556,20 @@ app.post("/api/ai/review", aiLimiter, async (req, res) => {
   const prompt = `Review this solution for the problem: "${problem?.title || "Untitled"}".
 Problem Description: ${problem?.prompt || problem?.pastedStatement || "No description provided."}
 Language: ${language}
-Code:
+
+Return ONLY valid JSON with this exact shape:
+{
+  "bugs": ["bug description 1", "bug description 2"],
+  "time_complexity": "O(n)",
+  "space_complexity": "O(1)",
+  "style_issues": ["issue 1"],
+  "summary": "one sentence overall assessment"
+}
+
+Code to review:
+\`\`\`${language}
 ${code}
-
-Provide a structured review focusing on:
-1. Correctness risks
-2. Edge cases missed
-3. Time complexity
-4. Space complexity
-5. Readability
-
-Keep it concise and practical for a DSA practice context.`;
+\`\`\``;
 
   try {
     let review;
@@ -1555,7 +1586,28 @@ Keep it concise and practical for a DSA practice context.`;
       });
     }
 
-    res.json(review);
+    // Try to extract JSON if AI wrapped it in markdown
+    let jsonResponse;
+    try {
+      const jsonStart = review.indexOf("{");
+      const jsonEnd = review.lastIndexOf("}") + 1;
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        jsonResponse = JSON.parse(review.substring(jsonStart, jsonEnd));
+      } else {
+        jsonResponse = JSON.parse(review);
+      }
+    } catch (e) {
+      // Fallback if not JSON
+      jsonResponse = {
+        bugs: [],
+        time_complexity: "N/A",
+        space_complexity: "N/A",
+        style_issues: [],
+        summary: review,
+      };
+    }
+
+    res.json(jsonResponse);
   } catch (error) {
     const errorMsg =
       error.response?.data?.error?.message || error.message || "Unknown error";
@@ -1731,7 +1783,7 @@ app.post("/api/run-code", async (req, res) => {
   const supportedLanguageIds = new Set(
     Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id),
   );
-  const authenticatedUser = getUserFromAuthHeader(req);
+  const authenticatedUser = await getUserFromAuthHeader(req);
 
   if (!code) {
     return res.status(400).json({ error: "Missing code" });
@@ -1750,7 +1802,7 @@ app.post("/api/run-code", async (req, res) => {
 
     if (authenticatedUser) {
       const roomState = roomId ? getOrCreateRoomState(roomId) : null;
-      appendRunHistory(authenticatedUser.id, {
+      await appendRunHistory(authenticatedUser._id, {
         roomId: roomId || null,
         languageId,
         languageLabel:
@@ -1787,7 +1839,7 @@ app.post("/api/run-sample-suite", async (req, res) => {
   const supportedLanguageIds = new Set(
     Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id),
   );
-  const authenticatedUser = getUserFromAuthHeader(req);
+  const authenticatedUser = await getUserFromAuthHeader(req);
   const roomId = req.body?.roomId || "";
 
   if (!code) {
@@ -1843,7 +1895,7 @@ app.post("/api/run-sample-suite", async (req, res) => {
 
     if (authenticatedUser) {
       const roomState = roomId ? getOrCreateRoomState(roomId) : null;
-      appendRunHistory(authenticatedUser.id, {
+      await appendRunHistory(authenticatedUser._id, {
         roomId: roomId || null,
         languageId,
         languageLabel:
@@ -1896,53 +1948,78 @@ function getUsersInRoom(roomId) {
 io.on("connection", (socket) => {
   // console.log('socket connected', socket.id); // remove in prod
 
-  socket.on("join", ({ roomId, username, role, authToken, sessionMode }) => {
-    const roomState = getOrCreateRoomState(roomId);
-    const authPayload = authToken ? verifyAuthToken(authToken) : null;
-    const authenticatedUser = authPayload?.userId
-      ? userState.users.find((user) => user.id === authPayload.userId) || null
-      : null;
-    const resolvedUsername = authenticatedUser?.name || username;
+  socket.on(
+    "join",
+    async ({ roomId, username, role, authToken, sessionMode }) => {
+      let roomState = roomStateMap.get(roomId);
 
-    userSocketMap[socket.id] = {
-      username: resolvedUsername,
-      role: role || "Peer",
-      userId: authenticatedUser?.id || null,
-    };
-    socket.join(roomId);
+      if (!roomState) {
+        try {
+          const savedRoom = await Room.findOne({ roomId });
+          if (savedRoom) {
+            roomState = {
+              ...createDefaultRoomState(),
+              code: savedRoom.code,
+              language: savedRoom.language,
+            };
+            roomStateMap.set(roomId, roomState);
+          } else {
+            roomState = getOrCreateRoomState(roomId);
+          }
+        } catch (err) {
+          console.error("Error fetching room from MongoDB:", err);
+          roomState = getOrCreateRoomState(roomId);
+        }
+      }
 
-    if (sessionMode && roomState.session.mode !== sessionMode) {
-      roomState.session = attachNormalizedSession({
-        ...roomState.session,
-        mode: sessionMode,
-      });
-      scheduleRoomStatePersist();
-    }
+      const authPayload = authToken
+        ? jwt.verify(authToken, process.env.JWT_SECRET || "secret")
+        : null;
+      let authenticatedUser = null;
+      if (authPayload?.userId) {
+        authenticatedUser = await User.findById(authPayload.userId);
+      }
+      const resolvedUsername = authenticatedUser?.name || username;
 
-    const users = getUsersInRoom(roomId);
-    // console.log(users);  // remove in prod
-
-    users.forEach(({ socketId }) => {
-      io.to(socketId).emit("joined", {
-        users,
+      userSocketMap[socket.id] = {
         username: resolvedUsername,
-        role: userSocketMap[socket.id].role,
-        socketId: socket.id,
-      });
-    });
-
-    if (authenticatedUser) {
-      upsertRecentRoom(authenticatedUser.id, {
-        roomId,
         role: role || "Peer",
-        username: resolvedUsername,
-        problemTitle: roomState.problem?.title || "Untitled Practice Problem",
-        problemCode: roomState.problem?.problemCode || "",
-      });
-    }
+        userId: authenticatedUser?._id || null,
+      };
+      socket.join(roomId);
 
-    socket.emit("room-state", roomState);
-  });
+      if (sessionMode && roomState.session.mode !== sessionMode) {
+        roomState.session = attachNormalizedSession({
+          ...roomState.session,
+          mode: sessionMode,
+        });
+        scheduleRoomStatePersist();
+      }
+
+      const users = getUsersInRoom(roomId);
+
+      users.forEach(({ socketId }) => {
+        io.to(socketId).emit("joined", {
+          users,
+          username: resolvedUsername,
+          role: userSocketMap[socket.id].role,
+          socketId: socket.id,
+        });
+      });
+
+      if (authenticatedUser) {
+        upsertRecentRoom(authenticatedUser._id, {
+          roomId,
+          role: role || "Peer",
+          username: resolvedUsername,
+          problemTitle: roomState.problem?.title || "Untitled Practice Problem",
+          problemCode: roomState.problem?.problemCode || "",
+        });
+      }
+
+      socket.emit("room-state", roomState);
+    },
+  );
 
   socket.on("code-change", ({ roomId, code }) => {
     const roomState = getOrCreateRoomState(roomId);
@@ -2040,42 +2117,60 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("disconnecting", () => {
+  socket.on("disconnecting", async () => {
     const rooms = [...socket.rooms];
-    rooms.forEach((roomId) => {
+    for (const roomId of rooms) {
       const roomState = roomStateMap.get(roomId);
 
-      if (roomState?.session) {
-        const nextSession = attachNormalizedSession({
-          ...roomState.session,
-          driverSocketId:
-            roomState.session.driverSocketId === socket.id
-              ? ""
-              : roomState.session.driverSocketId,
-          navigatorSocketId:
-            roomState.session.navigatorSocketId === socket.id
-              ? ""
-              : roomState.session.navigatorSocketId,
-        });
-
-        const sessionChanged =
-          nextSession.driverSocketId !== roomState.session.driverSocketId ||
-          nextSession.navigatorSocketId !== roomState.session.navigatorSocketId;
-
-        if (sessionChanged) {
-          roomState.session = nextSession;
-          scheduleRoomStatePersist();
-          socket.in(roomId).emit("session-update", {
-            session: roomState.session,
-          });
+      if (roomState) {
+        // Save to MongoDB on disconnect
+        try {
+          await Room.findOneAndUpdate(
+            { roomId },
+            {
+              code: roomState.code,
+              language: roomState.language,
+              updatedAt: new Date(),
+            },
+            { upsert: true },
+          );
+        } catch (err) {
+          console.error("Error saving room to MongoDB:", err);
         }
-      }
 
-      socket.in(roomId).emit("left", {
-        socketId: socket.id,
-        username: userSocketMap[socket.id]?.username,
-      });
-    });
+        if (roomState.session) {
+          const nextSession = attachNormalizedSession({
+            ...roomState.session,
+            driverSocketId:
+              roomState.session.driverSocketId === socket.id
+                ? ""
+                : roomState.session.driverSocketId,
+            navigatorSocketId:
+              roomState.session.navigatorSocketId === socket.id
+                ? ""
+                : roomState.session.navigatorSocketId,
+          });
+
+          const sessionChanged =
+            nextSession.driverSocketId !== roomState.session.driverSocketId ||
+            nextSession.navigatorSocketId !==
+              roomState.session.navigatorSocketId;
+
+          if (sessionChanged) {
+            roomState.session = nextSession;
+            scheduleRoomStatePersist();
+            socket.in(roomId).emit("session-update", {
+              session: roomState.session,
+            });
+          }
+        }
+
+        socket.in(roomId).emit("left", {
+          socketId: socket.id,
+          username: userSocketMap[socket.id]?.username,
+        });
+      }
+    }
     delete userSocketMap[socket.id];
     socket.leave();
   });

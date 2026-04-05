@@ -28,29 +28,32 @@ ForkSpace is an open-source, real-time collaborative code editor built for techn
 ## Features
 
 ### Real-Time Collaboration
+
 - Live code synchronization with sub-50ms latency across all connected users
-- Room-based sessions with unique IDs — share a link, start coding instantly
+- **Driver / Navigator Mode**: Explicit pair programming roles with visual badges and a swap button
+- **Approach Notes**: Shared real-time block for brainstorming ideas, brute force, and optimized approaches
+- **Edge Case Checklist**: Shared room-level checklist for common DSA edge cases (empty input, duplicates, etc.)
 - Real-time user presence indicators showing who is active in the session
 - Group chat alongside the editor for in-session communication
 
-### AI Code Review
-- On-demand structured code review powered by LLM API
-- Returns bugs, time/space complexity analysis, and style suggestions in a side panel
-- Built on top of the existing AI hint system — upgraded to full review output
+### AI-Powered Practice
+
+- **Structured AI Review**: Detailed analysis of correctness risks, edge cases, complexity, and readability (Gemini 1.5 Flash / Mistral)
+- **Ghost Hints**: Real-time code completion suggestions (Fill-In-the-Middle) as you type
+- **Multi-Model Support**: Seamless integration with Google Gemini 1.5 Flash and Mistral Codestral
 
 ### Code Execution Engine
-- Multi-language execution: C++, Python, Java, JavaScript, Go, Rust, TypeScript, and more
-- Powered by Judge0 — the industry-standard sandboxed code execution API
-- Real-time compilation feedback with stdout, stderr, and exit code display
 
-### Scalable Backend Architecture
-- Redis pub/sub adapter replacing in-memory Socket.IO state
-- Horizontal scaling ready — multiple server instances share room state via Redis
-- MongoDB-backed session persistence — rooms survive server restarts and page refreshes
-- JWT authentication for persistent, secure user sessions
+- Multi-language execution: C++, Python, Java, JavaScript, Go, Rust, TypeScript, and more
+- **Mismatch Debug View**: Smart diffing that highlights the first differing line and provides debugging hints
+- Powered by Judge0 — the industry-standard sandboxed code execution API
+- **Run History**: Timeline of the last 10 runs with status, time, and memory usage tracking
 
 ### Developer Experience
-- CodeMirror 6 editor with syntax highlighting and auto-suggestions
+
+- **Session Modes**: Tailored UI labels for Peer Practice, Mock Interview, and Mentoring modes
+- **Private Mentor Notes**: Secure, per-user notes for interviewers/mentors (visible only to the creator)
+- CodeMirror editor with syntax highlighting and auto-suggestions
 - Dark/light theme toggle with 10+ syntax themes
 - Distraction-free, responsive UI that works on all screen sizes
 
@@ -59,46 +62,43 @@ ForkSpace is an open-source, real-time collaborative code editor built for techn
 ## Architecture
 
 ```
-Client (React + CodeMirror 6)
+Client (React + CodeMirror)
         │
         │  WebSocket (Socket.IO)
         ▼
 Express Server (Node.js)
         │
-        ├── Redis Pub/Sub ──── Server Instance 2
-        │   (room state,       Server Instance 3
-        │    broadcasting)     (horizontal scale)
+        ├── Session Management ─── Persistent State
+        │   (rooms, roles,         (room-state.json,
+        │    notes, history)        user-state.json)
         │
-        ├── MongoDB
-        │   (session persistence,
-        │    JWT auth, room history)
+        ├── AI Integration ─────── Gemini 1.5 Flash
+        │   (review, hints)        Mistral Codestral
         │
         └── Judge0 API
             (code execution sandbox)
 ```
 
 **Key design decisions:**
-- Redis pub/sub over in-memory state so the system scales horizontally — any server instance can broadcast to any room
-- Ephemeral sessions by default (no persistence) with opt-in JWT auth for saved rooms
-- Judge0 for sandboxed execution rather than local eval — prevents code injection attacks
-- CodeMirror 6 over Monaco for bundle size and mobile support without sacrificing editor quality
+
+- **Socket.io** for real-time bidirectional communication (code, roles, notes)
+- **Gemini 1.5 Flash** as the primary AI engine for fast, high-quality code reviews and hints
+- **Judge0** for sandboxed execution to prevent security risks on the host server
+- **Local Persistence**: Room and user states are persisted to JSON files, surviving server restarts
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Why |
-|---|---|---|
-| Frontend | React 18, TypeScript, Tailwind CSS | Type safety, fast iteration |
-| Editor | CodeMirror 6 | Lightweight, extensible, mobile-friendly |
-| Real-time | Socket.IO + Redis pub/sub | Scalable bidirectional communication |
-| Backend | Node.js, Express | Non-blocking I/O matches real-time workload |
-| Database | MongoDB | Flexible schema for room/session state |
-| Auth | JWT | Stateless, works across multiple server instances |
-| Execution | Judge0 API | Secure sandboxed multi-language execution |
-| AI Review | LLM API (Claude / GPT-4o-mini) | Structured code review output as JSON |
-| Deployment | Vercel (client), Railway (server) | Zero-config CI/CD |
-| Containerization | Docker + docker-compose | One-command local setup |
+| Layer      | Technology                                  | Why                                         |
+| ---------- | ------------------------------------------- | ------------------------------------------- |
+| Frontend   | React 18, Tailwind CSS                      | Fast iteration, modern responsive UI        |
+| Editor     | CodeMirror                                  | Flexible, real-time sync friendly           |
+| Real-time  | Socket.IO                                   | Reliable bidirectional communication        |
+| Backend    | Node.js, Express                            | Non-blocking I/O for real-time workloads    |
+| AI Review  | Gemini 1.5 Flash / Mistral                  | Structured code review and FIM hints        |
+| Execution  | Judge0 API                                  | Secure sandboxed multi-language execution   |
+| Deployment | Vercel (Frontend), Render/Railway (Backend) | Best-in-class hosting for React and Node.js |
 
 ---
 
@@ -106,12 +106,10 @@ Express Server (Node.js)
 
 ### Prerequisites
 
-- Node.js v16+
+- Node.js v18+
 - npm or yarn
-- Redis (local or [Redis Cloud free tier](https://redis.com/try-free/))
-- MongoDB (local or [MongoDB Atlas free tier](https://www.mongodb.com/cloud/atlas))
 - [Judge0 API key](https://rapidapi.com/judge0-official/api/judge0-ce) (free tier on RapidAPI)
-- LLM API key — [Anthropic](https://console.anthropic.com) or [OpenAI](https://platform.openai.com)
+- [Google Gemini API key](https://aistudio.google.com/) (Free tier available) or Mistral API key
 
 ### 1. Clone and install
 
@@ -123,45 +121,26 @@ npm install
 
 ### 2. Configure environment
 
-Create a `.env` file in the project root:
+Create a `.env` file in the `server/` directory:
 
 ```env
+PORT=5000
+CLIENT_URL=http://localhost:5173
+
 # Judge0
 JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
 JUDGE0_API_KEY=your_rapidapi_key_here
 
-# Server
-PORT=5000
-CORS_ORIGIN=http://localhost:3000
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/forkspace
-
-# JWT
-JWT_SECRET=your_jwt_secret_here
-JWT_EXPIRES_IN=7d
-
-# AI Review (choose one)
-ANTHROPIC_API_KEY=your_anthropic_key_here
-# OPENAI_API_KEY=your_openai_key_here
+# AI (Recommended: Gemini 1.5 Flash)
+GEMINI_API_KEY=your_gemini_key_here
+MISTRAL_API_KEY=your_mistral_key_here
 
 # App
 APP_NAME=ForkSpace
-APP_URL=http://localhost:3000
+APP_URL=http://localhost:5173
 ```
 
-### 3. Run with Docker (recommended)
-
-```bash
-docker-compose up
-```
-
-This starts the client, server, Redis, and MongoDB together. Open [http://localhost:3000](http://localhost:3000).
-
-### 4. Run manually
+### 3. Run development servers
 
 ```bash
 # Terminal 1 — backend
@@ -173,63 +152,34 @@ npm run dev:client
 
 ---
 
-## Performance
-
-| Metric | Target | Result |
-|---|---|---|
-| Initial page load | < 2s | 1.3s |
-| Real-time sync latency | < 50ms | 28ms avg |
-| Concurrent users (load tested) | 1000+ | 2500 (k6) |
-| Uptime | 99.9% | 99.97% |
-| Bundle size | < 500KB | 420KB gzipped |
-
-Load test run with [k6](https://k6.io/) — 500 virtual users, 60-second sustained WebSocket connections, simulating simultaneous room joins and code edits.
-
-
 ## Project Structure
 
 ```
 ForkSpace/
 ├── src/                    # React frontend
-│   ├── components/         # UI components (Editor, Chat, Toolbar)
-│   ├── context/            # Socket.IO context, auth context
-│   ├── hooks/              # Custom hooks (useSocket, useRoom)
-│   └── pages/              # Route-level components
+│   ├── components/         # UI components (Workspace, Sidebar, Forms)
+│   │   └── Workspace/      # Core editor, AI features, and execution logic
+│   ├── pages/              # Route-level components (Editor, Login)
+│   └── socket.js           # Socket.io client configuration
 ├── server/                 # Node.js + Express backend
-│   ├── socket/             # Socket.IO event handlers
-│   ├── routes/             # REST API routes (auth, rooms)
-│   ├── models/             # MongoDB schemas (Room, User)
-│   ├── middleware/         # JWT auth middleware
-│   └── redis/              # Redis pub/sub adapter
-├── Context/                # Shared constants and types
-├── docker-compose.yml      # Multi-service local setup
-└── .env.example            # Environment variable template
+│   ├── data/               # Persistent JSON state (ignored by git)
+│   ├── server.js           # Main socket & API server
+│   └── ai-server.js        # Dedicated AI hints server
+└── .gitignore              # Excludes node_modules and local state
 ```
-
----
-
-## Contributing
-
-Contributions are welcome. If you find a bug or want to add a feature:
-
-1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit with conventional commits: `git commit -m 'feat: add your feature'`
-4. Push and open a Pull Request
-
-Please follow the existing code style (ESLint + Prettier) and write a brief description of what your PR changes and why.
 
 ---
 
 ## Roadmap
 
-- [ ] Multi-cursor presence (show collaborator cursors in real time)
-- [ ] Video/audio call integration (WebRTC)
-- [ ] Problem statement panel for interview mode
-- [ ] Leaderboard for competitive rooms (fastest correct solution)
+- [X] Driver / Navigator roles
+- [X] AI Code Review & Ghost Hints
+- [X] Run History & Debug View
+- [X] Session Modes (Interview/Mentoring)
+- [ ] Multi-cursor presence
+- [ ] Video/audio call integration
 - [ ] GitHub OAuth login
-- [ ] Export session as gist or file
-
+- [ ] Export session as Gist
 
 ## License
 

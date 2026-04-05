@@ -1037,8 +1037,47 @@ const runCode = async () => {
                                             <span className="text-sm text-amber-700 dark:text-amber-400">Analyzing solution...</span>
                                         </div>
                                     ) : (
-                                        <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                                            {reviewContent}
+                                        <div className="space-y-4">
+                                            {reviewContent?.summary && (
+                                                <div className="rounded-lg bg-white/50 p-3 dark:bg-gray-800/40">
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{reviewContent.summary}</p>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="rounded-lg bg-blue-50/50 p-2 dark:bg-blue-900/10">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Time</p>
+                                                    <p className="text-xs font-medium text-blue-900 dark:text-blue-100">{reviewContent?.time_complexity || "N/A"}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-purple-50/50 p-2 dark:bg-purple-900/10">
+                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Space</p>
+                                                    <p className="text-xs font-medium text-purple-900 dark:text-purple-100">{reviewContent?.space_complexity || "N/A"}</p>
+                                                </div>
+                                            </div>
+
+                                            {reviewContent?.bugs?.length > 0 && (
+                                                <details className="group rounded-lg border border-red-100 bg-red-50/30 dark:border-red-900/20 dark:bg-red-900/5">
+                                                    <summary className="flex cursor-pointer items-center justify-between p-3 text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-400">
+                                                        <span>Potential Bugs ({reviewContent.bugs.length})</span>
+                                                        <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" /></svg>
+                                                    </summary>
+                                                    <ul className="list-disc space-y-2 px-4 pb-3 text-xs text-red-800 dark:text-red-300">
+                                                        {reviewContent.bugs.map((bug, i) => <li key={i}>{bug}</li>)}
+                                                    </ul>
+                                                </details>
+                                            )}
+
+                                            {reviewContent?.style_issues?.length > 0 && (
+                                                <details className="group rounded-lg border border-amber-100 bg-amber-50/30 dark:border-amber-900/20 dark:bg-amber-900/5">
+                                                    <summary className="flex cursor-pointer items-center justify-between p-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                                        <span>Style & Readability ({reviewContent.style_issues.length})</span>
+                                                        <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" /></svg>
+                                                    </summary>
+                                                    <ul className="list-disc space-y-2 px-4 pb-3 text-xs text-amber-800 dark:text-amber-300">
+                                                        {reviewContent.style_issues.map((issue, i) => <li key={i}>{issue}</li>)}
+                                                    </ul>
+                                                </details>
+                                            )}
                                         </div>
                                     )}
                                 </div>
