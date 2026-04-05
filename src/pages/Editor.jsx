@@ -104,8 +104,8 @@ function Editor() {
   }, [roomId, enteredRole, enteredSessionMode, enteredUsername, username]);
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-white dark:bg-gray-900 lg:h-screen lg:overflow-hidden lg:flex-row">
-      <aside className="w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900 lg:h-screen lg:w-80 lg:min-w-[320px] lg:max-w-[420px] lg:flex-none lg:border-b-0 lg:border-r lg:panel-resize">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_22%),linear-gradient(180deg,#020617_0%,#0f172a_52%,#020617_100%)] lg:h-screen lg:overflow-hidden lg:flex-row">
+      <aside className="w-full border-b border-gray-200/80 bg-white/75 backdrop-blur-xl dark:border-gray-700/80 dark:bg-slate-950/55 lg:h-screen lg:w-80 lg:min-w-[320px] lg:max-w-[420px] lg:flex-none lg:border-b-0 lg:border-r lg:panel-resize">
         <Sidebar 
           socketRef={socketRef} 
           roomId={roomId} 
@@ -115,13 +115,13 @@ function Editor() {
           currentSocketId={currentSocketId}
         />
       </aside>
-      <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-white dark:bg-gray-900 lg:min-h-0 lg:h-screen">
+      <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-transparent lg:min-h-0 lg:h-screen">
         {socketConnected ? (
           <Workspace socketRef={socketRef} roomId={roomId} roomState={roomState} currentSocketId={currentSocketId} />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-16">
-            <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-gray-50/90 p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800/60">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+            <div className="w-full max-w-lg rounded-[2rem] border border-white/70 bg-white/88 p-8 text-center shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/72">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-500/10 dark:text-amber-300">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V6.75a3.75 3.75 0 117.5 0V9m-8.25 0h8.5A2.25 2.25 0 0118.25 11.25v6.5A2.25 2.25 0 0116 20H8a2.25 2.25 0 01-2.25-2.25v-6.5A2.25 2.25 0 018 9z" />
                 </svg>

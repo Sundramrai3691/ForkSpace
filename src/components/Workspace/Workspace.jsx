@@ -87,6 +87,35 @@ function ComparisonPanel({ expectedOutput, actualOutput }) {
     );
 }
 
+function OverlayPanel({ title, subtitle, onClose, children }) {
+    return createPortal(
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+            <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_120px_-36px_rgba(15,23,42,0.7)] dark:bg-slate-950">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 bg-[linear-gradient(180deg,rgba(255,248,239,0.95),rgba(248,250,252,0.88))] px-6 py-5 dark:border-gray-800 dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.92),rgba(2,6,23,0.96))]">
+                    <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600 dark:text-amber-300">{subtitle}</p>
+                        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white/90 text-gray-600 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-slate-900/70 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-white"
+                        aria-label="Close overlay"
+                    >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.72),rgba(255,255,255,0.92))] px-6 py-6 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.94))]">
+                    {children}
+                </div>
+            </div>
+        </div>,
+        document.body,
+    );
+}
+
 function normalizeOutput(value = "") {
     return value.replace(/\r\n/g, "\n").trim();
 }
@@ -145,6 +174,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
     const [timeRemaining, setTimeRemaining] = useState(45 * 60);
     const [isTimerRunning, setIsTimerRunning] = useState(false);
     const [showReview, setShowReview] = useState(false);
+    const [showOutputModal, setShowOutputModal] = useState(false);
     const [reviewContent, setReviewContent] = useState(null);
     const [isReviewLoading, setIsReviewLoading] = useState(false);
 
@@ -202,6 +232,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
         setShowReview(true);
         try {
             const code = editorRef.current?.getValue() || "";
+            setReviewContent(null);
             const response = await axios.post(`${serverUrl}/api/ai/review`, {
                 code,
                 problem: roomState?.problem,
@@ -609,6 +640,7 @@ const runCode = async () => {
     );
 
     setOutput(finalOutput);
+    setShowOutputModal(true);
   } catch (error) {
     setLastRunMeta({
       languageLabel: languageConfig.label,
@@ -624,16 +656,102 @@ const runCode = async () => {
         <p>Error running code: {error.response?.data?.error || error.message}</p>
       </div>
     );
+    setShowOutputModal(true);
     toast.error("Run Code failed. Check your Judge0 configuration.");
   }
 };
 
     return (
-        <div className="flex h-full min-h-0 flex-col bg-white dark:bg-gray-900">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 bg-white/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-700 dark:bg-gray-900/95 dark:supports-[backdrop-filter]:bg-gray-900/60">
+        <div className="flex h-full min-h-0 flex-col bg-transparent">
+            {showOutputModal && output && (
+                <OverlayPanel
+                    title="Run Output"
+                    subtitle="Execution Results"
+                    onClose={() => setShowOutputModal(false)}
+                >
+                    <div className="space-y-5">
+                        <div className="grid gap-3 md:grid-cols-4">
+                            <div className="rounded-[1.35rem] border border-gray-200/80 bg-white/90 p-4 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Language</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}</p>
+                            </div>
+                            <div className="rounded-[1.35rem] border border-gray-200/80 bg-white/90 p-4 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Status</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.status || 'idle'}</p>
+                            </div>
+                            <div className="rounded-[1.35rem] border border-gray-200/80 bg-white/90 p-4 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Execution Time</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.time ?? 'Not run yet'}</p>
+                            </div>
+                            <div className="rounded-[1.35rem] border border-gray-200/80 bg-white/90 p-4 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Memory</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.memory ?? 'Not run yet'}</p>
+                            </div>
+                        </div>
+                        <div className="rounded-[1.5rem] border border-gray-200/80 bg-white/88 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                            {output}
+                        </div>
+                    </div>
+                </OverlayPanel>
+            )}
+
+            {showReview && (
+                <OverlayPanel
+                    title="Solution Review"
+                    subtitle="AI Review"
+                    onClose={() => setShowReview(false)}
+                >
+                    {isReviewLoading ? (
+                        <div className="flex min-h-[40vh] items-center justify-center">
+                            <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></div>
+                                <span className="text-sm font-medium">Analyzing solution...</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-5">
+                            {reviewContent?.summary && (
+                                <div className="rounded-[1.4rem] border border-gray-200/80 bg-white/90 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                                    <p className="text-base leading-7 text-slate-800 dark:text-slate-200">{reviewContent.summary}</p>
+                                </div>
+                            )}
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="rounded-[1.35rem] border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Time Complexity</p>
+                                    <p className="mt-2 text-lg font-semibold text-blue-950 dark:text-blue-100">{reviewContent?.time_complexity || 'N/A'}</p>
+                                </div>
+                                <div className="rounded-[1.35rem] border border-purple-200 bg-purple-50/80 p-4 dark:border-purple-800/40 dark:bg-purple-950/20">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-700 dark:text-purple-300">Space Complexity</p>
+                                    <p className="mt-2 text-lg font-semibold text-purple-950 dark:text-purple-100">{reviewContent?.space_complexity || 'N/A'}</p>
+                                </div>
+                            </div>
+
+                            {reviewContent?.bugs?.length > 0 && (
+                                <div className="rounded-[1.4rem] border border-red-200 bg-red-50/80 p-5 dark:border-red-800/40 dark:bg-red-950/20">
+                                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">Potential Bugs</h3>
+                                    <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-red-900 dark:text-red-200">
+                                        {reviewContent.bugs.map((bug, index) => <li key={index}>{bug}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {reviewContent?.style_issues?.length > 0 && (
+                                <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-800/40 dark:bg-amber-950/20">
+                                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">Style And Readability</h3>
+                                    <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-amber-900 dark:text-amber-200">
+                                        {reviewContent.style_issues.map((issue, index) => <li key={index}>{issue}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </OverlayPanel>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-3 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <button
-                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 border border-gray-800 dark:border-gray-200 shadow-sm h-9 px-4"
+                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-800 bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-200 dark:bg-white dark:text-black dark:hover:bg-gray-100"
                         onClick={runCode}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -642,7 +760,7 @@ const runCode = async () => {
                         Run
                     </button>
                     <button
-                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm h-9 px-4"
+                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
                         onClick={handleResetCode}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -655,7 +773,7 @@ const runCode = async () => {
                         Clear
                     </button>
                     <button
-                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm h-9 px-4"
+                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
                         onClick={handleFormatCode}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -666,7 +784,7 @@ const runCode = async () => {
                         Format
                     </button>
                     <button
-                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800/50 shadow-sm h-9 px-4"
+                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50/90 px-4 text-sm font-medium text-amber-700 shadow-sm transition-all hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
                         onClick={reviewSolution}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -685,7 +803,7 @@ const runCode = async () => {
                             id="language-select"
                             value={selectedLanguage}
                             onChange={handleLanguageChange}
-                            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                            className="h-9 rounded-xl border border-gray-200 bg-white/92 px-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
                         >
                             {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
                                 <option key={languageKey} value={languageKey}>
@@ -695,7 +813,7 @@ const runCode = async () => {
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
                     <div className="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
@@ -770,7 +888,7 @@ const runCode = async () => {
                         <div className="relative group">
                             <button 
                                 onClick={fetchAIHints}
-                                className="ai-button inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                className="ai-button inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/92 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                 aria-label="AI Practice Coach"
                                 title="AI Practice Coach - Get interview-oriented suggestions"
                             >
@@ -847,7 +965,7 @@ const runCode = async () => {
                             <select
                                 value={timerDuration}
                                 onChange={handleTimerPresetChange}
-                                className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                            className="h-9 rounded-xl border border-gray-200 bg-white/92 px-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
                             >
                                 {TIMER_PRESETS.map((preset) => (
                                     <option key={preset.value} value={preset.value}>
@@ -858,14 +976,14 @@ const runCode = async () => {
                             <button
                                 type="button"
                                 onClick={handleTimerToggle}
-                                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                             >
                                 {isTimerRunning ? "Pause" : "Start"}
                             </button>
                             <button
                                 type="button"
                                 onClick={handleTimerReset}
-                                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                             >
                                 Reset
                             </button>
@@ -875,17 +993,17 @@ const runCode = async () => {
             </div>
 
             <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                <div className="relative min-h-[24rem] xl:min-h-0">
+                <div className="relative min-h-[24rem] bg-white dark:bg-[#0a1324] xl:min-h-0">
                     <textarea 
                         id="realtimeEditor" 
-                        className="h-full w-full resize-none border-0 bg-white dark:bg-gray-900 p-6 text-sm font-mono outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-white"
+                        className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
                         placeholder="// Start coding here..."
                     />
                 </div>
 
-                <aside className="border-t border-gray-200 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/20 xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left overflow-hidden">
+                <aside className="overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left">
                     <div className="flex h-full flex-col min-h-0">
-                        <div className="flex flex-none items-center gap-2 border-b border-gray-200 bg-white/80 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900/70">
+                        <div className="flex flex-none items-center gap-2 border-b border-gray-200/80 bg-white px-4 py-2.5 dark:border-gray-700/80 dark:bg-[#0b1528]">
                             <div className="flex gap-1.5">
                                 <div className="h-3 w-3 rounded-full bg-red-500"></div>
                                 <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
@@ -894,7 +1012,7 @@ const runCode = async () => {
                             <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Output</span>
                         </div>
 
-                        <div className="flex-none border-b border-gray-200 bg-gray-50/80 px-4 py-2.5 dark:border-gray-700 dark:bg-gray-900/50">
+                        <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-2.5 dark:border-gray-700/80 dark:bg-[#0d172b]">
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                     {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
@@ -924,7 +1042,7 @@ const runCode = async () => {
                                 </div>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-3">
-                                <div className="rounded-2xl border border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900">
+                                <div className="rounded-2xl border border-gray-200/80 bg-white px-3 py-3 shadow-sm dark:border-gray-700/80 dark:bg-[#111d33]">
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                                         Execution Time
                                     </p>
@@ -932,7 +1050,7 @@ const runCode = async () => {
                                         {lastRunMeta?.time ?? "Not run yet"}
                                     </p>
                                 </div>
-                                <div className="rounded-2xl border border-gray-200 bg-white px-3 py-3 dark:border-gray-700 dark:bg-gray-900">
+                                <div className="rounded-2xl border border-gray-200/80 bg-white px-3 py-3 shadow-sm dark:border-gray-700/80 dark:bg-[#111d33]">
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                                         Memory
                                     </p>
@@ -941,13 +1059,31 @@ const runCode = async () => {
                                     </p>
                                 </div>
                             </div>
+                            <div className="mt-3 flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowOutputModal(true)}
+                                    disabled={!output}
+                                    className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-stone-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-[#16243d] dark:hover:text-white"
+                                >
+                                    Open large output
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowReview(true)}
+                                    disabled={!reviewContent && !isReviewLoading}
+                                    className="inline-flex flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                                >
+                                    Open review
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6">
                             {/* Session Content */}
                             <div className="space-y-6">
                                 {/* Approach Notes */}
-                                <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                                     <div className="mb-3 flex items-center justify-between">
                                         <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Approach Notes</h3>
                                         <span className="text-[10px] text-gray-400">Shared with partner</span>
@@ -961,7 +1097,7 @@ const runCode = async () => {
                                 </div>
 
                                 {/* Edge Case Checklist */}
-                                <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                                     <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
                                     <div className="grid grid-cols-1 gap-2">
                                         {session.edgeCaseChecklist.map((item) => (
@@ -982,7 +1118,7 @@ const runCode = async () => {
 
                                 {/* Run History */}
                                 {session.runHistory.length > 0 && (
-                                    <div className="rounded-2xl border border-gray-200 bg-white/50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                    <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                                         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Run History</h3>
                                         <div className="space-y-2">
                                             {session.runHistory.map((run) => (
@@ -1019,69 +1155,6 @@ const runCode = async () => {
                             </div>
 
                             <div className="h-px bg-gray-200 dark:bg-gray-700 my-2"></div>
-
-                            {/* Output Content */}
-                            {showReview && (
-                                <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-4 dark:border-amber-800/30 dark:bg-amber-900/10">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Solution Review</h3>
-                                        <button onClick={() => setShowReview(false)} className="text-gray-400 hover:text-gray-600">
-                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    {isReviewLoading ? (
-                                        <div className="flex items-center gap-2 py-4 justify-center">
-                                            <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                                            <span className="text-sm text-amber-700 dark:text-amber-400">Analyzing solution...</span>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {reviewContent?.summary && (
-                                                <div className="rounded-lg bg-white/50 p-3 dark:bg-gray-800/40">
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{reviewContent.summary}</p>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div className="rounded-lg bg-blue-50/50 p-2 dark:bg-blue-900/10">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Time</p>
-                                                    <p className="text-xs font-medium text-blue-900 dark:text-blue-100">{reviewContent?.time_complexity || "N/A"}</p>
-                                                </div>
-                                                <div className="rounded-lg bg-purple-50/50 p-2 dark:bg-purple-900/10">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Space</p>
-                                                    <p className="text-xs font-medium text-purple-900 dark:text-purple-100">{reviewContent?.space_complexity || "N/A"}</p>
-                                                </div>
-                                            </div>
-
-                                            {reviewContent?.bugs?.length > 0 && (
-                                                <details className="group rounded-lg border border-red-100 bg-red-50/30 dark:border-red-900/20 dark:bg-red-900/5">
-                                                    <summary className="flex cursor-pointer items-center justify-between p-3 text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-400">
-                                                        <span>Potential Bugs ({reviewContent.bugs.length})</span>
-                                                        <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" /></svg>
-                                                    </summary>
-                                                    <ul className="list-disc space-y-2 px-4 pb-3 text-xs text-red-800 dark:text-red-300">
-                                                        {reviewContent.bugs.map((bug, i) => <li key={i}>{bug}</li>)}
-                                                    </ul>
-                                                </details>
-                                            )}
-
-                                            {reviewContent?.style_issues?.length > 0 && (
-                                                <details className="group rounded-lg border border-amber-100 bg-amber-50/30 dark:border-amber-900/20 dark:bg-amber-900/5">
-                                                    <summary className="flex cursor-pointer items-center justify-between p-3 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                                                        <span>Style & Readability ({reviewContent.style_issues.length})</span>
-                                                        <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" /></svg>
-                                                    </summary>
-                                                    <ul className="list-disc space-y-2 px-4 pb-3 text-xs text-amber-800 dark:text-amber-300">
-                                                        {reviewContent.style_issues.map((issue, i) => <li key={i}>{issue}</li>)}
-                                                    </ul>
-                                                </details>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
 
                             {sampleInput && (
                                 <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">

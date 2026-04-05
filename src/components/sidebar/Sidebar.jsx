@@ -195,26 +195,26 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
     };
 
     return (
-        <div className="flex h-full w-full flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+        <div className="flex h-full w-full flex-col border-r border-stone-200/80 bg-transparent dark:border-slate-700/80 dark:bg-transparent">
             <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="flex flex-col space-y-3 p-5">
-                    <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-800/40">
+                    <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-4 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
                     <div className="mb-3 flex items-center justify-between">
                         <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                             Problem Brief
                         </h3>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:bg-[#111d33] dark:text-slate-300">
                             Shared
                         </span>
                     </div>
 
                     <div className="space-y-3">
-                        <div className="rounded-2xl border border-gray-200 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                        <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
                             <div className="mb-3 flex items-center justify-between">
                                 <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                     Session Setup
                                 </h4>
-                                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                                <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-[#111d33] dark:text-slate-300">
                                     Shared
                                 </span>
                             </div>
@@ -226,7 +226,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                     <select
                                         value={session.mode}
                                         onChange={(event) => handleSessionUpdate({ mode: event.target.value })}
-                                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                     >
                                         {SESSION_MODE_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>
@@ -243,7 +243,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                         className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
                                             session.driverSocketId === currentSocketId
                                                 ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
-                                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
+                                                : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
                                         }`}
                                     >
                                         {session.driverSocketId === currentSocketId ? 'Release Driver' : 'Make me Driver'}
@@ -254,7 +254,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                         className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
                                             session.navigatorSocketId === currentSocketId
                                                 ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
-                                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
+                                                : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
                                         }`}
                                     >
                                         {session.navigatorSocketId === currentSocketId ? 'Release Navigator' : 'Make me Navigator'}
@@ -262,11 +262,11 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                 </div>
 
                                 <div className="grid gap-2 sm:grid-cols-2">
-                                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                    <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
                                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Driver</p>
                                         <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{driver?.username || 'Unassigned'}</p>
                                     </div>
-                                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                    <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
                                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Navigator</p>
                                         <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{navigatorUser?.username || 'Unassigned'}</p>
                                     </div>
@@ -275,7 +275,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                         </div>
 
                         {importNotice && (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-sm leading-6 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-sm leading-6 text-amber-900 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
                                 {importNotice}
                             </div>
                         )}
@@ -289,14 +289,14 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                 value={problemDraft.problemUrl}
                                 onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
                                 placeholder="https://codeforces.com/problemset/problem/1/A"
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                             />
                         </div>
                         <button
                             type="button"
                             onClick={handleImportProblemUrl}
                             disabled={isImporting || !problemDraft.problemUrl.trim()}
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                         >
                             {isImporting ? 'Importing...' : 'Import from URL'}
                         </button>
@@ -316,7 +316,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                             title: formatProblemTitle(nextPlatform, prev.problemCode, prev.title),
                                         }));
                                     }}
-                                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 >
                                     {PLATFORM_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -345,7 +345,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                         }));
                                     }}
                                     placeholder="1885A"
-                                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 />
                             </label>
                         </div>
@@ -353,7 +353,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                             type="button"
                             onClick={handleImportProblem}
                             disabled={isImporting || !problemDraft.problemCode.trim()}
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                         >
                             {isImporting ? 'Importing problem...' : 'Import problem details'}
                         </button>
@@ -362,13 +362,13 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                             value={problemDraft.title}
                             onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
                             placeholder="Problem title"
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         />
                         <textarea
                             value={problemDraft.prompt}
                             onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
                             placeholder="Add the prompt, constraints, or the approach you want to discuss..."
-                            className="h-24 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                         />
                         <div className="grid gap-3">
                             <label className="space-y-1.5">
@@ -379,7 +379,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                     value={problemDraft.sampleInput}
                                     onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
                                     placeholder="Paste the Codeforces sample input here"
-                                    className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    className="h-32 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 />
                             </label>
                             <label className="space-y-1.5">
@@ -390,12 +390,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                     value={problemDraft.sampleOutput}
                                     onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
                                     placeholder="Paste the expected output here"
-                                    className="h-32 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 outline-none transition focus:border-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    className="h-32 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 />
                             </label>
                         </div>
                         {problemDraft.samples?.length > 0 && (
-                            <div className="flex items-center justify-between rounded-xl border border-dashed border-gray-300 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                            <div className="flex items-center justify-between rounded-xl border border-dashed border-stone-300 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/50">
                                 <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                         Parsed Samples
@@ -404,7 +404,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                         {problemDraft.samples.length} sample {problemDraft.samples.length === 1 ? 'test' : 'tests'} ready for suite runs.
                                     </p>
                                 </div>
-                                <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                                <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200">
                                     Ready
                                 </span>
                             </div>
@@ -417,7 +417,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                             <h2 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
                                 Room Members
                             </h2>
-                            <div className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-1">
+                            <div className="flex items-center gap-1.5 rounded-full bg-stone-100 dark:bg-gray-800 px-2.5 py-1">
                                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{users.length}</span>
                             </div>
@@ -456,7 +456,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                 </div>
             </div>
             
-            <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 backdrop-blur-sm p-6 flex-shrink-0">
+            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white p-6 dark:border-slate-700/80 dark:bg-[#081121]">
                 <div className="flex justify-center gap-4">
                     <button
                         onClick={handleCopyRoomId}
