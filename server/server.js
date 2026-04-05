@@ -26,8 +26,27 @@ const redisUrl = process.env.REDIS_URL;
 let pubClient, subClient;
 
 if (redisUrl) {
-  pubClient = new Redis(redisUrl);
-  subClient = pubClient.duplicate();
+  const redisOptions = {
+    maxRetriesPerRequest: null, // Required for some environments to prevent crashing on connection loss
+    retryStrategy(times) {
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
+  };
+
+  pubClient = new Redis(redisUrl, redisOptions);
+  subClient = pubClient.duplicate(redisOptions);
+
+  pubClient.on("error", (err) => {
+    console.error("Redis PubClient Error:", err.message);
+  });
+
+  subClient.on("error", (err) => {
+    console.error("Redis SubClient Error:", err.message);
+  });
+
+  pubClient.on("connect", () => console.log("Redis PubClient connected"));
+  subClient.on("connect", () => console.log("Redis SubClient connected"));
 }
 
 // Connect to MongoDB
@@ -39,15 +58,29 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err));
 
 const allowedOrigins = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://localhost:5000",
-  "http://127.0.0.1:5000",
-  process.env.CLIENT_URL || process.env.CORS_ORIGIN,
-].filter(Boolean);
+  ...new Set(
+    [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:5000",
+      "http://127.0.0.1:5000",
+      process.env.CLIENT_URL,
+      process.env.CORS_ORIGIN,
+    ].filter(Boolean),
+  ),
+];
 
 const app = express();
-app.use(helmet());
+
+// Configure Helmet to avoid "blacklist and siteRules" warnings and allow common resources
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: "no-referrer" }, // Added to address the warning
+  }),
+);
+
 app.use(
   cors({
     origin: allowedOrigins,
@@ -57,6 +90,19 @@ app.use(
 );
 
 app.use(express.json());
+
+// Middleware to check database connection
+app.use((req, res, next) => {
+  if (
+    mongoose.connection.readyState !== 1 &&
+    req.path.startsWith("/api/auth")
+  ) {
+    return res.status(503).json({
+      error: "Database is not connected. Please ensure MongoDB is running.",
+    });
+  }
+  next();
+});
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -102,7 +148,11 @@ app.post("/api/auth/register", async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to register user" });
+    console.error("Registration error details:", err);
+    res.status(500).json({
+      error: "Failed to register user",
+      details: err.message,
+    });
   }
 });
 
@@ -112,7 +162,12 @@ app.post("/api/auth/login", async (req, res) => {
 
   try {
     const user = await User.findOne({ email: normalizedEmail });
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
@@ -127,7 +182,11 @@ app.post("/api/auth/login", async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to login" });
+    console.error("Login error details:", err);
+    res.status(500).json({
+      error: "Failed to login",
+      details: err.message,
+    });
   }
 });
 
@@ -405,92 +464,6 @@ function getOrCreateRoomState(roomId) {
   return roomStateMap.get(roomId);
 }
 
-function createPasswordHash(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, storedHash) {
-  const [salt, originalHash] = String(storedHash || "").split(":");
-
-  if (!salt || !originalHash) {
-    return false;
-  }
-
-  const derivedHash = crypto.scryptSync(password, salt, 64);
-  const originalBuffer = Buffer.from(originalHash, "hex");
-
-  return (
-    derivedHash.length === originalBuffer.length &&
-    crypto.timingSafeEqual(derivedHash, originalBuffer)
-  );
-}
-
-function encodeBase64Url(value) {
-  return Buffer.from(value)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function decodeBase64Url(value) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded =
-    normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-  return Buffer.from(padded, "base64").toString("utf8");
-}
-
-function signAuthToken(payload) {
-  const secret = process.env.JWT_SECRET || "forkspace-dev-secret";
-  const header = encodeBase64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const expiresAt = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-  const body = encodeBase64Url(JSON.stringify({ ...payload, exp: expiresAt }));
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(`${header}.${body}`)
-    .digest("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-
-  return `${header}.${body}.${signature}`;
-}
-
-function verifyAuthToken(token) {
-  try {
-    const secret = process.env.JWT_SECRET || "forkspace-dev-secret";
-    const [header, body, signature] = token.split(".");
-
-    if (!header || !body || !signature) {
-      return null;
-    }
-
-    const expectedSignature = crypto
-      .createHmac("sha256", secret)
-      .update(`${header}.${body}`)
-      .digest("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
-
-    if (signature !== expectedSignature) {
-      return null;
-    }
-
-    const payload = JSON.parse(decodeBase64Url(body));
-
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 async function getUserFromAuthHeader(req) {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -660,7 +633,8 @@ function getGeminiApiKey() {
 
 async function getAiReview(prompt, apiKey, model = "mistral") {
   if (model === "gemini") {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Use gemini-1.5-flash-latest to ensure we're hitting the correct endpoint for v1beta
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
     try {
       const response = await axios.post(
         geminiUrl,
@@ -745,18 +719,24 @@ async function upsertRecentRoom(userId, roomEntry) {
     const user = await User.findById(userId);
     if (!user) return;
 
+    // Filter out existing entry for this room to avoid duplicates
+    const filteredHistory = (user.roomHistory || []).filter(
+      (entry) => entry.roomId !== roomEntry.roomId,
+    );
+
     const nextHistory = [
       {
         ...roomEntry,
         updatedAt: new Date(),
       },
-      ...(user.roomHistory || []).filter(
-        (entry) => entry.roomId !== roomEntry.roomId,
-      ),
+      ...filteredHistory,
     ].slice(0, 12);
 
-    user.roomHistory = nextHistory;
-    await user.save();
+    // Use atomic update to avoid VersionError
+    await User.updateOne(
+      { _id: userId },
+      { $set: { roomHistory: nextHistory } },
+    );
   } catch (err) {
     console.error("Error updating room history:", err);
   }
@@ -767,7 +747,7 @@ async function appendRunHistory(userId, runEntry) {
     const user = await User.findById(userId);
     if (!user) return;
 
-    user.runHistory = [
+    const nextHistory = [
       {
         ...runEntry,
         createdAt: new Date(),
@@ -775,7 +755,11 @@ async function appendRunHistory(userId, runEntry) {
       ...(user.runHistory || []),
     ].slice(0, 30);
 
-    await user.save();
+    // Use atomic update to avoid VersionError
+    await User.updateOne(
+      { _id: userId },
+      { $set: { runHistory: nextHistory } },
+    );
   } catch (err) {
     console.error("Error updating run history:", err);
   }

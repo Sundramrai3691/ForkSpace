@@ -52,10 +52,18 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
 
     let hint = "";
     if (geminiKey) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
       const response = await axios.post(geminiUrl, {
-        contents: [{ parts: [{ text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}` }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 64 }
+        contents: [
+          {
+            parts: [
+              {
+                text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 64 },
       });
       hint = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     } else {
@@ -82,7 +90,8 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
 
     res.json({ hint: hint.trim() });
   } catch (err) {
-    const errorMsg = err.response?.data?.error?.message || err.message || "Unknown error";
+    const errorMsg =
+      err.response?.data?.error?.message || err.message || "Unknown error";
     console.error("AI hint error:", errorMsg);
     res.status(500).json({ error: `Failed to fetch AI hint: ${errorMsg}` });
   }
@@ -104,12 +113,25 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
     const suggestions = [];
 
     if (geminiKey) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-      const response = await axios.post(geminiUrl, {
-        contents: [{ parts: [{ text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}` }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 256 }
-      }, { timeout: 10000 });
-      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
+      const response = await axios.post(
+        geminiUrl,
+        {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
+        },
+        { timeout: 10000 },
+      );
+      const text =
+        response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       try {
         const jsonStart = text.indexOf("[");
         const jsonEnd = text.lastIndexOf("]") + 1;
@@ -138,7 +160,7 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
               Authorization: `Bearer ${mistralKey}`,
               "Content-Type": "application/json",
             },
-            timeout: 8000
+            timeout: 8000,
           },
         );
 
@@ -163,7 +185,7 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
             Authorization: `Bearer ${mistralKey}`,
             "Content-Type": "application/json",
           },
-          timeout: 8000
+          timeout: 8000,
         },
       );
 
@@ -176,9 +198,12 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
     const uniqueSuggestions = [...new Set(suggestions)].slice(0, 5);
     res.json({ hints: uniqueSuggestions });
   } catch (err) {
-    const errorMsg = err.response?.data?.error?.message || err.message || "Unknown error";
+    const errorMsg =
+      err.response?.data?.error?.message || err.message || "Unknown error";
     console.error("AI hints error:", errorMsg);
-    res.status(500).json({ error: `Failed to fetch AI hints: ${errorMsg}`, hints: [] });
+    res
+      .status(500)
+      .json({ error: `Failed to fetch AI hints: ${errorMsg}`, hints: [] });
   }
 });
 
