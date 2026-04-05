@@ -83,23 +83,28 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
     }
 
     if (!hint && geminiKey) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-        const response = await axios.post(geminiUrl, {
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
-                },
-              ],
-            },
-          ],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 64 },
-        });
-        hint = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } catch (e) {
-        console.warn("Gemini hint failed, falling back...");
+      const models = ["gemini-1.5-flash", "gemini-pro"];
+      for (const modelName of models) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
+          const response = await axios.post(geminiUrl, {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 64 },
+          });
+          hint =
+            response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (hint) break;
+        } catch (e) {
+          console.warn(`Gemini ${modelName} hint failed, trying next...`);
+        }
       }
     }
 
@@ -191,38 +196,47 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
     }
 
     if (suggestions.length === 0 && geminiKey) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-        const response = await axios.post(
-          geminiUrl,
-          {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
-          },
-          { timeout: 10000 },
-        );
-        const text =
-          response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const models = ["gemini-1.5-flash", "gemini-pro"];
+      for (const modelName of models) {
         try {
-          const jsonStart = text.indexOf("[");
-          const jsonEnd = text.lastIndexOf("]") + 1;
-          if (jsonStart !== -1 && jsonEnd !== -1) {
-            const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
-            if (Array.isArray(parsed)) suggestions.push(...parsed);
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
+          const response = await axios.post(
+            geminiUrl,
+            {
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
+            },
+            { timeout: 10000 },
+          );
+          const text =
+            response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          try {
+            const jsonStart = text.indexOf("[");
+            const jsonEnd = text.lastIndexOf("]") + 1;
+            if (jsonStart !== -1 && jsonEnd !== -1) {
+              const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
+              if (Array.isArray(parsed)) {
+                suggestions.push(...parsed);
+                break;
+              }
+            }
+          } catch (e) {
+            if (text) {
+              suggestions.push(text.trim().split("\n")[0]);
+              break;
+            }
           }
         } catch (e) {
-          if (text) suggestions.push(text.trim().split("\n")[0]);
+          console.warn(`Gemini ${modelName} hints failed, trying next...`);
         }
-      } catch (e) {
-        console.warn("Gemini hints failed, falling back...");
       }
     }
 

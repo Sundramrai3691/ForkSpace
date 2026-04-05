@@ -639,56 +639,30 @@ function getGroqApiKey() {
 
 async function getAiReview(prompt, apiKey, model = "mistral") {
   if (model === "gemini") {
-    // Use gemini-1.5-flash with v1 API (more stable than v1beta)
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    try {
-      const response = await axios.post(
-        geminiUrl,
-        {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 1024,
+    // Try gemini-1.5-flash then gemini-pro via v1beta (most compatible)
+    const models = ["gemini-1.5-flash", "gemini-pro"];
+    let lastError;
+
+    for (const modelName of models) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      try {
+        const response = await axios.post(
+          geminiUrl,
+          {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
           },
-        },
-        { timeout: 15000 },
-      );
+          { timeout: 15000 },
+        );
 
-      if (
-        !response.data ||
-        !response.data.candidates ||
-        response.data.candidates.length === 0
-      ) {
-        console.error("Gemini API: No candidates in response", response.data);
-        return "The AI provider returned an empty response. Please try again.";
+        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Gemini ${modelName} failed: ${error.message}`);
       }
-
-      const candidate = response.data.candidates[0];
-      if (
-        candidate.finishReason === "SAFETY" ||
-        candidate.finishReason === "OTHER"
-      ) {
-        return "The AI response was filtered or blocked by the provider's safety policies.";
-      }
-
-      const text = candidate.content?.parts?.[0]?.text;
-      if (!text) {
-        console.error("Gemini API: No text in candidate content", candidate);
-        return "The AI provider returned a response without text content.";
-      }
-
-      return text;
-    } catch (error) {
-      const errorData = error.response?.data;
-      const errorMessage = error.message;
-      console.error(
-        "Gemini API error detail:",
-        JSON.stringify(errorData || errorMessage),
-      );
-      throw new Error(
-        errorData?.error?.message || errorMessage || "Gemini API call failed",
-      );
     }
+    throw lastError || new Error("All Gemini models failed");
   }
 
   if (model === "groq") {
