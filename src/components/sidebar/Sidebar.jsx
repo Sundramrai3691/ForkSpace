@@ -189,13 +189,14 @@ function ImportProblemModal({
     );
 }
 
-function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) {
+function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, currentRole = 'Peer' }) {
     const location = useLocation();
     const navigate = useNavigate();
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [isImporting, setIsImporting] = useState(false);
     const [importNotice, setImportNotice] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
+    const [activeTab, setActiveTab] = useState('problem');
     const [problemDraft, setProblemDraft] = useState({
         platform: 'codeforces',
         problemCode: '',
@@ -211,6 +212,10 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
 
     const hasJoinState = Boolean(location.state);
     const session = roomState?.session || { mode: 'peer_practice', driverSocketId: '', navigatorSocketId: '' };
+    const normalizedRole = (currentRole || 'Peer').toLowerCase();
+    const isMentoringMode = session.mode === 'mentoring';
+    const isMockMode = session.mode === 'mock_interview';
+    const canSeePrivateNotes = (isMentoringMode && normalizedRole === 'mentor') || (isMockMode && normalizedRole === 'interviewer');
     const driver = users.find((user) => user.socketId === session.driverSocketId);
     const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
     const getEditorAccess = (user) => {
@@ -286,6 +291,18 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                 ...session,
                 ...partialSession,
             },
+        });
+    };
+
+    const handleApproachNotesChange = (event) => {
+        handleSessionUpdate({
+            approachNotes: event.target.value,
+        });
+    };
+
+    const handleMentorNotesChange = (event) => {
+        handleSessionUpdate({
+            mentorNotes: event.target.value,
         });
     };
 
@@ -379,185 +396,277 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
             <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="flex flex-col space-y-3 p-5">
                     <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-4 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                            Problem Brief
-                        </h3>
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:bg-[#111d33] dark:text-slate-300">
-                            Shared
-                        </span>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
-                            <div className="mb-3 flex items-center justify-between">
-                                <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Session Setup
-                                </h4>
-                                <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-[#111d33] dark:text-slate-300">
-                                    Shared
-                                </span>
-                            </div>
-                            <div className="space-y-3">
-                                <label className="space-y-1.5">
-                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                        Mode
-                                    </span>
-                                    <select
-                                        value={session.mode}
-                                        onChange={(event) => handleSessionUpdate({ mode: event.target.value })}
-                                        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                    >
-                                        {SESSION_MODE_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                                <p className="rounded-xl border border-stone-200 bg-white/80 px-3 py-2 text-xs leading-6 text-stone-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-                                    {SESSION_MODE_HELP[session.mode] || SESSION_MODE_HELP.peer_practice}
+                        <div className="mb-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                                    Workspace Brief
+                                </h3>
+                                <p className="mt-1 text-xs text-stone-500 dark:text-slate-400">
+                                    Keep problem details and session tools separated.
                                 </p>
+                            </div>
+                            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:bg-[#111d33] dark:text-slate-300">
+                                Shared
+                            </span>
+                        </div>
 
-                                <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="mb-4 grid grid-cols-2 gap-2 rounded-[1.2rem] border border-stone-200/80 bg-stone-50 p-1 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('problem')}
+                                className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${
+                                    activeTab === 'problem'
+                                        ? 'bg-white text-stone-900 shadow-sm dark:bg-slate-900 dark:text-white'
+                                        : 'text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
+                                }`}
+                            >
+                                Problem
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('session')}
+                                className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${
+                                    activeTab === 'session'
+                                        ? 'bg-white text-stone-900 shadow-sm dark:bg-slate-900 dark:text-white'
+                                        : 'text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
+                                }`}
+                            >
+                                Session
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {activeTab === 'problem' ? (
+                                <>
+                                    <div className="space-y-3 rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                                        <div>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                Problem Title
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={problemDraft.title}
+                                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
+                                                placeholder="Problem title"
+                                                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                Prompt
+                                            </p>
+                                            <textarea
+                                                value={problemDraft.prompt}
+                                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                                                placeholder="Paste the statement or the specific prompt you want to discuss."
+                                                className="mt-1.5 h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                Constraints
+                                            </p>
+                                            <textarea
+                                                value={problemDraft.constraints}
+                                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, constraints: event.target.value }))}
+                                                placeholder="1 <= n <= 2e5, values can be negative, sum fits in 64-bit..."
+                                                className="mt-1.5 h-20 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-3">
+                                        <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                                            <div className="mb-3 flex items-center justify-between">
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Example
+                                                </p>
+                                                <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                                    Shared
+                                                </span>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <label className="space-y-1.5">
+                                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                        Input
+                                                    </span>
+                                                    <textarea
+                                                        value={problemDraft.sampleInput}
+                                                        onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
+                                                        placeholder="Paste the sample input here"
+                                                        className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                    />
+                                                </label>
+                                                <label className="space-y-1.5">
+                                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                        Expected Output
+                                                    </span>
+                                                    <textarea
+                                                        value={problemDraft.sampleOutput}
+                                                        onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
+                                                        placeholder="Paste the expected output here"
+                                                        className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                    />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {problemDraft.samples?.length > 0 && (
+                                        <div className="flex items-center justify-between rounded-xl border border-dashed border-stone-300 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                            <div>
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Parsed Samples
+                                                </p>
+                                                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                                                    {problemDraft.samples.length} sample {problemDraft.samples.length === 1 ? 'test' : 'tests'} ready for suite runs.
+                                                </p>
+                                            </div>
+                                            <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200">
+                                                Ready
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                Session Setup
+                                            </h4>
+                                            <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-[#111d33] dark:text-slate-300">
+                                                Shared
+                                            </span>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <label className="space-y-1.5">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Mode
+                                                </span>
+                                                <select
+                                                    value={session.mode}
+                                                    onChange={(event) => handleSessionUpdate({ mode: event.target.value })}
+                                                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                >
+                                                    {SESSION_MODE_OPTIONS.map((option) => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <p className="rounded-xl border border-stone-200 bg-white/80 px-3 py-2 text-xs leading-6 text-stone-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                                                {SESSION_MODE_HELP[session.mode] || SESSION_MODE_HELP.peer_practice}
+                                            </p>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleSessionClaim('driverSocketId')}
+                                                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                        session.driverSocketId === currentSocketId
+                                                            ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
+                                                            : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    {session.driverSocketId === currentSocketId ? 'Release Driver' : 'Make me Driver'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleSessionClaim('navigatorSocketId')}
+                                                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                        session.navigatorSocketId === currentSocketId
+                                                            ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
+                                                            : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    {session.navigatorSocketId === currentSocketId ? 'Release Navigator' : 'Make me Navigator'}
+                                                </button>
+                                            </div>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Driver</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{driver?.username || 'Unassigned'}</p>
+                                                </div>
+                                                <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Navigator</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{navigatorUser?.username || 'Unassigned'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {importNotice && (
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-sm leading-6 text-amber-900 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                                            {importNotice}
+                                        </div>
+                                    )}
                                     <button
                                         type="button"
-                                        onClick={() => handleToggleSessionClaim('driverSocketId')}
-                                        className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                                            session.driverSocketId === currentSocketId
-                                                ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
-                                                : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
-                                        }`}
+                                        onClick={() => setShowImportModal(true)}
+                                        className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                     >
-                                        {session.driverSocketId === currentSocketId ? 'Release Driver' : 'Make me Driver'}
+                                        Import Problem
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleToggleSessionClaim('navigatorSocketId')}
-                                        className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                                            session.navigatorSocketId === currentSocketId
-                                                ? 'border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-100'
-                                                : 'border-stone-200 bg-stone-50 text-stone-700 hover:border-stone-300 hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white'
-                                        }`}
-                                    >
-                                        {session.navigatorSocketId === currentSocketId ? 'Release Navigator' : 'Make me Navigator'}
-                                    </button>
-                                </div>
-
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                    <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Driver</p>
-                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{driver?.username || 'Unassigned'}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Navigator</p>
-                                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{navigatorUser?.username || 'Unassigned'}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {importNotice && (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-sm leading-6 text-amber-900 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
-                                {importNotice}
-                            </div>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={() => setShowImportModal(true)}
-                            className="inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-white hover:text-stone-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                        >
-                            Import Problem
-                        </button>
-                        <div className="space-y-3 rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Problem Title
-                                </p>
-                                <input
-                                    type="text"
-                                    value={problemDraft.title}
-                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
-                                    placeholder="Problem title"
-                                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                            </div>
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Prompt
-                                </p>
-                                <textarea
-                                    value={problemDraft.prompt}
-                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
-                                    placeholder="Paste the statement or the specific prompt you want to discuss."
-                                    className="mt-1.5 h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                            </div>
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Constraints
-                                </p>
-                                <textarea
-                                    value={problemDraft.constraints}
-                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, constraints: event.target.value }))}
-                                    placeholder="1 <= n <= 2e5, values can be negative, sum fits in 64-bit..."
-                                    className="mt-1.5 h-20 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid gap-3">
-                            <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
-                                <div className="mb-3 flex items-center justify-between">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                        Example
-                                    </p>
-                                    <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                                        Shared
-                                    </span>
-                                </div>
-                                <div className="space-y-3">
-                                    <label className="space-y-1.5">
-                                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                            Input
-                                        </span>
+                                    <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                Shared Approach Board
+                                            </h4>
+                                            <span className="text-[10px] text-gray-400">Use this before coding</span>
+                                        </div>
                                         <textarea
-                                            value={problemDraft.sampleInput}
-                                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
-                                            placeholder="Paste the Codeforces sample input here"
-                                            className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                            value={session.approachNotes || ''}
+                                            onChange={handleApproachNotesChange}
+                                            placeholder="Idea, brute force, optimized approach, edge cases..."
+                                            className="min-h-[120px] w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                         />
-                                    </label>
-                                    <label className="space-y-1.5">
-                                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                            Output
-                                        </span>
-                                        <textarea
-                                            value={problemDraft.sampleOutput}
-                                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
-                                            placeholder="Paste the expected output here"
-                                            className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                        />
-                                    </label>
-                                </div>
-                            </div>
+                                    </div>
+                                    {canSeePrivateNotes && (
+                                        <div className="rounded-[1.35rem] border border-purple-200 bg-purple-50/40 p-4 dark:border-purple-800/40 dark:bg-purple-950/15">
+                                            <div className="mb-3 flex items-center justify-between">
+                                                <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-purple-700 dark:text-purple-300">
+                                                    {isMockMode ? 'Private Interviewer Notes' : 'Private Mentor Notes'}
+                                                </h4>
+                                                <span className="text-[10px] text-purple-400">Visible only to you</span>
+                                            </div>
+                                            <textarea
+                                                value={session.mentorNotes || ''}
+                                                onChange={handleMentorNotesChange}
+                                                placeholder="Confusion points, next topic, score/rubric..."
+                                                className="min-h-[120px] w-full rounded-xl border border-purple-100 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-purple-400 dark:border-purple-800/50 dark:bg-slate-900 dark:text-white"
+                                            />
+                                        </div>
+                                    )}
+                                    {isMockMode && session.mockSummary && (
+                                        <div className="rounded-[1.35rem] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+                                            <div className="mb-3 flex items-center justify-between">
+                                                <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Mock Summary</h4>
+                                                {session.mockSummary.shareId ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            await navigator.clipboard.writeText(`${window.location.origin}/summary/${session.mockSummary.shareId}`);
+                                                            toast.success('Mock summary link copied');
+                                                        }}
+                                                        className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:border-amber-800/40 dark:bg-slate-900/60 dark:text-amber-200"
+                                                    >
+                                                        Share
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">
+                                                    <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Problem</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{session.mockSummary.problemTitle}</p>
+                                                </div>
+                                                <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">
+                                                    <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Latest Run</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{session.mockSummary.latestRunStatus}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
-                        {problemDraft.samples?.length > 0 && (
-                            <div className="flex items-center justify-between rounded-xl border border-dashed border-stone-300 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/50">
-                                <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                        Parsed Samples
-                                    </p>
-                                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                                        {problemDraft.samples.length} sample {problemDraft.samples.length === 1 ? 'test' : 'tests'} ready for suite runs.
-                                    </p>
-                                </div>
-                                <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200">
-                                    Ready
-                                </span>
-                            </div>
-                        )}
-                    </div>
                     </div>
 
                     <div className="space-y-3">

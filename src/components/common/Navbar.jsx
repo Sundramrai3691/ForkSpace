@@ -73,11 +73,11 @@ function Navbar() {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <div className="rounded-lg bg-black p-1 dark:bg-white">
+                        <div className="rounded-lg bg-white p-1 shadow-sm ring-1 ring-black/5 dark:bg-white">
                             <img
-                                src={theme === 'dark' ? '/favicon-dark.svg' : '/favicon.svg'}
+                                src="/logo.png"
                                 alt="ForkSpace logo"
-                                className="h-8 w-8 rounded-lg invert dark:invert-0"
+                                className="h-8 w-8 rounded-lg object-contain"
                             />
                         </div>
                         <div className="flex flex-col">

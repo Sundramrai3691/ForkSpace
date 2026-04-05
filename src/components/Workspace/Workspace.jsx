@@ -205,11 +205,91 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [timerDuration, setTimerDuration] = useState(45 * 60);
     const [timeRemaining, setTimeRemaining] = useState(45 * 60);
     const [isTimerRunning, setIsTimerRunning] = useState(false);
-    const [showReview, setShowReview] = useState(false);
     const [showOutputModal, setShowOutputModal] = useState(false);
     const [reviewContent, setReviewContent] = useState(null);
     const [isReviewLoading, setIsReviewLoading] = useState(false);
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+    const [activeRightTab, setActiveRightTab] = useState("output");
+
+    const renderReviewContent = () => {
+        if (isReviewLoading) {
+            return (
+                <div className="flex min-h-[14rem] items-center justify-center rounded-[1.4rem] border border-amber-200 bg-amber-50/70 p-5 dark:border-amber-800/40 dark:bg-amber-900/20">
+                    <div className="flex items-center gap-3 text-sm font-medium text-amber-800 dark:text-amber-200">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></div>
+                        Analyzing solution...
+                    </div>
+                </div>
+            );
+        }
+
+        if (!reviewContent) {
+            return (
+                <div className="rounded-[1.4rem] border border-dashed border-gray-300 bg-white/80 p-5 text-sm leading-7 text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+                    Run `Review Solution` to get complexity, bug checks, and optimization suggestions here.
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-5">
+                {reviewContent.summary && (
+                    <div className="rounded-[1.4rem] border border-gray-200/80 bg-white/90 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                        <p className="text-base leading-7 text-slate-800 dark:text-slate-200">{reviewContent.summary}</p>
+                        {reviewContent?.complexity_reasoning ? (
+                            <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{reviewContent.complexity_reasoning}</p>
+                        ) : null}
+                    </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[1.35rem] border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Time Complexity</p>
+                        <p className="mt-2 text-lg font-semibold text-blue-950 dark:text-blue-100">{reviewContent?.time_complexity || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-[1.35rem] border border-purple-200 bg-purple-50/80 p-4 dark:border-purple-800/40 dark:bg-purple-950/20">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-700 dark:text-purple-300">Space Complexity</p>
+                        <p className="mt-2 text-lg font-semibold text-purple-950 dark:text-purple-100">{reviewContent?.space_complexity || 'N/A'}</p>
+                    </div>
+                </div>
+
+                {reviewContent?.bugs?.length > 0 && (
+                    <div className="rounded-[1.4rem] border border-red-200 bg-red-50/80 p-5 dark:border-red-800/40 dark:bg-red-950/20">
+                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">Potential Bugs</h3>
+                        <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-red-900 dark:text-red-200">
+                            {reviewContent.bugs.map((bug, index) => <li key={index}>{bug}</li>)}
+                        </ul>
+                    </div>
+                )}
+
+                {reviewContent?.style_issues?.length > 0 && (
+                    <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-800/40 dark:bg-amber-950/20">
+                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">Style And Readability</h3>
+                        <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-amber-900 dark:text-amber-200">
+                            {reviewContent.style_issues.map((issue, index) => <li key={index}>{issue}</li>)}
+                        </ul>
+                    </div>
+                )}
+
+                {reviewContent?.optimization_suggestion && (
+                    <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50/80 p-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Optimization Suggestion</h3>
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                            <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
+                                <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.before}</p>
+                            </div>
+                            <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
+                                <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.after}</p>
+                            </div>
+                        </div>
+                        <p className="mt-4 text-sm leading-7 text-emerald-900 dark:text-emerald-100">{reviewContent.optimization_suggestion.benefit}</p>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
@@ -234,7 +314,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const hasAssignedDriver = Boolean(session.driverSocketId);
     const isMentoringMode = session.mode === 'mentoring';
     const isMockMode = session.mode === 'mock_interview';
-    const isMentorRole = normalizedRole === 'mentor';
     const isLearnerRole = normalizedRole === 'learner';
     const isInterviewerRole = normalizedRole === 'interviewer';
     const isCandidateRole = normalizedRole === 'candidate';
@@ -280,13 +359,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         socketRef.current?.emit('swap-roles', { roomId });
     };
 
-    const updateApproachNotes = (notes) => {
-        socketRef.current?.emit('session-update', {
-            roomId,
-            session: { ...session, approachNotes: notes },
-        });
-    };
-
     const toggleEdgeCase = (id) => {
         const nextChecklist = session.edgeCaseChecklist.map((item) =>
             item.id === id ? { ...item, checked: !item.checked } : item
@@ -294,13 +366,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         socketRef.current?.emit('session-update', {
             roomId,
             session: { ...session, edgeCaseChecklist: nextChecklist },
-        });
-    };
-
-    const updateMentorNotes = (notes) => {
-        socketRef.current?.emit('session-update', {
-            roomId,
-            session: { ...session, mentorNotes: notes },
         });
     };
 
@@ -321,7 +386,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
     const reviewSolution = async () => {
         setIsReviewLoading(true);
-        setShowReview(true);
+        setActiveRightTab("ai");
         try {
             const code = editorRef.current?.getValue() || "";
             setReviewContent(null);
@@ -335,7 +400,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             setReviewContent(response.data);
         } catch {
             toast.error("Failed to get review");
-            setShowReview(false);
         } finally {
             setIsReviewLoading(false);
         }
@@ -709,6 +773,7 @@ const runCode = async () => {
   const effectiveStdin = sampleInput;
   const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
   const normalizedExpectedOutput = normalizeOutput(expectedOutput);
+  setActiveRightTab("output");
 
   setLastRunMeta({
     languageLabel: languageConfig.label,
@@ -895,79 +960,6 @@ const runCode = async () => {
                 </OverlayPanel>
             )}
 
-            {showReview && (
-                <OverlayPanel
-                    title="Solution Review"
-                    subtitle="AI Review"
-                    onClose={() => setShowReview(false)}
-                >
-                    {isReviewLoading ? (
-                        <div className="flex min-h-[40vh] items-center justify-center">
-                            <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
-                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></div>
-                                <span className="text-sm font-medium">Analyzing solution...</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-5">
-                            {reviewContent?.summary && (
-                                <div className="rounded-[1.4rem] border border-gray-200/80 bg-white/90 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
-                                    <p className="text-base leading-7 text-slate-800 dark:text-slate-200">{reviewContent.summary}</p>
-                                    {reviewContent?.complexity_reasoning ? (
-                                        <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{reviewContent.complexity_reasoning}</p>
-                                    ) : null}
-                                </div>
-                            )}
-
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="rounded-[1.35rem] border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Time Complexity</p>
-                                    <p className="mt-2 text-lg font-semibold text-blue-950 dark:text-blue-100">{reviewContent?.time_complexity || 'N/A'}</p>
-                                </div>
-                                <div className="rounded-[1.35rem] border border-purple-200 bg-purple-50/80 p-4 dark:border-purple-800/40 dark:bg-purple-950/20">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-700 dark:text-purple-300">Space Complexity</p>
-                                    <p className="mt-2 text-lg font-semibold text-purple-950 dark:text-purple-100">{reviewContent?.space_complexity || 'N/A'}</p>
-                                </div>
-                            </div>
-
-                            {reviewContent?.bugs?.length > 0 && (
-                                <div className="rounded-[1.4rem] border border-red-200 bg-red-50/80 p-5 dark:border-red-800/40 dark:bg-red-950/20">
-                                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">Potential Bugs</h3>
-                                    <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-red-900 dark:text-red-200">
-                                        {reviewContent.bugs.map((bug, index) => <li key={index}>{bug}</li>)}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {reviewContent?.style_issues?.length > 0 && (
-                                <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-800/40 dark:bg-amber-950/20">
-                                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">Style And Readability</h3>
-                                    <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-amber-900 dark:text-amber-200">
-                                        {reviewContent.style_issues.map((issue, index) => <li key={index}>{issue}</li>)}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {reviewContent?.optimization_suggestion && (
-                                <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50/80 p-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-                                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Optimization Suggestion</h3>
-                                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                                        <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
-                                            <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.before}</p>
-                                        </div>
-                                        <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
-                                            <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.after}</p>
-                                        </div>
-                                    </div>
-                                    <p className="mt-4 text-sm leading-7 text-emerald-900 dark:text-emerald-100">{reviewContent.optimization_suggestion.benefit}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </OverlayPanel>
-            )}
             <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-2.5 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <button
@@ -994,28 +986,6 @@ const runCode = async () => {
                         </svg>
                         Clear
                     </button>
-                    <button
-                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
-                        onClick={handleFormatCode}
-                        disabled={!editorUnlocked}
-                        title={editorUnlocked ? 'Format the shared code' : 'Only the active editor owner can format code right now'}
-                    >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M4 7h10" />
-                            <path d="M4 12h16" />
-                            <path d="M4 17h12" />
-                        </svg>
-                        Format
-                    </button>
-                    <button
-                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50/90 px-4 text-sm font-medium text-amber-700 shadow-sm transition-all hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
-                        onClick={reviewSolution}
-                    >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Review Solution
-                    </button>
                 </div>
 
                 <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
@@ -1040,34 +1010,6 @@ const runCode = async () => {
                     <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                             <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                        <span className={`rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em] uppercase ${
-                            participationLabel === 'Driver' 
-                                ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200'
-                                : participationLabel === 'Navigator'
-                                    ? 'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800/50 dark:bg-purple-950/30 dark:text-purple-200'
-                                    : 'border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
-                        }`}>
-                            {participationLabel}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${
-                            editorUnlocked
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200'
-                                : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200'
-                        }`}>
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {editorUnlocked ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 113.182 3.182L7.5 20.213 3 21l.787-4.5L16.862 4.487z" />
-                                ) : (
-                                    <>
-                                        <rect x="4" y="10" width="16" height="10" rx="2" strokeWidth={2} />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10V7a4 4 0 118 0v3" />
-                                    </>
-                                )}
-                            </svg>
-                            {editorUnlocked ? 'Editor control' : 'Read only'}
-                        </span>
                     </div>
                     <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Room</span>
@@ -1105,6 +1047,13 @@ const runCode = async () => {
                                         <p className="font-mono text-sm text-gray-900 dark:text-white">{roomId}</p>
                                     </div>
                                     <button
+                                        onClick={handleFormatCode}
+                                        disabled={!editorUnlocked}
+                                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                                    >
+                                        Format code
+                                    </button>
+                                    <button
                                         onClick={handleCopyRoomId}
                                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                     >
@@ -1125,84 +1074,12 @@ const runCode = async () => {
                                 </div>
                             )}
                         </div>
-                        <div className="relative group">
-                            <button 
-                                onClick={fetchAIHints}
-                                className="ai-button inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/92 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                                aria-label="AI Practice Coach"
-                                title="AI Practice Coach - Get interview-oriented suggestions"
-                            >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                                    <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423L16.5 15.75l.394 1.183a2.25 2.25 0 001.423 1.423L19.5 18.75l-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
-                                </svg>
-                                AI
-                            </button>
-                            
-                            {/* AI Hints Dropdown */}
-                            {showDropdown && createPortal(
-                                <div className="ai-dropdown fixed top-20 right-6 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[9999]">
-                                    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-sm font-medium text-gray-900 dark:text-white">AI Practice Suggestions</h3>
-                                            <button
-                                                onClick={closeDropdown}
-                                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                            >
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="max-h-64 overflow-y-auto">
-                                        {isLoading ? (
-                                            <div className="p-4 text-center">
-                                                <div className="inline-flex items-center gap-2">
-                                                    <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                                                    <span className="text-sm text-gray-600 dark:text-gray-400">Generating suggestions...</span>
-                                                </div>
-                                            </div>
-                                        ) : aiHints.length > 0 ? (
-                                            <div className="p-2">
-                                                {aiHints.map((hint, index) => (
-                                                    <button
-                                                        key={index}
-                                                        onClick={() => applyHint(hint)}
-                                                        className="w-full text-left p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                                                                <svg className="w-3 h-3 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                                                </svg>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm text-gray-900 dark:text-white font-mono leading-relaxed group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
-                                                                    {hint}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="p-4 text-center">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-sm">
-                                                    No suggestions available right now
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>,
-                                document.body
-                            )}
-                        </div>
                         <button
                             type="button"
                             onClick={() => setIsOutputCollapsed((current) => !current)}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                             title={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
+                            aria-label={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
                         >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
                                 {isOutputCollapsed ? (
@@ -1211,7 +1088,6 @@ const runCode = async () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16M18 6v12" />
                                 )}
                             </svg>
-                            {isOutputCollapsed ? 'Show Output' : 'Hide Output'}
                         </button>
                         {isMockMode && (
                             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
@@ -1270,243 +1146,204 @@ const runCode = async () => {
                                 <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
                                 <div className="h-3 w-3 rounded-full bg-green-500"></div>
                             </div>
-                            <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">Output</span>
+                            <span className="ml-2 text-sm font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Right Panel</span>
                         </div>
 
-                        <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-2.5 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                    {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
-                                </div>
-                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                    source: {lastRunMeta?.inputSource || "none"}
-                                </div>
-                                <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                    status: {lastRunMeta?.status || "idle"}
-                                </div>
-                                <div className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                                    lastRunMeta?.sampleCheck === "passed"
-                                        ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-200"
-                                        : lastRunMeta?.sampleCheck === "mismatch"
-                                            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200"
-                                            : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                                }`}>
-                                    sample: {lastRunMeta?.sampleCheck === "passed"
-                                        ? "passed"
-                                        : lastRunMeta?.sampleCheck === "mismatch"
-                                            ? "mismatch"
-                                            : lastRunMeta?.sampleCheck === "pending"
-                                                ? "checking"
-                                                : lastRunMeta?.sampleCheck === "not_checked"
-                                                    ? "not checked"
-                                                    : "n/a"}
-                                </div>
-                            </div>
-                            <div className="mt-3 grid grid-cols-2 gap-3">
-                                <div className="rounded-2xl border border-gray-200/80 bg-white px-3 py-3 shadow-sm dark:border-gray-700/80 dark:bg-[#111d33]">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                                        Execution Time
-                                    </p>
-                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                        {lastRunMeta?.time ?? "Not run yet"}
-                                    </p>
-                                </div>
-                                <div className="rounded-2xl border border-gray-200/80 bg-white px-3 py-3 shadow-sm dark:border-gray-700/80 dark:bg-[#111d33]">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                                        Memory
-                                    </p>
-                                    <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                        {lastRunMeta?.memory ?? "Not run yet"}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="mt-3 flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowOutputModal(true)}
-                                    disabled={!output}
-                                    className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-stone-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-[#16243d] dark:hover:text-white"
-                                >
-                                    Open large output
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowReview(true)}
-                                    disabled={!reviewContent && !isReviewLoading}
-                                    className="inline-flex flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
-                                >
-                                    Open review
-                                </button>
+                        <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-3 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                            <div className="grid grid-cols-3 gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1 dark:border-gray-700/80 dark:bg-slate-950/40">
+                                {[
+                                    { key: "output", label: "Output" },
+                                    { key: "history", label: "History" },
+                                    { key: "ai", label: "AI" },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => setActiveRightTab(tab.key)}
+                                        className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${
+                                            activeRightTab === tab.key
+                                                ? "bg-white text-gray-900 shadow-sm dark:bg-slate-900 dark:text-white"
+                                                : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6">
-                            {/* Session Content */}
-                            <div className="space-y-6">
-                                {/* Shared Approach Board */}
-                                <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Shared Approach Board</h3>
-                                        <span className="text-[10px] text-gray-400">Use this before coding</span>
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+                            {activeRightTab === "output" && (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                            {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
+                                        </div>
+                                        <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                            status: {lastRunMeta?.status || "idle"}
+                                        </div>
+                                        <div className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                                            lastRunMeta?.sampleCheck === "passed"
+                                                ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-200"
+                                                : lastRunMeta?.sampleCheck === "mismatch"
+                                                    ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200"
+                                                    : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                        }`}>
+                                            sample: {lastRunMeta?.sampleCheck === "passed"
+                                                ? "passed"
+                                                : lastRunMeta?.sampleCheck === "mismatch"
+                                                    ? "mismatch"
+                                                    : lastRunMeta?.sampleCheck === "pending"
+                                                        ? "checking"
+                                                        : lastRunMeta?.sampleCheck === "not_checked"
+                                                            ? "not checked"
+                                                            : "n/a"}
+                                        </div>
                                     </div>
-                                    <textarea
-                                        value={session.approachNotes}
-                                        onChange={(e) => updateApproachNotes(e.target.value)}
-                                        placeholder="Idea, brute force, optimized approach, edge cases..."
-                                        className="w-full min-h-[100px] rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-900 outline-none focus:border-blue-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500"
-                                    />
-                                </div>
 
-                                {/* Edge Case Checklist */}
-                                <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {session.edgeCaseChecklist.map((item) => (
-                                            <label key={item.id} className="flex items-center gap-3 cursor-pointer group">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={item.checked}
-                                                    onChange={() => toggleEdgeCase(item.id)}
-                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
-                                                />
-                                                <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                    {item.label}
-                                                </span>
-                                            </label>
-                                        ))}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="rounded-2xl border border-gray-200/80 bg-white px-3 py-3 shadow-sm dark:border-gray-700/80 dark:bg-[#111d33]">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Execution Time</p>
+                                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{lastRunMeta?.time ?? "Not run yet"}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-gray-200/80 bg-white px-3 py-3 shadow-sm dark:border-gray-700/80 dark:bg-[#111d33]">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Memory</p>
+                                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{lastRunMeta?.memory ?? "Not run yet"}</p>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Run History */}
-                                {session.runHistory.length > 0 && (
-                                    <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                                        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Run History</h3>
-                                        <div className="space-y-2">
-                                            {session.runHistory.map((run) => (
-                                                <div key={run.id} className="rounded-lg border border-gray-100 bg-white/80 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/60">
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`h-1.5 w-1.5 rounded-full ${run.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{run.status}</span>
-                                                            <span className={`rounded-full px-2 py-0.5 ${
-                                                                run.sampleCheck === 'passed'
-                                                                    ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-200'
-                                                                    : run.sampleCheck === 'mismatch'
-                                                                        ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-200'
-                                                                        : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-300'
-                                                            }`}>
-                                                                {run.sampleCheck === 'passed' ? 'Passed sample' : run.sampleCheck === 'mismatch' ? 'Mismatch' : 'No check'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-3 text-gray-400">
-                                                            <span>{run.time}</span>
-                                                            <span>{run.memory}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOutputModal(true)}
+                                        disabled={!output}
+                                        className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-stone-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-[#16243d] dark:hover:text-white"
+                                    >
+                                        Open large output
+                                    </button>
+
+                                    {output ? (
+                                        <div className="rounded-[1.5rem] border border-gray-200/80 bg-white/88 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                                            <div className="font-mono text-sm text-gray-900 dark:text-white">{output}</div>
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-5 text-sm leading-7 text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+                                            Run your code to see compiler output, runtime messages, and execution stats here.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeRightTab === "history" && (
+                                session.runHistory.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {session.runHistory.map((run) => (
+                                            <div key={run.id} className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`h-1.5 w-1.5 rounded-full ${run.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{run.status}</span>
+                                                        <span className={`rounded-full px-2 py-0.5 text-xs ${
+                                                            run.sampleCheck === 'passed'
+                                                                ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-200'
+                                                                : run.sampleCheck === 'mismatch'
+                                                                    ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-200'
+                                                                    : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-300'
+                                                        }`}>
+                                                            {run.sampleCheck === 'passed' ? 'Passed sample' : run.sampleCheck === 'mismatch' ? 'Mismatch' : 'No check'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                                                        <span>{run.time}</span>
+                                                        <span>{run.memory}</span>
+                                                    </div>
+                                                </div>
+                                                {(run.stdin || run.stdout || run.expectedOutput) && (
+                                                    <div className="mt-3 space-y-2">
+                                                        {run.stdin ? (
+                                                            <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`stdin\n${run.stdin}`}</pre>
+                                                        ) : null}
+                                                        <div className="grid gap-2">
+                                                            {run.stdout ? (
+                                                                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`stdout\n${run.stdout}`}</pre>
+                                                            ) : null}
+                                                            {run.expectedOutput ? (
+                                                                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`expected\n${run.expectedOutput}`}</pre>
+                                                            ) : null}
                                                         </div>
                                                     </div>
-                                                    {(run.stdin || run.stdout || run.expectedOutput) && (
-                                                        <div className="mt-2 space-y-2">
-                                                            {run.stdin ? (
-                                                                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`stdin\n${run.stdin}`}</pre>
-                                                            ) : null}
-                                                            <div className="grid gap-2 lg:grid-cols-2">
-                                                                {run.stdout ? (
-                                                                    <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`stdout\n${run.stdout}`}</pre>
-                                                                ) : null}
-                                                                {run.expectedOutput ? (
-                                                                    <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{`expected\n${run.expectedOutput}`}</pre>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-5 text-sm leading-7 text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+                                        Run your code to populate the last 5 executions here.
+                                    </div>
+                                )
+                            )}
+
+                            {activeRightTab === "ai" && (
+                                <div className="space-y-5">
+                                    <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                                        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {session.edgeCaseChecklist.map((item) => (
+                                                <label key={item.id} className="flex cursor-pointer items-center gap-3 group">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.checked}
+                                                        onChange={() => toggleEdgeCase(item.id)}
+                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                                                    />
+                                                    <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                        {item.label}
+                                                    </span>
+                                                </label>
                                             ))}
                                         </div>
                                     </div>
-                                )}
 
-                                {/* Mentor Notes */}
-                                {((isMentoringMode && isMentorRole) || (isMockMode && isInterviewerRole)) && (
-                                    <div className="rounded-2xl border border-purple-200 bg-purple-50/30 p-4 dark:border-purple-800/30 dark:bg-purple-900/10">
-                                        <div className="mb-3 flex items-center justify-between">
-                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">{isMockMode ? 'Private Interviewer Notes' : 'Private Mentor Notes'}</h3>
-                                            <span className="text-[10px] text-purple-400">Visible only to you</span>
-                                        </div>
-                                        <textarea
-                                            value={session.mentorNotes}
-                                            onChange={(e) => updateMentorNotes(e.target.value)}
-                                            placeholder="Confusion points, next topic, score/rubric..."
-                                            className="w-full min-h-[100px] rounded-lg border border-purple-100 bg-white p-3 text-sm text-gray-900 outline-none focus:border-purple-400 dark:border-purple-800/50 dark:bg-gray-800 dark:text-white dark:focus:border-purple-500"
-                                        />
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={reviewSolution}
+                                            className="inline-flex flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                                        >
+                                            Review Solution
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={fetchAIHints}
+                                            className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-stone-50 hover:text-gray-900 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-[#16243d] dark:hover:text-white"
+                                        >
+                                            Refresh AI Hints
+                                        </button>
                                     </div>
-                                )}
 
-                                {isMockMode && session.mockSummary && (
-                                    <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+                                    <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                                         <div className="mb-3 flex items-center justify-between">
-                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Mock Summary</h3>
-                                            <div className="flex items-center gap-2">
-                                                {session.mockSummary.shareId ? (
+                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">AI Hints</h3>
+                                            {isLoading ? <span className="text-[10px] text-amber-500">Loading...</span> : null}
+                                        </div>
+                                        {aiHints.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {aiHints.map((hint, index) => (
                                                     <button
+                                                        key={index}
                                                         type="button"
-                                                        onClick={async () => {
-                                                            await navigator.clipboard.writeText(`${window.location.origin}/summary/${session.mockSummary.shareId}`);
-                                                            toast.success('Mock summary link copied');
-                                                        }}
-                                                        className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:border-amber-800/40 dark:bg-slate-900/60 dark:text-amber-200"
+                                                        onClick={() => applyHint(hint)}
+                                                        className="w-full rounded-xl border border-gray-200 bg-white/80 p-3 text-left text-sm text-gray-700 transition hover:border-amber-200 hover:bg-amber-50/70 dark:border-gray-700 dark:bg-slate-900/50 dark:text-gray-200 dark:hover:border-amber-800/40 dark:hover:bg-amber-900/10"
                                                     >
-                                                        Share
+                                                        {hint}
                                                     </button>
-                                                ) : null}
-                                                <span className="text-[10px] text-amber-500">Saved at time-up</span>
+                                                ))}
                                             </div>
-                                        </div>
-                                        <div className="grid gap-3 sm:grid-cols-2">
-                                            <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">
-                                                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Problem</p>
-                                                <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{session.mockSummary.problemTitle}</p>
-                                            </div>
-                                            <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">
-                                                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Latest Run</p>
-                                                <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{session.mockSummary.latestRunStatus}</p>
-                                            </div>
-                                        </div>
-                                        <p className="mt-3 text-sm leading-6 text-amber-900 dark:text-amber-100">
-                                            {session.mockSummary.candidate || 'Candidate'} worked through a {session.mockSummary.durationLabel || formatTimerLabel(timerDuration)} round. Latest sample check: {session.mockSummary.latestSampleCheck || 'n/a'}.
-                                        </p>
+                                        ) : (
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">No suggestions available right now.</p>
+                                        )}
                                     </div>
-                                )}
-                            </div>
 
-                            <div className="h-px bg-gray-200 dark:bg-gray-700 my-2"></div>
-
-                            {sampleInput && (
-                                <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
-                                    <div className="mb-2 flex items-center justify-between gap-3">
-                                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                                            Shared Sample Input
-                                        </p>
-                                        <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                            Used by Run
-                                        </span>
-                                    </div>
-                                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">{sampleInput}</pre>
-                                </div>
-                            )}
-                            {expectedOutput && (
-                                <div className="mb-4 rounded-2xl border border-dashed border-gray-300 bg-white/80 p-4 dark:border-gray-700 dark:bg-gray-900/60">
-                                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                                        Expected Output
-                                    </p>
-                                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">{expectedOutput}</pre>
-                                </div>
-                            )}
-                            {output ? (
-                                <div className="font-mono text-sm text-gray-900 dark:text-white">
-                                    {output}
-                                </div>
-                            ) : (
-                                <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-5 text-sm leading-7 text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
-                                    Run your code to see compiler output, runtime messages, and execution stats here.
+                                    {renderReviewContent()}
                                 </div>
                             )}
                         </div>

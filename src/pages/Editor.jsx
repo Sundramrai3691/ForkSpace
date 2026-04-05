@@ -113,6 +113,7 @@ function Editor() {
           users={users}
           roomState={roomState}
           currentSocketId={currentSocketId}
+          currentRole={enteredRole}
         />
       </aside>
       <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-transparent lg:min-h-0 lg:h-screen">
