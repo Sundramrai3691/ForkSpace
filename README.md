@@ -1,19 +1,18 @@
 <div align="center">
 
-<img src="./public/favicon-dark.svg" alt="ForkSpace Logo" width="100" height="100" />
+<img src="./public/favicon-dark.svg" alt="ForkSpace Logo" width="96" height="96" />
 
 # ForkSpace
 
-### A real-time collaborative coding platform — built for developers, by a developer.
+### Shared coding rooms for interview practice and DSA mentoring.
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-16%2B-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)](https://react.dev/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-white?logo=socket.io&logoColor=black)](https://socket.io/)
-[![Redis](https://img.shields.io/badge/Redis-pub%2Fsub-dc382d?logo=redis&logoColor=white)](https://redis.io/)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
 
-**[Live Demo](https://forkspace.studio)** · **[Quick Start](#-quick-start)** · **[Architecture](#-architecture)** · **[Report Bug](https://github.com/Sundramrai3691/ForkSpace/issues)**
+**[Quick Start](#quick-start)** | **[Features](#features)** | **[Architecture](#architecture)** | **[License](#license)**
 
 </div>
 
@@ -21,84 +20,129 @@
 
 ## What is ForkSpace?
 
-ForkSpace is an open-source, real-time collaborative code editor built for technical interviews, pair programming, and code reviews. Multiple users join a room, code together with live synchronization, execute code in 10+ languages, and get instant AI-powered code review — all from the browser with no setup required.
+ForkSpace is a realtime shared coding room built for:
+
+- mock interviews
+- peer DSA practice
+- mentor-led problem solving
+
+Instead of screen sharing, switching tabs, and testing code in separate places, two people can stay in one room, edit the same solution, run it, and compare output together.
+
+The product is currently strongest for Codeforces-style practice and general interview-prep sessions.
 
 ---
 
 ## Features
 
-### Real-Time Collaboration
+### Shared Practice Room
 
-- Live code synchronization with sub-50ms latency across all connected users
-- **Driver / Navigator Mode**: Explicit pair programming roles with visual badges and a swap button
-- **Approach Notes**: Shared real-time block for brainstorming ideas, brute force, and optimized approaches
-- **Edge Case Checklist**: Shared room-level checklist for common DSA edge cases (empty input, duplicates, etc.)
-- Real-time user presence indicators showing who is active in the session
-- Group chat alongside the editor for in-session communication
+- Realtime code sync with Socket.IO
+- Room-based collaboration with a shareable room ID
+- Live participant list and room presence
+- Session modes: `Peer Practice`, `Mock Interview`, `Mentoring`
+- Driver / Navigator role assignment for structured pair coding
 
-### AI-Powered Practice
+### Problem-Solving Workflow
 
-- **Structured AI Review**: Detailed analysis of correctness risks, edge cases, complexity, and readability (Gemini 1.5 Flash / Mistral)
-- **Ghost Hints**: Real-time code completion suggestions (Fill-In-the-Middle) as you type
-- **Multi-Model Support**: Seamless integration with Google Gemini 1.5 Flash and Mistral Codestral
+- Shared problem brief in the sidebar
+- Manual sample input and expected output fields for practical DSA sessions
+- Codeforces-first workflow with problem URL / platform / code context
+- Clear output comparison with visible `Passed sample` / `Mismatch` feedback
+- Shared approach notes for discussing brute force, optimized ideas, and edge cases
 
-### Code Execution Engine
+### Code Execution
 
-- Multi-language execution: C++, Python, Java, JavaScript, Go, Rust, TypeScript, and more
-- **Mismatch Debug View**: Smart diffing that highlights the first differing line and provides debugging hints
-- Powered by Judge0 — the industry-standard sandboxed code execution API
-- **Run History**: Timeline of the last 10 runs with status, time, and memory usage tracking
+- Run code in:
+  - C++
+  - Python
+  - JavaScript
+- Execution status with visible time and memory
+- Formatter support for cleaner code before review or reruns
+- Output panel designed for quick debugging during pair sessions
 
-### Developer Experience
+### AI Assistance
 
-- **Session Modes**: Tailored UI labels for Peer Practice, Mock Interview, and Mentoring modes
-- **Private Mentor Notes**: Secure, per-user notes for interviewers/mentors (visible only to the creator)
-- CodeMirror editor with syntax highlighting and auto-suggestions
-- Dark/light theme toggle with 10+ syntax themes
-- Distraction-free, responsive UI that works on all screen sizes
+- AI code hints inside the editor
+- `Review Solution` flow for bug risks, complexity, and style feedback
+- Provider fallback support across:
+  - Groq
+  - Gemini
+  - Mistral Codestral
+- Graceful fallback when AI providers fail
+
+### Auth And Persistence
+
+- Continue as guest for fast room entry
+- Sign in / create account flow
+- Signed-in users can keep room and run history
+- Room state persistence survives refresh and backend restart
+
+---
+
+## Current Product Direction
+
+ForkSpace is not trying to be a full IDE or another generic online compiler.
+
+It is focused on one narrower workflow:
+
+1. Enter as guest or sign in
+2. Join a shared room
+3. Discuss the problem in one place
+4. Edit one solution together
+5. Run and compare output immediately
+
+That makes it especially useful for:
+
+- pair programming during DSA prep
+- mentor / learner sessions
+- mock interviewer / candidate sessions
 
 ---
 
 ## Architecture
 
-```
+```text
 Client (React + CodeMirror)
-        │
-        │  WebSocket (Socket.IO)
-        ▼
-Express Server (Node.js)
-        │
-        ├── Session Management ─── Persistent State
-        │   (rooms, roles,         (room-state.json,
-        │    notes, history)        user-state.json)
-        │
-        ├── AI Integration ─────── Gemini 1.5 Flash
-        │   (review, hints)        Mistral Codestral
-        │
-        └── Judge0 API
-            (code execution sandbox)
+        |
+        |  WebSocket (Socket.IO)
+        v
+Express + Socket Server
+        |
+        |-- Room state persistence
+        |   (room-state.json)
+        |
+        |-- Auth / history
+        |   (JWT + MongoDB)
+        |
+        |-- AI providers
+        |   (Groq / Gemini / Mistral)
+        |
+        `-- Judge0 API
+            (sandboxed code execution)
 ```
 
-**Key design decisions:**
+### Notes
 
-- **Socket.io** for real-time bidirectional communication (code, roles, notes)
-- **Gemini 1.5 Flash** as the primary AI engine for fast, high-quality code reviews and hints
-- **Judge0** for sandboxed execution to prevent security risks on the host server
-- **Local Persistence**: Room and user states are persisted to JSON files, surviving server restarts
+- Socket.IO powers realtime room sync
+- Judge0 handles code execution
+- Room state is persisted locally in `server/data/room-state.json`
+- Auth and saved history currently use JWT plus MongoDB-backed user storage
+- Redis pub/sub support exists in the backend for horizontal scaling when configured
 
 ---
 
 ## Tech Stack
 
-| Layer      | Technology                                  | Why                                         |
-| ---------- | ------------------------------------------- | ------------------------------------------- |
-| Frontend   | React 18, Tailwind CSS                      | Fast iteration, modern responsive UI        |
-| Editor     | CodeMirror                                  | Flexible, real-time sync friendly           |
-| Real-time  | Socket.IO                                   | Reliable bidirectional communication        |
-| Backend    | Node.js, Express                            | Non-blocking I/O for real-time workloads    |
-| AI Review  | Gemini 1.5 Flash / Mistral                  | Structured code review and FIM hints        |
-| Execution  | Judge0 API                                  | Secure sandboxed multi-language execution   |
-| Deployment | Vercel (Frontend), Render/Railway (Backend) | Best-in-class hosting for React and Node.js |
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 18, Tailwind CSS, Vite |
+| Editor | CodeMirror |
+| Realtime | Socket.IO |
+| Backend | Node.js, Express |
+| Auth | JWT, bcryptjs, MongoDB / Mongoose |
+| AI | Groq, Gemini, Mistral |
+| Execution | Judge0 |
+| Optional scaling | Redis adapter for Socket.IO |
 
 ---
 
@@ -106,89 +150,143 @@ Express Server (Node.js)
 
 ### Prerequisites
 
-- Node.js v18+
-- npm or yarn
-- [Judge0 API key](https://rapidapi.com/judge0-official/api/judge0-ce) (free tier on RapidAPI)
-- [Google Gemini API key](https://aistudio.google.com/) (Free tier available) or Mistral API key
+- Node.js 18+
+- npm
+- MongoDB if you want sign-in and saved history
+- A Judge0 RapidAPI key for code execution
+- At least one AI provider key if you want AI hints / review
 
-### 1. Clone and install
+### 1. Install dependencies
 
 ```bash
-git clone https://github.com/Sundramrai3691/ForkSpace.git
-cd ForkSpace
 npm install
 ```
 
 ### 2. Configure environment
 
-Create a `.env` file in the `server/` directory:
+Root `.env`:
+
+```env
+VITE_SERVER_URL=http://localhost:5000
+```
+
+`server/.env`:
 
 ```env
 PORT=5000
 CLIENT_URL=http://localhost:5173
 
-# Judge0
-JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
-JUDGE0_API_KEY=your_rapidapi_key_here
+APP_NAME=ForkSpace
+APP_URL=http://localhost:5173
 
-# AI (Recommended: Gemini 1.5 Flash)
+JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
+JUDGE0_API_KEY=your_judge0_key_here
+
+GROQ_API_KEY=your_groq_key_here
 GEMINI_API_KEY=your_gemini_key_here
 MISTRAL_API_KEY=your_mistral_key_here
 
-# App
-APP_NAME=ForkSpace
-APP_URL=http://localhost:5173
+JWT_SECRET=replace_this_with_a_real_secret
+MONGODB_URI=mongodb://localhost:27017/forkspace
+
+# Optional
+REDIS_URL=redis://localhost:6379
 ```
 
-### 3. Run development servers
+### 3. Start the backend
 
 ```bash
-# Terminal 1 — backend
 npm run dev:server
+```
 
-# Terminal 2 — frontend
+### 4. Start the frontend
+
+```bash
 npm run dev:client
 ```
+
+### 5. Open the app
+
+```text
+http://localhost:5173
+```
+
+---
+
+## How To Use It Well
+
+Recommended workflow for the current product:
+
+1. Choose `Continue as Guest` for fast sessions, or sign in if you want saved rooms and runs.
+2. Create or enter a room ID.
+3. Add the problem context and shared sample input / expected output.
+4. Solve together in the shared editor.
+5. Run once and use the mismatch view to discuss what needs to change.
+
+For now, this manual sample-based workflow is more reliable than trying to automate every external problem platform.
 
 ---
 
 ## Project Structure
 
-```
+```text
 ForkSpace/
-├── src/                    # React frontend
-│   ├── components/         # UI components (Workspace, Sidebar, Forms)
-│   │   └── Workspace/      # Core editor, AI features, and execution logic
-│   ├── pages/              # Route-level components (Editor, Login)
-│   └── socket.js           # Socket.io client configuration
-├── server/                 # Node.js + Express backend
-│   ├── data/               # Persistent JSON state (ignored by git)
-│   ├── server.js           # Main socket & API server
-│   └── ai-server.js        # Dedicated AI hints server
-└── .gitignore              # Excludes node_modules and local state
+|-- src/
+|   |-- components/
+|   |   |-- Workspace/
+|   |   |-- common/
+|   |   |-- forms/
+|   |   `-- sidebar/
+|   |-- lib/
+|   |-- pages/
+|   `-- socket.js
+|-- server/
+|   |-- data/
+|   |-- models/
+|   |-- ai-server.js
+|   `-- server.js
+|-- public/
+|-- nodemon.json
+`-- README.md
 ```
+
+---
+
+## Known Product Boundaries
+
+ForkSpace currently does not try to be:
+
+- a full multi-file IDE
+- a LeetCode-native execution environment
+- a video-call platform
+- a generic "online compiler clone"
+
+It is intentionally narrower: shared coding rooms for problem-solving sessions.
 
 ---
 
 ## Roadmap
 
-- [X] Driver / Navigator roles
-- [X] AI Code Review & Ghost Hints
-- [X] Run History & Debug View
-- [X] Session Modes (Interview/Mentoring)
-- [ ] Multi-cursor presence
-- [ ] Video/audio call integration
-- [ ] GitHub OAuth login
-- [ ] Export session as Gist
+- [x] Realtime shared rooms
+- [x] Driver / Navigator session roles
+- [x] Multi-language execution for C++, Python, and JavaScript
+- [x] Sample output comparison
+- [x] AI hints and review flow
+- [x] Guest entry plus sign-in flow
+- [x] Room persistence across restart
+- [ ] Stronger room history UI
+- [ ] More structured mentoring notes
+- [ ] Better problem import workflow
+- [ ] Deeper run/result history inside each room
+
+---
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
 <div align="center">
-  <strong>Built by <a href="https://github.com/Sundramrai3691">Sundram Kumar Rai</a> · NIT Raipur</strong>
-  <br/>
-  <em>If this helped you, a ⭐ on GitHub goes a long way.</em>
+  <strong>ForkSpace is being shaped around practical interview practice and DSA mentoring workflows.</strong>
 </div>
