@@ -209,6 +209,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [showOutputModal, setShowOutputModal] = useState(false);
     const [reviewContent, setReviewContent] = useState(null);
     const [isReviewLoading, setIsReviewLoading] = useState(false);
+    const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
 
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
@@ -274,22 +275,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             : isNavigator
                 ? 'Navigator'
                 : 'Observer';
-
-    const controlMessage = isMentoringMode
-        ? editorUnlocked
-            ? 'Mentor controls the editor in mentoring mode.'
-            : 'Learners stay read-only while the mentor guides the session.'
-        : isMockMode
-            ? session.mockLocked
-                ? 'Time is up. The mock editor is locked until the round is reset.'
-                : editorUnlocked
-                    ? 'Candidate has the keyboard during the mock round.'
-                    : 'Observers and interviewers stay read-only during the mock round.'
-            : hasAssignedDriver
-                ? editorUnlocked
-                    ? 'You currently control the editor as Driver.'
-                    : 'The editor is locked while the Driver types.'
-                : 'Peer mode stays collaborative until someone claims Driver.';
 
     const handleSwapRoles = () => {
         socketRef.current?.emit('swap-roles', { roomId });
@@ -983,7 +968,7 @@ const runCode = async () => {
                     )}
                 </OverlayPanel>
             )}
-            <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3 border-b border-gray-200/80 bg-white px-5 py-3 dark:border-gray-700/80 dark:bg-[#081121]">
+            <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-2.5 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-800 bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-200 dark:bg-white dark:text-black dark:hover:bg-gray-100"
@@ -1033,7 +1018,7 @@ const runCode = async () => {
                     </button>
                 </div>
 
-                <div className="flex flex-1 flex-wrap items-center justify-end gap-2.5">
+                <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
                     <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <label htmlFor="language-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
@@ -1052,7 +1037,7 @@ const runCode = async () => {
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                             <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
@@ -1083,10 +1068,16 @@ const runCode = async () => {
                             </svg>
                             {editorUnlocked ? 'Editor control' : 'Read only'}
                         </span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Room</span>
+                        <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
+                            {roomId}
+                        </code>
                         {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
                             <button
                                 onClick={handleSwapRoles}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#111d33] dark:text-gray-400 dark:hover:bg-gray-700"
                                 title="Swap Roles"
                             >
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1094,15 +1085,6 @@ const runCode = async () => {
                                 </svg>
                             </button>
                         )}
-                    </div>
-                    <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                        {controlMessage}
-                    </div>
-                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Room:</span>
-                        <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
-                            {roomId}
-                        </code>
                         <div className="relative" ref={settingsRef}>
                             <button
                                 onClick={() => setShowSettings((current) => !current)}
@@ -1216,6 +1198,21 @@ const runCode = async () => {
                                 document.body
                             )}
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsOutputCollapsed((current) => !current)}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            title={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
+                        >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                                {isOutputCollapsed ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16m0-12v12" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16M18 6v12" />
+                                )}
+                            </svg>
+                            {isOutputCollapsed ? 'Show Output' : 'Hide Output'}
+                        </button>
                         {isMockMode && (
                             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                                 <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
@@ -1252,7 +1249,7 @@ const runCode = async () => {
                 </div>
             </div>
 
-            <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem]">
+            <div className={`grid min-h-0 flex-1 grid-cols-1 ${isOutputCollapsed ? 'xl:grid-cols-[minmax(0,1fr)]' : 'xl:grid-cols-[minmax(0,1fr)_24rem]'}`}>
                 <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${
                     editorUnlocked
                         ? 'border-emerald-200/80 dark:border-emerald-800/40'
@@ -1265,7 +1262,7 @@ const runCode = async () => {
                     />
                 </div>
 
-                <aside className="overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left">
+                <aside className={`${isOutputCollapsed ? 'hidden xl:hidden' : 'block'} overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left`}>
                     <div className="flex h-full flex-col min-h-0">
                         <div className="flex flex-none items-center gap-2 border-b border-gray-200/80 bg-white px-4 py-2.5 dark:border-gray-700/80 dark:bg-[#0b1528]">
                             <div className="flex gap-1.5">
