@@ -216,6 +216,20 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     const isMentoringMode = session.mode === 'mentoring';
     const isMockMode = session.mode === 'mock_interview';
     const canSeePrivateNotes = (isMentoringMode && normalizedRole === 'mentor') || (isMockMode && normalizedRole === 'interviewer');
+    const participationLabel =
+        session.driverSocketId === currentSocketId
+            ? 'Driver'
+            : session.navigatorSocketId === currentSocketId
+                ? 'Navigator'
+                : 'Observer';
+    const editorUnlocked =
+        isMentoringMode
+            ? normalizedRole !== 'learner'
+            : isMockMode
+                ? normalizedRole === 'candidate' || (!['candidate', 'interviewer'].includes(normalizedRole) && session.driverSocketId === currentSocketId)
+                : session.driverSocketId
+                    ? session.driverSocketId === currentSocketId
+                    : true;
     const driver = users.find((user) => user.socketId === session.driverSocketId);
     const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
     const getEditorAccess = (user) => {
@@ -589,6 +603,16 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                 <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
                                                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Navigator</p>
                                                     <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{navigatorUser?.username || 'Unassigned'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Your Session Role</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{participationLabel}</p>
+                                                </div>
+                                                <div className="rounded-xl border border-stone-200 bg-stone-50/90 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Editor Access</p>
+                                                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{editorUnlocked ? 'Editor control' : 'Read only'}</p>
                                                 </div>
                                             </div>
                                         </div>
