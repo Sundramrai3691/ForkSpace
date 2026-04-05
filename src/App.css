@@ -21,6 +21,55 @@
     font-size: 15px;
 }
 
+.forkspace-editor-driver,
+.forkspace-editor-mentor,
+.forkspace-editor-candidate,
+.forkspace-editor-shared,
+.forkspace-editor-navigator,
+.forkspace-editor-locked {
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.forkspace-editor-driver {
+  box-shadow: inset 3px 0 0 rgba(59, 130, 246, 0.9);
+}
+
+.forkspace-editor-driver .CodeMirror-cursor {
+  border-left-color: #3b82f6 !important;
+}
+
+.forkspace-editor-mentor {
+  box-shadow: inset 3px 0 0 rgba(16, 185, 129, 0.9);
+}
+
+.forkspace-editor-mentor .CodeMirror-cursor,
+.forkspace-editor-candidate .CodeMirror-cursor,
+.forkspace-editor-shared .CodeMirror-cursor {
+  border-left-color: #10b981 !important;
+}
+
+.forkspace-editor-candidate {
+  box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.9);
+}
+
+.forkspace-editor-candidate .CodeMirror-cursor {
+  border-left-color: #f59e0b !important;
+}
+
+.forkspace-editor-shared {
+  box-shadow: inset 3px 0 0 rgba(20, 184, 166, 0.9);
+}
+
+.forkspace-editor-locked,
+.forkspace-editor-navigator {
+  box-shadow: inset 3px 0 0 rgba(244, 63, 94, 0.85);
+}
+
+.forkspace-editor-locked .CodeMirror-lines,
+.forkspace-editor-navigator .CodeMirror-lines {
+  opacity: 0.96;
+}
+
 .panel-resize {
   overflow: auto;
   resize: horizontal;

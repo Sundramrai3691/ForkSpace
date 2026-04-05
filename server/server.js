@@ -271,6 +271,7 @@ function createDefaultProblemState() {
     sourceUrl: "",
     title: "Untitled Practice Problem",
     prompt: "",
+    constraints: "",
     pastedStatement: "",
     sampleInput: "",
     sampleOutput: "",
@@ -293,6 +294,7 @@ function createDefaultSessionState() {
     ],
     runHistory: [],
     mentorNotes: "",
+    mockSummary: null,
   };
 }
 
@@ -327,6 +329,10 @@ function attachNormalizedSession(session = {}) {
       typeof session?.mentorNotes === "string"
         ? session.mentorNotes
         : defaults.mentorNotes,
+    mockSummary:
+      session?.mockSummary && typeof session.mockSummary === "object"
+        ? session.mockSummary
+        : defaults.mockSummary,
   };
 }
 
@@ -944,6 +950,7 @@ function attachNormalizedSamples(problem = {}) {
     ...normalizedProblem,
     problemUrl:
       normalizedProblem.problemUrl || normalizedProblem.sourceUrl || "",
+    constraints: normalizeWhitespace(normalizedProblem.constraints || ""),
     pastedStatement: normalizedProblem.pastedStatement || "",
     sampleInput: normalizeWhitespace(normalizedProblem.sampleInput),
     sampleOutput: normalizeWhitespace(normalizedProblem.sampleOutput),
@@ -1623,6 +1630,7 @@ app.post("/api/ai/review", aiLimiter, async (req, res) => {
 
   const prompt = `Review this solution for the problem: "${problem?.title || "Untitled"}".
 Problem Description: ${problem?.prompt || problem?.pastedStatement || "No description provided."}
+Constraints: ${problem?.constraints || "No constraints provided."}
 Language: ${language}
 
 Return ONLY valid JSON with this exact shape:
@@ -1630,7 +1638,13 @@ Return ONLY valid JSON with this exact shape:
   "bugs": ["bug description 1", "bug description 2"],
   "time_complexity": "O(n)",
   "space_complexity": "O(1)",
+  "complexity_reasoning": "why those complexities apply in 1-2 sentences",
   "style_issues": ["issue 1"],
+  "optimization_suggestion": {
+    "before": "what is inefficient now",
+    "after": "what to change",
+    "benefit": "why it improves the solution"
+  },
   "summary": "one sentence overall assessment"
 }
 
@@ -1685,7 +1699,9 @@ ${code}
         bugs: [],
         time_complexity: "N/A",
         space_complexity: "N/A",
+        complexity_reasoning: "",
         style_issues: [],
+        optimization_suggestion: null,
         summary: review,
       };
     }
@@ -2192,7 +2208,7 @@ io.on("connection", (socket) => {
     roomState.session.runHistory = [
       nextRun,
       ...roomState.session.runHistory,
-    ].slice(0, 10);
+    ].slice(0, 5);
     scheduleRoomStatePersist();
 
     io.to(roomId).emit("session-update", {

@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import FormComp from '../components/forms/FormComp';
 import Navbar from '../components/common/Navbar';
 
@@ -99,6 +100,12 @@ function Login() {
                                 >
                                     Quick Start
                                 </a>
+                                <Link
+                                    to="/analyse"
+                                    className="inline-flex items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
+                                >
+                                    Solution Analyser
+                                </Link>
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-3">

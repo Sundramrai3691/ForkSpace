@@ -2,7 +2,7 @@ import Avatar from 'react-avatar'
 
 
 // eslint-disable-next-line react/prop-types
-function User({ username, isOnline, role, pairLabel }) {
+function User({ username, isOnline, role, pairLabel, editorAccess }) {
     return (
         <div className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm">
             <div className="relative">
@@ -26,6 +26,16 @@ function User({ username, isOnline, role, pairLabel }) {
                     {pairLabel && (
                         <span className="inline-flex w-fit rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-900 dark:bg-blue-500/10 dark:text-blue-200">
                             {pairLabel}
+                        </span>
+                    )}
+                    {editorAccess && (
+                        <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                            editorAccess === 'control'
+                                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200'
+                                : 'bg-rose-100 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200'
+                        }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${editorAccess === 'control' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                            {editorAccess === 'control' ? 'Can edit' : 'Read only'}
                         </span>
                     )}
                 </div>

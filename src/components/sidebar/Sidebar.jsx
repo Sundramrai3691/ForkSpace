@@ -43,6 +43,12 @@ const SESSION_MODE_OPTIONS = [
     { value: 'mentoring', label: 'Mentoring' },
 ];
 
+const SESSION_MODE_HELP = {
+    peer_practice: 'Equal collaboration. Claim Driver only when one person should type.',
+    mock_interview: 'Timer-focused round. Candidate types, interviewer observes and reviews.',
+    mentoring: 'Mentor leads the editor. Learner stays read-only and focuses on the approach.',
+};
+
 function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) {
     const location = useLocation();
     const navigate = useNavigate();
@@ -56,6 +62,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
         sourceUrl: '',
         title: '',
         prompt: '',
+        constraints: '',
         sampleInput: '',
         sampleOutput: '',
         samples: [],
@@ -65,6 +72,25 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
     const session = roomState?.session || { mode: 'peer_practice', driverSocketId: '', navigatorSocketId: '' };
     const driver = users.find((user) => user.socketId === session.driverSocketId);
     const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
+    const getEditorAccess = (user) => {
+        const normalizedRole = (user?.role || '').toLowerCase();
+
+        if (session.mode === 'mentoring') {
+            return normalizedRole === 'mentor' ? 'control' : 'locked';
+        }
+
+        if (session.mode === 'mock_interview') {
+            if (normalizedRole === 'interviewer') return 'locked';
+            if (normalizedRole === 'candidate') return 'control';
+            if (user.socketId === session.driverSocketId) return 'control';
+        }
+
+        if (session.driverSocketId) {
+            return user.socketId === session.driverSocketId ? 'control' : 'locked';
+        }
+
+        return '';
+    };
 
     useEffect(() => {
         setProblemDraft({
@@ -74,6 +100,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
             sourceUrl: roomState?.problem?.sourceUrl || '',
             title: roomState?.problem?.title || '',
             prompt: roomState?.problem?.prompt || '',
+            constraints: roomState?.problem?.constraints || '',
             sampleInput: roomState?.problem?.sampleInput || '',
             sampleOutput: roomState?.problem?.sampleOutput || '',
             samples: roomState?.problem?.samples || [],
@@ -235,6 +262,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                         ))}
                                     </select>
                                 </label>
+                                <p className="rounded-xl border border-stone-200 bg-white/80 px-3 py-2 text-xs leading-6 text-stone-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                                    {SESSION_MODE_HELP[session.mode] || SESSION_MODE_HELP.peer_practice}
+                                </p>
 
                                 <div className="grid gap-2 sm:grid-cols-2">
                                     <button
@@ -357,42 +387,77 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                         >
                             {isImporting ? 'Importing problem...' : 'Import problem details'}
                         </button>
-                        <input
-                            type="text"
-                            value={problemDraft.title}
-                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
-                            placeholder="Problem title"
-                            className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        />
-                        <textarea
-                            value={problemDraft.prompt}
-                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
-                            placeholder="Add the prompt, constraints, or the approach you want to discuss..."
-                            className="h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        />
+                        <div className="space-y-3 rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Problem Title
+                                </p>
+                                <input
+                                    type="text"
+                                    value={problemDraft.title}
+                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
+                                    placeholder="Problem title"
+                                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Prompt
+                                </p>
+                                <textarea
+                                    value={problemDraft.prompt}
+                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                                    placeholder="Paste the statement or the specific prompt you want to discuss."
+                                    className="mt-1.5 h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Constraints
+                                </p>
+                                <textarea
+                                    value={problemDraft.constraints}
+                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, constraints: event.target.value }))}
+                                    placeholder="1 <= n <= 2e5, values can be negative, sum fits in 64-bit..."
+                                    className="mt-1.5 h-20 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                />
+                            </div>
+                        </div>
                         <div className="grid gap-3">
-                            <label className="space-y-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Sample Input
-                                </span>
-                                <textarea
-                                    value={problemDraft.sampleInput}
-                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
-                                    placeholder="Paste the Codeforces sample input here"
-                                    className="h-32 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                            </label>
-                            <label className="space-y-1.5">
-                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                    Expected Output
-                                </span>
-                                <textarea
-                                    value={problemDraft.sampleOutput}
-                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
-                                    placeholder="Paste the expected output here"
-                                    className="h-32 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                />
-                            </label>
+                            <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                                <div className="mb-3 flex items-center justify-between">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                        Example
+                                    </p>
+                                    <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                        Shared
+                                    </span>
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="space-y-1.5">
+                                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                            Input
+                                        </span>
+                                        <textarea
+                                            value={problemDraft.sampleInput}
+                                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
+                                            placeholder="Paste the Codeforces sample input here"
+                                            className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                        />
+                                    </label>
+                                    <label className="space-y-1.5">
+                                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                            Output
+                                        </span>
+                                        <textarea
+                                            value={problemDraft.sampleOutput}
+                                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
+                                            placeholder="Paste the expected output here"
+                                            className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                        />
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                         {problemDraft.samples?.length > 0 && (
                             <div className="flex items-center justify-between rounded-xl border border-dashed border-stone-300 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/50">
@@ -441,6 +506,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId }) 
                                     username={user.username}
                                     role={user.role}
                                     isOnline={true}
+                                    editorAccess={getEditorAccess(user)}
                                     pairLabel={
                                         user.socketId === session.driverSocketId
                                             ? 'Driver'

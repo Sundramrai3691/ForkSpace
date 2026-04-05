@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import Codemirror from "codemirror";
@@ -43,17 +43,34 @@ function OutputSection({ tone, title, children }) {
     );
 }
 
-function ComparisonPanel({ expectedOutput, actualOutput }) {
+function buildLineComparison(expectedOutput = "", actualOutput = "") {
     const expectedLines = (expectedOutput || "").split('\n');
     const actualLines = (actualOutput || "").split('\n');
+    const maxLength = Math.max(expectedLines.length, actualLines.length);
     let firstDiffLine = -1;
 
-    for (let i = 0; i < Math.max(expectedLines.length, actualLines.length); i++) {
-        if (normalizeOutput(expectedLines[i] || "") !== normalizeOutput(actualLines[i] || "")) {
-            firstDiffLine = i + 1;
-            break;
+    const lines = Array.from({ length: maxLength }, (_, index) => {
+        const expectedLine = expectedLines[index] || "";
+        const actualLine = actualLines[index] || "";
+        const matches = normalizeOutput(expectedLine) === normalizeOutput(actualLine);
+
+        if (!matches && firstDiffLine === -1) {
+            firstDiffLine = index + 1;
         }
-    }
+
+        return {
+            lineNumber: index + 1,
+            expectedLine,
+            actualLine,
+            matches,
+        };
+    });
+
+    return { lines, firstDiffLine, expectedLines, actualLines };
+}
+
+function ComparisonPanel({ expectedOutput, actualOutput }) {
+    const { lines, firstDiffLine, expectedLines, actualLines } = buildLineComparison(expectedOutput, actualOutput);
 
     const getPossibleCause = () => {
         if (actualLines.length < expectedLines.length) return "Output is shorter than expected. Missing data?";
@@ -69,18 +86,33 @@ function ComparisonPanel({ expectedOutput, actualOutput }) {
                     <span className="font-bold">Hint:</span> First difference found at line {firstDiffLine}. {getPossibleCause()}
                 </div>
             )}
-            <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-xl border border-red-200 bg-white/90 p-4 dark:border-red-800/50 dark:bg-gray-900/70">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">
-                        Expected Output
+            <div className="rounded-xl border border-gray-200 bg-white/90 p-4 dark:border-gray-700/70 dark:bg-gray-900/70">
+                <div className="mb-3 grid gap-3 sm:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        Line
                     </p>
-                    <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{expectedOutput || "No expected output provided."}</pre>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-green-700 dark:text-green-300">
+                        Expected
+                    </p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                        Actual
+                    </p>
                 </div>
-                <div className="rounded-xl border border-amber-200 bg-white/90 p-4 dark:border-amber-800/50 dark:bg-gray-900/70">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
-                        Your Output
-                    </p>
-                    <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-200">{actualOutput || "No stdout produced."}</pre>
+                <div className="space-y-2">
+                    {lines.length > 0 ? lines.map((line) => (
+                        <div
+                            key={`${line.lineNumber}-${line.expectedLine}-${line.actualLine}`}
+                            className="grid gap-3 rounded-xl sm:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)]"
+                        >
+                            <div className={`rounded-lg px-3 py-2 text-xs font-semibold ${line.matches ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-200' : 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-200'}`}>
+                                Line {line.lineNumber}
+                            </div>
+                            <pre className={`overflow-x-auto whitespace-pre-wrap rounded-lg px-3 py-2 font-mono text-sm leading-relaxed ${line.matches ? 'bg-green-50 text-green-900 dark:bg-green-950/20 dark:text-green-100' : 'bg-red-50 text-red-900 dark:bg-red-950/20 dark:text-red-100'}`}>{line.expectedLine || ' '}</pre>
+                            <pre className={`overflow-x-auto whitespace-pre-wrap rounded-lg px-3 py-2 font-mono text-sm leading-relaxed ${line.matches ? 'bg-green-50 text-green-900 dark:bg-green-950/20 dark:text-green-100' : 'bg-red-50 text-red-900 dark:bg-red-950/20 dark:text-red-100'}`}>{line.actualLine || ' '}</pre>
+                        </div>
+                    )) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No expected output provided.</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -140,7 +172,7 @@ const SESSION_MODE_LABELS = {
     mentoring: 'Mentoring',
 };
 
-function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
+function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole = 'Peer', currentUsername = 'Anonymous', users = [] }) {
     const rawServerUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     // Fallback for development if frontend is on 5173 and backend is on 5000
     const serverUrl = (rawServerUrl.includes(":5173") && !import.meta.env.VITE_SERVER_URL) 
@@ -180,24 +212,79 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
 
     const sampleInput = roomState?.problem?.sampleInput || "";
     const expectedOutput = roomState?.problem?.sampleOutput || "";
-    const session = roomState?.session || { 
-      mode: 'peer_practice', 
-      driverSocketId: '', 
-      navigatorSocketId: '',
-      approachNotes: '',
-      edgeCaseChecklist: [],
-      runHistory: [],
-      mentorNotes: '',
-    };
+    const session = useMemo(() => (
+        roomState?.session || {
+            mode: 'peer_practice',
+            driverSocketId: '',
+            navigatorSocketId: '',
+            approachNotes: '',
+            edgeCaseChecklist: [],
+            runHistory: [],
+            mentorNotes: '',
+        }
+    ), [roomState?.session]);
+    const normalizedRole = (currentRole || 'Peer').toLowerCase();
+    const isDriver = session.driverSocketId === currentSocketId;
+    const isNavigator = session.navigatorSocketId === currentSocketId;
+    const driverUser = users.find((user) => user.socketId === session.driverSocketId);
+    const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
+    const hasAssignedDriver = Boolean(session.driverSocketId);
+    const isMentoringMode = session.mode === 'mentoring';
+    const isMockMode = session.mode === 'mock_interview';
+    const isMentorRole = normalizedRole === 'mentor';
+    const isLearnerRole = normalizedRole === 'learner';
+    const isInterviewerRole = normalizedRole === 'interviewer';
+    const isCandidateRole = normalizedRole === 'candidate';
 
-    const isMentorOrInterviewer = session.mode === 'mock_interview' || session.mode === 'mentoring';
+    const canEdit =
+        isMentoringMode
+            ? isLearnerRole
+                ? false
+                : true
+            : isMockMode
+                ? isInterviewerRole
+                    ? false
+                    : isCandidateRole
+                        ? true
+                        : hasAssignedDriver
+                            ? isDriver
+                            : true
+                : hasAssignedDriver
+                    ? isDriver
+                    : true;
+
+    const controlTone = canEdit
+        ? isDriver
+            ? 'driver'
+            : isMentoringMode
+                ? 'mentor'
+                : isMockMode
+                    ? 'candidate'
+                    : 'shared'
+        : isNavigator
+            ? 'navigator'
+            : 'locked';
 
     const participationLabel =
-        session.driverSocketId === currentSocketId
+        isDriver
             ? 'Driver'
-            : session.navigatorSocketId === currentSocketId
+            : isNavigator
                 ? 'Navigator'
                 : 'Observer';
+
+    const controlMessage = isMentoringMode
+        ? canEdit
+            ? 'Mentor controls the editor in mentoring mode.'
+            : 'Learners stay read-only while the mentor guides the session.'
+        : isMockMode
+            ? canEdit
+                ? 'Candidate has the keyboard during the mock round.'
+                : 'Observers and interviewers stay read-only during the mock round.'
+            : hasAssignedDriver
+                ? canEdit
+                    ? 'You currently control the editor as Driver.'
+                    : 'The editor is locked while the Driver types.'
+                : 'Peer mode stays collaborative until someone claims Driver.';
 
     const handleSwapRoles = () => {
         socketRef.current?.emit('swap-roles', { roomId });
@@ -282,6 +369,25 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
         }
         connect();
     }, [roomId, socketRef]);
+
+    useEffect(() => {
+        if (!editorRef.current) return;
+
+        const wrapper = editorRef.current.getWrapperElement();
+        editorRef.current.setOption("readOnly", canEdit ? false : "nocursor");
+
+        if (wrapper) {
+            wrapper.classList.remove(
+                "forkspace-editor-driver",
+                "forkspace-editor-navigator",
+                "forkspace-editor-mentor",
+                "forkspace-editor-candidate",
+                "forkspace-editor-shared",
+                "forkspace-editor-locked",
+            );
+            wrapper.classList.add(`forkspace-editor-${controlTone}`);
+        }
+    }, [canEdit, controlTone]);
 
     useEffect(() => {
         if (!editorRef.current || !roomState) return;
@@ -403,7 +509,30 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
                 if (currentValue <= 1) {
                     window.clearInterval(intervalId);
                     setIsTimerRunning(false);
-                    toast.success("Timer complete");
+                    if (isMockMode) {
+                        const snapshot = {
+                            capturedAt: new Date().toISOString(),
+                            durationLabel: formatTimerLabel(timerDuration),
+                            timerFinished: true,
+                            candidate: isCandidateRole ? currentUsername : driverUser?.username || currentUsername,
+                            interviewer: isInterviewerRole ? currentUsername : navigatorUser?.username || 'Not assigned',
+                            problemTitle: roomState?.problem?.title || 'Untitled Practice Problem',
+                            latestRunStatus: lastRunMeta?.status || 'Not run yet',
+                            latestSampleCheck: lastRunMeta?.sampleCheck || 'n/a',
+                            codeLength: (editorRef.current?.getValue() || '').trim().length,
+                        };
+
+                        socketRef.current?.emit('session-update', {
+                            roomId,
+                            session: {
+                                ...session,
+                                mockSummary: snapshot,
+                            },
+                        });
+                        toast.success("Mock timer complete. Session snapshot saved.");
+                    } else {
+                        toast.success("Timer complete");
+                    }
                     return 0;
                 }
 
@@ -412,7 +541,22 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId }) {
         }, 1000);
 
         return () => window.clearInterval(intervalId);
-    }, [isTimerRunning]);
+    }, [
+        currentUsername,
+        driverUser?.username,
+        isCandidateRole,
+        isInterviewerRole,
+        isMockMode,
+        isTimerRunning,
+        lastRunMeta?.sampleCheck,
+        lastRunMeta?.status,
+        navigatorUser?.username,
+        roomId,
+        roomState?.problem?.title,
+        session,
+        socketRef,
+        timerDuration,
+    ]);
 
     const handleCopyRoomId = async () => {
         try {
@@ -577,6 +721,10 @@ const runCode = async () => {
         time: time || "N/A",
         memory: memory || "N/A",
         passed: sampleMatched,
+        languageLabel: languageConfig.label,
+        outputPreview: normalizeOutput(stdout || "").slice(0, 240),
+        expectedPreview: normalizedExpectedOutput.slice(0, 240),
+        sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : "not_checked",
       },
     });
 
@@ -713,6 +861,9 @@ const runCode = async () => {
                             {reviewContent?.summary && (
                                 <div className="rounded-[1.4rem] border border-gray-200/80 bg-white/90 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
                                     <p className="text-base leading-7 text-slate-800 dark:text-slate-200">{reviewContent.summary}</p>
+                                    {reviewContent?.complexity_reasoning ? (
+                                        <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{reviewContent.complexity_reasoning}</p>
+                                    ) : null}
                                 </div>
                             )}
 
@@ -744,6 +895,23 @@ const runCode = async () => {
                                     </ul>
                                 </div>
                             )}
+
+                            {reviewContent?.optimization_suggestion && (
+                                <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50/80 p-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+                                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Optimization Suggestion</h3>
+                                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                        <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
+                                            <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.before}</p>
+                                        </div>
+                                        <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
+                                            <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.after}</p>
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-sm leading-7 text-emerald-900 dark:text-emerald-100">{reviewContent.optimization_suggestion.benefit}</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </OverlayPanel>
@@ -762,6 +930,8 @@ const runCode = async () => {
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
                         onClick={handleResetCode}
+                        disabled={!canEdit}
+                        title={canEdit ? 'Reset the shared editor' : 'Only the active editor owner can clear code right now'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h18"/>
@@ -775,6 +945,8 @@ const runCode = async () => {
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
                         onClick={handleFormatCode}
+                        disabled={!canEdit}
+                        title={canEdit ? 'Format the shared code' : 'Only the active editor owner can format code right now'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M4 7h10" />
@@ -803,6 +975,7 @@ const runCode = async () => {
                             id="language-select"
                             value={selectedLanguage}
                             onChange={handleLanguageChange}
+                            disabled={!canEdit}
                             className="h-9 rounded-xl border border-gray-200 bg-white/92 px-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
                         >
                             {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
@@ -826,6 +999,23 @@ const runCode = async () => {
                                     : 'border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
                         }`}>
                             {participationLabel}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${
+                            canEdit
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200'
+                                : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200'
+                        }`}>
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {canEdit ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 113.182 3.182L7.5 20.213 3 21l.787-4.5L16.862 4.487z" />
+                                ) : (
+                                    <>
+                                        <rect x="4" y="10" width="16" height="10" rx="2" strokeWidth={2} />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10V7a4 4 0 118 0v3" />
+                                    </>
+                                )}
+                            </svg>
+                            {canEdit ? 'Editor control' : 'Read only'}
                         </span>
                         {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
                             <button
@@ -884,6 +1074,9 @@ const runCode = async () => {
                                     </button>
                                 </div>
                             )}
+                        </div>
+                        <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            {controlMessage}
                         </div>
                         <div className="relative group">
                             <button 
@@ -958,42 +1151,57 @@ const runCode = async () => {
                                 document.body
                             )}
                         </div>
-                        <div className="flex items-center gap-2 border-l border-gray-200 pl-2.5 dark:border-gray-700">
-                            <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.12em] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                                {formatTimerLabel(timeRemaining)}
-                            </span>
-                            <select
-                                value={timerDuration}
-                                onChange={handleTimerPresetChange}
-                            className="h-9 rounded-xl border border-gray-200 bg-white/92 px-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
-                            >
-                                {TIMER_PRESETS.map((preset) => (
-                                    <option key={preset.value} value={preset.value}>
-                                        {preset.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <button
-                                type="button"
-                                onClick={handleTimerToggle}
-                                className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                            >
-                                {isTimerRunning ? "Pause" : "Start"}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleTimerReset}
-                                className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                            >
-                                Reset
-                            </button>
-                        </div>
+                        {isMockMode && (
+                            <div className="flex items-center gap-2 border-l border-gray-200 pl-2.5 dark:border-gray-700">
+                                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+                                    {formatTimerLabel(timeRemaining)}
+                                </span>
+                                <select
+                                    value={timerDuration}
+                                    onChange={handleTimerPresetChange}
+                                    className="h-9 rounded-xl border border-gray-200 bg-white/92 px-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
+                                >
+                                    {TIMER_PRESETS.map((preset) => (
+                                        <option key={preset.value} value={preset.value}>
+                                            {preset.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={handleTimerToggle}
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                >
+                                    {isTimerRunning ? "Pause" : "Start"}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleTimerReset}
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
             <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                <div className="relative min-h-[24rem] bg-white dark:bg-[#0a1324] xl:min-h-0">
+                <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${
+                    canEdit
+                        ? 'border-emerald-200/80 dark:border-emerald-800/40'
+                        : 'border-rose-200/80 dark:border-rose-800/40'
+                } bg-white dark:bg-[#0a1324]`}>
+                    <div className="pointer-events-none absolute left-4 top-3 z-10 flex items-center gap-2">
+                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                            canEdit
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/20 dark:text-emerald-200'
+                                : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200'
+                        }`}>
+                            {canEdit ? 'Typing enabled' : 'Read only'}
+                        </span>
+                    </div>
                     <textarea 
                         id="realtimeEditor" 
                         className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
@@ -1082,11 +1290,11 @@ const runCode = async () => {
                         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6">
                             {/* Session Content */}
                             <div className="space-y-6">
-                                {/* Approach Notes */}
+                                {/* Shared Approach Board */}
                                 <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                                     <div className="mb-3 flex items-center justify-between">
-                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Approach Notes</h3>
-                                        <span className="text-[10px] text-gray-400">Shared with partner</span>
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Shared Approach Board</h3>
+                                        <span className="text-[10px] text-gray-400">Use this before coding</span>
                                     </div>
                                     <textarea
                                         value={session.approachNotes}
@@ -1122,15 +1330,34 @@ const runCode = async () => {
                                         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Run History</h3>
                                         <div className="space-y-2">
                                             {session.runHistory.map((run) => (
-                                                <div key={run.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-white/80 p-2 text-xs dark:border-gray-700 dark:bg-gray-800/60">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`h-1.5 w-1.5 rounded-full ${run.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                                        <span className="font-medium text-gray-700 dark:text-gray-300">{run.status}</span>
+                                                <div key={run.id} className="rounded-lg border border-gray-100 bg-white/80 p-3 text-xs dark:border-gray-700 dark:bg-gray-800/60">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`h-1.5 w-1.5 rounded-full ${run.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{run.status}</span>
+                                                            <span className={`rounded-full px-2 py-0.5 ${
+                                                                run.sampleCheck === 'passed'
+                                                                    ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-200'
+                                                                    : run.sampleCheck === 'mismatch'
+                                                                        ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-200'
+                                                                        : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-300'
+                                                            }`}>
+                                                                {run.sampleCheck === 'passed' ? 'Passed sample' : run.sampleCheck === 'mismatch' ? 'Mismatch' : 'No check'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-gray-400">
+                                                            <span>{run.time}</span>
+                                                            <span>{run.memory}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3 text-gray-400">
-                                                        <span>{run.time}</span>
-                                                        <span>{run.memory}</span>
-                                                    </div>
+                                                    {run.outputPreview && (
+                                                        <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                                                            <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{run.outputPreview}</pre>
+                                                            {run.expectedPreview ? (
+                                                                <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 px-2 py-2 font-mono text-[11px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{run.expectedPreview}</pre>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -1138,10 +1365,10 @@ const runCode = async () => {
                                 )}
 
                                 {/* Mentor Notes */}
-                                {isMentorOrInterviewer && (
+                                {((isMentoringMode && isMentorRole) || (isMockMode && isInterviewerRole)) && (
                                     <div className="rounded-2xl border border-purple-200 bg-purple-50/30 p-4 dark:border-purple-800/30 dark:bg-purple-900/10">
                                         <div className="mb-3 flex items-center justify-between">
-                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">Private Mentor Notes</h3>
+                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-300">{isMockMode ? 'Private Interviewer Notes' : 'Private Mentor Notes'}</h3>
                                             <span className="text-[10px] text-purple-400">Visible only to you</span>
                                         </div>
                                         <textarea
@@ -1150,6 +1377,28 @@ const runCode = async () => {
                                             placeholder="Confusion points, next topic, score/rubric..."
                                             className="w-full min-h-[100px] rounded-lg border border-purple-100 bg-white p-3 text-sm text-gray-900 outline-none focus:border-purple-400 dark:border-purple-800/50 dark:bg-gray-800 dark:text-white dark:focus:border-purple-500"
                                         />
+                                    </div>
+                                )}
+
+                                {isMockMode && session.mockSummary && (
+                                    <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Mock Summary</h3>
+                                            <span className="text-[10px] text-amber-500">Saved at time-up</span>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">
+                                                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Problem</p>
+                                                <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{session.mockSummary.problemTitle}</p>
+                                            </div>
+                                            <div className="rounded-xl bg-white/80 p-3 dark:bg-slate-900/50">
+                                                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Latest Run</p>
+                                                <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{session.mockSummary.latestRunStatus}</p>
+                                            </div>
+                                        </div>
+                                        <p className="mt-3 text-sm leading-6 text-amber-900 dark:text-amber-100">
+                                            {session.mockSummary.candidate || 'Candidate'} worked through a {session.mockSummary.durationLabel || formatTimerLabel(timerDuration)} round. Latest sample check: {session.mockSummary.latestSampleCheck || 'n/a'}.
+                                        </p>
                                     </div>
                                 )}
                             </div>

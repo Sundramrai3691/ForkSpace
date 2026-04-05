@@ -117,7 +117,15 @@ function Editor() {
       </aside>
       <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-transparent lg:min-h-0 lg:h-screen">
         {socketConnected ? (
-          <Workspace socketRef={socketRef} roomId={roomId} roomState={roomState} currentSocketId={currentSocketId} />
+          <Workspace
+            socketRef={socketRef}
+            roomId={roomId}
+            roomState={roomState}
+            currentSocketId={currentSocketId}
+            currentRole={enteredRole}
+            currentUsername={username}
+            users={users}
+          />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-16">
             <div className="w-full max-w-lg rounded-[2rem] border border-white/70 bg-white/88 p-8 text-center shadow-[0_24px_80px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/72">
