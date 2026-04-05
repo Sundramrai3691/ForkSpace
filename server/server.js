@@ -109,7 +109,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: "https://fork-space.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
