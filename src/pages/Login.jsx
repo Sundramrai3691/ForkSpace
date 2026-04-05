@@ -17,9 +17,9 @@ const capabilityCards = [
 ];
 
 const recommendedFlow = [
-    'Open or paste a Codeforces problem URL to keep the room anchored to one problem.',
-    'Fill the shared sample input and expected output manually so everyone runs against the same visible test case.',
-    'Code together, run the solution, and use the mismatch view to discuss what changed.',
+    'Pick guest mode for a quick session, or sign in first if you want rooms and runs saved to your profile.',
+    'Anchor the room to one Codeforces problem and keep sample input and expected output shared for both peers.',
+    'Code together, run once, and use the mismatch view to discuss what changed instead of screen-sharing outputs.',
 ];
 
 const useCases = [
@@ -38,9 +38,9 @@ const useCases = [
 ];
 
 const quickStartSteps = [
-    'Create or paste a practice room ID and enter your name.',
-    'Share the room code with your mentor, interviewer, or learner.',
-    'Solve the problem together, run the solution, and iterate on feedback in the same room.',
+    'Choose guest mode or sign in, then enter a room ID or generate a fresh one.',
+    'Invite your partner, choose a session role, and keep one shared problem brief in view.',
+    'Run the solution, compare the output, and iterate together in the same workspace.',
 ];
 
 const heroSessionPoints = [
@@ -49,14 +49,29 @@ const heroSessionPoints = [
     'One visible sample check',
 ];
 
+const heroSignals = [
+    {
+        label: 'Session flow',
+        value: 'Auth or guest -> room -> code -> compare',
+    },
+    {
+        label: 'Best fit',
+        value: 'Codeforces pair practice and mentor-led DSA sessions',
+    },
+    {
+        label: 'Why it feels lighter',
+        value: 'No screen-share juggling, no editor handoff, no split testing flow',
+    },
+];
+
 function Login() {
     return (
         <div className="min-h-screen bg-stone-50 text-slate-900 dark:bg-slate-950 dark:text-white">
             <Navbar />
 
             <main>
-                <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.18),_transparent_32%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 py-16 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.16),_transparent_28%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
-                    <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+                <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 py-16 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
+                    <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
                         <div className="space-y-8">
                             <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
                                 Realtime rooms for interview practice, DSA mentoring, and revision
@@ -73,7 +88,7 @@ function Login() {
 
                             <div className="flex flex-col gap-3 sm:flex-row">
                                 <a
-                                    href="#join-session"
+                                    href="#auth-entry"
                                     className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
                                 >
                                     Start a Practice Room
@@ -101,7 +116,7 @@ function Login() {
                                 </div>
                             </div>
 
-                            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                            <div className="grid gap-4 lg:grid-cols-[1.06fr_0.94fr]">
                                 <div className="rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
                                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
                                         In One Session
@@ -120,17 +135,15 @@ function Login() {
 
                                 <div className="rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
                                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
-                                        Best For
+                                        Why It Clicks
                                     </p>
                                     <div className="mt-4 space-y-3">
-                                        <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-                                            <p className="text-sm font-medium text-slate-900 dark:text-white">Codeforces pair practice</p>
-                                            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">Discuss the approach, edit together, then verify against shared samples.</p>
-                                        </div>
-                                        <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-                                            <p className="text-sm font-medium text-slate-900 dark:text-white">Mentor-led DSA sessions</p>
-                                            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">Keep explanation, coding, and output review in one place.</p>
-                                        </div>
+                                        {heroSignals.map((item) => (
+                                            <div key={item.label} className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+                                                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{item.value}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
