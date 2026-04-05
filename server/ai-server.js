@@ -36,6 +36,106 @@ const aiHintLimiter = rateLimit({
   max: 10,
 });
 
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const PREFERRED_GEMINI_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-flash-latest",
+];
+
+function extractAiText(responseData) {
+  const firstChoice = responseData?.choices?.[0];
+
+  return (
+    firstChoice?.message?.content ||
+    firstChoice?.delta?.content ||
+    firstChoice?.text ||
+    firstChoice?.completion ||
+    ""
+  );
+}
+
+async function listGeminiGenerateContentModels(apiKey) {
+  try {
+    const response = await axios.get(`${GEMINI_API_BASE_URL}/models`, {
+      headers: {
+        "x-goog-api-key": apiKey,
+      },
+      params: {
+        pageSize: 1000,
+      },
+      timeout: 10000,
+    });
+
+    const models = response.data?.models || [];
+    return models
+      .filter((entry) =>
+        entry?.supportedGenerationMethods?.includes("generateContent"),
+      )
+      .map((entry) => entry?.name?.replace(/^models\//, ""))
+      .filter(Boolean);
+  } catch (error) {
+    console.warn(
+      "Gemini model discovery failed:",
+      error.response?.data?.error?.message || error.message,
+    );
+    return [];
+  }
+}
+
+function buildGeminiModelCandidates(discoveredModels = []) {
+  const discoveredPreferred = discoveredModels.filter(
+    (modelName) =>
+      modelName.includes("flash") &&
+      !modelName.includes("image") &&
+      !modelName.includes("live") &&
+      !modelName.includes("tts"),
+  );
+
+  return [...new Set([...PREFERRED_GEMINI_MODELS, ...discoveredPreferred])];
+}
+
+async function generateWithGemini(prompt, apiKey, generationConfig = {}) {
+  const discoveredModels = await listGeminiGenerateContentModels(apiKey);
+  const models = buildGeminiModelCandidates(discoveredModels);
+  let lastError;
+
+  for (const modelName of models) {
+    try {
+      const response = await axios.post(
+        `${GEMINI_API_BASE_URL}/models/${modelName}:generateContent`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig,
+        },
+        {
+          headers: {
+            "x-goog-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        },
+      );
+
+      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        return {
+          text,
+          modelName,
+        };
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        `Gemini ${modelName} failed:`,
+        error.response?.data?.error?.message || error.message,
+      );
+    }
+  }
+
+  throw lastError || new Error("All Gemini generateContent models failed");
+}
+
 app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
   try {
     const { prompt, suffix } = req.body;
@@ -77,40 +177,24 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
           },
         );
         hint = response.data?.choices?.[0]?.message?.content || "";
-      } catch (e) {
+      } catch {
         console.warn("Groq hint failed, falling back...");
       }
     }
 
     if (!hint && geminiKey) {
-      const models = ["gemini-1.5-flash", "gemini-pro"];
-      for (const modelName of models) {
-        try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
-          const response = await axios.post(geminiUrl, {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 64 },
-          });
-          hint =
-            response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (hint) break;
-        } catch (e) {
-          console.warn(`Gemini ${modelName} hint failed, trying next...`);
-        }
-      }
+      hint = (
+        await generateWithGemini(
+          `Based on this code context, provide a single, very short code completion (just the next few characters or line). Return ONLY the completion text.\n\nCode before cursor:\n${prompt}\n\nCode after cursor:\n${suffix}`,
+          geminiKey,
+          { temperature: 0.2, maxOutputTokens: 64 },
+        )
+      ).text;
     }
 
     if (!hint && mistralKey) {
       const response = await axios.post(
-        "https://codestral.mistral.ai/v1/fim/completions",
+        "https://api.mistral.ai/v1/fim/completions",
         {
           model: "codestral-latest",
           prompt: prompt,
@@ -127,7 +211,7 @@ app.post("/api/ai-hint", aiHintLimiter, async (req, res) => {
           },
         },
       );
-      hint = response.data.choices?.[0]?.message?.content || "";
+      hint = extractAiText(response.data);
     }
 
     res.json({ hint: hint.trim() });
@@ -187,56 +271,39 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
             const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
             if (Array.isArray(parsed)) suggestions.push(...parsed);
           }
-        } catch (e) {
+        } catch {
           if (text) suggestions.push(text.trim().split("\n")[0]);
         }
-      } catch (e) {
+      } catch {
         console.warn("Groq hints failed, falling back...");
       }
     }
 
     if (suggestions.length === 0 && geminiKey) {
-      const models = ["gemini-1.5-flash", "gemini-pro"];
-      for (const modelName of models) {
+      try {
+        const text = (
+          await generateWithGemini(
+            `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
+            geminiKey,
+            { temperature: 0.3, maxOutputTokens: 256 },
+          )
+        ).text;
         try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
-          const response = await axios.post(
-            geminiUrl,
-            {
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `Based on the code below, provide 3-5 short DSA-oriented code completion suggestions in a plain JSON array format like ["hint1", "hint2"].\n\nCode:\n${code}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: { temperature: 0.3, maxOutputTokens: 256 },
-            },
-            { timeout: 10000 },
-          );
-          const text =
-            response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          try {
-            const jsonStart = text.indexOf("[");
-            const jsonEnd = text.lastIndexOf("]") + 1;
-            if (jsonStart !== -1 && jsonEnd !== -1) {
-              const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
-              if (Array.isArray(parsed)) {
-                suggestions.push(...parsed);
-                break;
-              }
-            }
-          } catch (e) {
-            if (text) {
-              suggestions.push(text.trim().split("\n")[0]);
-              break;
+          const jsonStart = text.indexOf("[");
+          const jsonEnd = text.lastIndexOf("]") + 1;
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const parsed = JSON.parse(text.substring(jsonStart, jsonEnd));
+            if (Array.isArray(parsed)) {
+              suggestions.push(...parsed);
             }
           }
-        } catch (e) {
-          console.warn(`Gemini ${modelName} hints failed, trying next...`);
+        } catch {
+          if (text) {
+            suggestions.push(text.trim().split("\n")[0]);
+          }
         }
+      } catch {
+        console.warn("Gemini hints failed, falling back...");
       }
     }
 
@@ -244,7 +311,7 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
       // Mistral logic... (keeping existing)
       if (beforeCursor && afterCursor) {
         const response = await axios.post(
-          "https://codestral.mistral.ai/v1/fim/completions",
+          "https://api.mistral.ai/v1/fim/completions",
           {
             model: "codestral-latest",
             prompt: beforeCursor,
@@ -262,7 +329,7 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
           },
         );
 
-        const hint = response.data.choices?.[0]?.message?.content || "";
+        const hint = extractAiText(response.data);
         if (hint.trim()) {
           suggestions.push(hint.trim());
         }
@@ -270,7 +337,7 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
 
       // Generate general completion suggestion
       const response2 = await axios.post(
-        "https://codestral.mistral.ai/v1/fim/completions",
+        "https://api.mistral.ai/v1/fim/completions",
         {
           model: "codestral-latest",
           prompt: code,
@@ -287,7 +354,7 @@ app.post("/api/ai-hints", aiHintLimiter, async (req, res) => {
         },
       );
 
-      const hint2 = response2.data.choices?.[0]?.message?.content || "";
+      const hint2 = extractAiText(response2.data);
       if (hint2.trim()) {
         suggestions.push(hint2.trim());
       }

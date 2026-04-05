@@ -637,32 +637,99 @@ function getGroqApiKey() {
   return apiKey;
 }
 
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const PREFERRED_GEMINI_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-flash-latest",
+];
+
+async function listGeminiGenerateContentModels(apiKey) {
+  try {
+    const response = await axios.get(`${GEMINI_API_BASE_URL}/models`, {
+      headers: {
+        "x-goog-api-key": apiKey,
+      },
+      params: {
+        pageSize: 1000,
+      },
+      timeout: 10000,
+    });
+
+    const models = response.data?.models || [];
+    return models
+      .filter((entry) => entry?.supportedGenerationMethods?.includes("generateContent"))
+      .map((entry) => entry?.name?.replace(/^models\//, ""))
+      .filter(Boolean);
+  } catch (error) {
+    console.warn(
+      "Gemini model discovery failed:",
+      error.response?.data?.error?.message || error.message,
+    );
+    return [];
+  }
+}
+
+function buildGeminiModelCandidates(discoveredModels = []) {
+  const discoveredPreferred = discoveredModels.filter(
+    (modelName) =>
+      modelName.includes("flash") &&
+      !modelName.includes("image") &&
+      !modelName.includes("live") &&
+      !modelName.includes("tts"),
+  );
+
+  return [...new Set([...PREFERRED_GEMINI_MODELS, ...discoveredPreferred])];
+}
+
+async function generateWithGemini(prompt, apiKey, generationConfig = {}) {
+  const discoveredModels = await listGeminiGenerateContentModels(apiKey);
+  const models = buildGeminiModelCandidates(discoveredModels);
+  let lastError;
+
+  for (const modelName of models) {
+    try {
+      const response = await axios.post(
+        `${GEMINI_API_BASE_URL}/models/${modelName}:generateContent`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig,
+        },
+        {
+          headers: {
+            "x-goog-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        },
+      );
+
+      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        return {
+          text,
+          modelName,
+        };
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        `Gemini ${modelName} failed:`,
+        error.response?.data?.error?.message || error.message,
+      );
+    }
+  }
+
+  throw lastError || new Error("All Gemini generateContent models failed");
+}
+
 async function getAiReview(prompt, apiKey, model = "mistral") {
   if (model === "gemini") {
-    // Try gemini-1.5-flash then gemini-pro via v1beta (most compatible)
-    const models = ["gemini-1.5-flash", "gemini-pro"];
-    let lastError;
-
-    for (const modelName of models) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-      try {
-        const response = await axios.post(
-          geminiUrl,
-          {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
-          },
-          { timeout: 15000 },
-        );
-
-        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-      } catch (error) {
-        lastError = error;
-        console.warn(`Gemini ${modelName} failed: ${error.message}`);
-      }
-    }
-    throw lastError || new Error("All Gemini models failed");
+    const { text } = await generateWithGemini(prompt, apiKey, {
+      temperature: 0.2,
+      maxOutputTokens: 1024,
+    });
+    return text;
   }
 
   if (model === "groq") {
@@ -696,7 +763,7 @@ async function getAiReview(prompt, apiKey, model = "mistral") {
   // Default to Mistral
   try {
     const response = await axios.post(
-      "https://codestral.mistral.ai/v1/chat/completions",
+      "https://api.mistral.ai/v1/chat/completions",
       {
         model: "codestral-latest",
         messages: [{ role: "user", content: prompt }],
@@ -1366,10 +1433,15 @@ ${prompt}
 Code after cursor:
 ${suffix}
 Return ONLY the completion text, no explanation.`;
-      hint = await getAiReview(fullPrompt, geminiApiKey, "gemini");
+      hint = (
+        await generateWithGemini(fullPrompt, geminiApiKey, {
+          temperature: 0.2,
+          maxOutputTokens: 128,
+        })
+      ).text;
     } else {
       const response = await axios.post(
-        "https://codestral.mistral.ai/v1/fim/completions",
+        "https://api.mistral.ai/v1/fim/completions",
         {
           model: "codestral-latest",
           prompt,
@@ -1428,7 +1500,12 @@ app.post("/api/ai-hints", aiLimiter, async (req, res) => {
 
     if (geminiApiKey) {
       const prompt = `Code:\n${code}\n\nBefore cursor:\n${beforeCursor}\n\nAfter cursor:\n${afterCursor}\n\nBased on the current code and cursor position, provide 3-5 short, helpful DSA-oriented code completion suggestions or hints. Keep them very brief and in a plain JSON array format like ["hint1", "hint2"]. Do not include markdown or explanations.`;
-      const review = await getAiReview(prompt, geminiApiKey, "gemini");
+      const review = (
+        await generateWithGemini(prompt, geminiApiKey, {
+          temperature: 0.3,
+          maxOutputTokens: 256,
+        })
+      ).text;
       try {
         // More robust JSON extraction for AI responses that might include markdown
         const jsonStart = review.indexOf("[");
@@ -1452,7 +1529,7 @@ app.post("/api/ai-hints", aiLimiter, async (req, res) => {
     } else if (mistralApiKey) {
       if (beforeCursor && afterCursor) {
         const response = await axios.post(
-          "https://codestral.mistral.ai/v1/fim/completions",
+          "https://api.mistral.ai/v1/fim/completions",
           {
             model: "codestral-latest",
             prompt: beforeCursor,
@@ -1477,7 +1554,7 @@ app.post("/api/ai-hints", aiLimiter, async (req, res) => {
       }
 
       const response = await axios.post(
-        "https://codestral.mistral.ai/v1/fim/completions",
+        "https://api.mistral.ai/v1/fim/completions",
         {
           model: "codestral-latest",
           prompt: code,
@@ -1568,7 +1645,7 @@ ${code}
     if (groqKey) {
       try {
         review = await getAiReview(prompt, groqKey, "groq");
-      } catch (e) {
+      } catch {
         console.warn("Groq failed, falling back to other AI if available");
       }
     }
@@ -1576,7 +1653,7 @@ ${code}
     if (!review && geminiKey) {
       try {
         review = await getAiReview(prompt, geminiKey, "gemini");
-      } catch (e) {
+      } catch {
         console.warn("Gemini failed, falling back to Mistral if available");
       }
     }
@@ -1602,7 +1679,7 @@ ${code}
       } else {
         jsonResponse = JSON.parse(review);
       }
-    } catch (e) {
+    } catch {
       // Fallback if not JSON
       jsonResponse = {
         bugs: [],
