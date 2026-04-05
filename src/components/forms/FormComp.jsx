@@ -415,21 +415,6 @@ function FormComp() {
                         )}
                     </div>
 
-                    <div className="border-t border-gray-100 bg-gray-50 px-7 py-5 dark:border-gray-700 dark:bg-gray-900/50">
-                        <div className="text-center">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Built with love by{' '}
-                                <a
-                                    href="https://pflix.vercel.app/"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-gray-700 transition-colors duration-200 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
-                                >
-                                    Sundram Rai
-                                </a>
-                            </p>
-                        </div>
-                    </div>
                 </div>
 
                 <div className="absolute -left-6 top-10 h-14 w-14 rounded-[1.5rem] border border-white/60 bg-white/20 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-white/5"></div>

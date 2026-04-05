@@ -1,243 +1,159 @@
-import { Link } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import axios from 'axios';
+import { GraduationCap, Sword, Zap } from 'lucide-react';
 import FormComp from '../components/forms/FormComp';
 import Navbar from '../components/common/Navbar';
-
-const capabilityCards = [
-    {
-        title: 'Live Practice Editor',
-        description: 'Mentor and learner stay in the same code view, so explanations and edits happen in real time.',
-    },
-    {
-        title: 'DSA Run-and-Check Flow',
-        description: 'Run C++, Python, or JavaScript solutions during practice and inspect the result immediately.',
-    },
-    {
-        title: 'Room-Based Mentoring',
-        description: 'Share one room code, keep the session focused, and avoid the friction of screen sharing.',
-    },
-];
-
-const recommendedFlow = [
-    'Pick guest mode for a quick session, or sign in first if you want rooms and runs saved to your profile.',
-    'Anchor the room to one Codeforces problem and keep sample input and expected output shared for both peers.',
-    'Code together, run once, and use the mismatch view to discuss what changed instead of screen-sharing outputs.',
-];
+import { getAuthHeaders, getAuthToken } from '../lib/auth';
 
 const useCases = [
     {
-        title: 'Mock Interviews',
-        description: 'Practice DSA rounds with interviewer and candidate in the same room without setup overhead.',
+        icon: Sword,
+        title: 'Mock Interview',
+        description: 'Run a candidate-interviewer session in one room with shared code, role switching, and quick output checks.',
     },
     {
-        title: '1:1 DSA Mentoring',
-        description: 'Walk through patterns, edge cases, and optimizations live while the learner edits alongside you.',
+        icon: GraduationCap,
+        title: 'DSA Mentoring',
+        description: 'Explain patterns, compare approaches, and guide learners live without handing screens back and forth.',
     },
     {
-        title: 'Revision Sessions',
-        description: 'Revisit solved problems, compare approaches, and quickly rerun examples before interviews.',
+        icon: Zap,
+        title: 'Peer Practice',
+        description: 'Open a room fast, solve one problem together, and validate the answer in the same flow.',
     },
 ];
 
 const quickStartSteps = [
-    'Choose guest mode or sign in, then enter a room ID or generate a fresh one.',
-    'Invite your partner, choose a session role, and keep one shared problem brief in view.',
-    'Run the solution, compare the output, and iterate together in the same workspace.',
+    'Create a room instantly or paste an existing Room ID to jump straight into a shared session.',
+    'Pick the right mode for the session, then assign Driver and Navigator so both people know the flow.',
+    'Code, run, compare output, and use the AI review panel only when you actually need extra guidance.',
 ];
 
-const heroSessionPoints = [
-    'One shared problem brief',
-    'One editor for both peers',
-    'One visible sample check',
-];
-
-const heroSignals = [
-    {
-        label: 'Session flow',
-        value: 'Auth or guest -> room -> code -> compare',
-    },
-    {
-        label: 'Best fit',
-        value: 'Codeforces pair practice and mentor-led DSA sessions',
-    },
-    {
-        label: 'Why it feels lighter',
-        value: 'No screen-share juggling, no editor handoff, no split testing flow',
-    },
-];
+function createRoomId() {
+    return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
 
 function Login() {
+    const navigate = useNavigate();
+    const quickRoomRef = useRef(null);
+    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const [currentUser, setCurrentUser] = useState(null);
+    const [quickRoomId, setQuickRoomId] = useState('');
+
+    useEffect(() => {
+        const loadCurrentUser = async () => {
+            if (!getAuthToken()) {
+                setCurrentUser(null);
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${serverUrl}/api/auth/me`, {
+                    headers: getAuthHeaders(),
+                });
+                setCurrentUser(response.data.user);
+            } catch {
+                setCurrentUser(null);
+            }
+        };
+
+        loadCurrentUser();
+    }, [serverUrl]);
+
+    const handleQuickJoin = (event) => {
+        event.preventDefault();
+        const resolvedRoomId = quickRoomId.trim() || createRoomId();
+
+        navigate(`/editor/${resolvedRoomId}`, {
+            state: {
+                username: currentUser?.name || 'Guest',
+                role: 'Peer',
+                sessionMode: 'peer_practice',
+            },
+        });
+    };
+
+    const focusQuickEntry = () => {
+        quickRoomRef.current?.focus();
+    };
+
     return (
         <div className="min-h-screen bg-stone-50 text-slate-900 dark:bg-slate-950 dark:text-white">
             <Navbar />
 
             <main>
-                <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 py-16 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
-                    <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.18fr_0.82fr] lg:items-center">
-                        <div className="space-y-8">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                                Realtime rooms for interview practice, DSA mentoring, and revision
-                            </div>
-
-                            <div className="space-y-5">
-                                <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl">
-                                    Practice interviews and teach DSA live in one shared coding room.
-                                </h1>
-                                <p className="max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                                    ForkSpace helps mentors, interviewers, and learners open a room quickly, solve problems together, and run code without screen sharing or extra setup.
-                                </p>
-                            </div>
-
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                                <a
-                                    href="#auth-entry"
-                                    className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                                >
-                                    Start a Practice Room
-                                </a>
-                                <a
-                                    href="#quick-start"
-                                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                                >
-                                    Quick Start
-                                </a>
-                                <Link
-                                    to="/analyse"
-                                    className="inline-flex items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
-                                >
-                                    Solution Analyser
-                                </Link>
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-2xl font-bold">Practice</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Live interviewer and candidate workflow.</p>
-                                </div>
-                                <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-2xl font-bold">Mentor</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Explain patterns while editing together.</p>
-                                </div>
-                                <div className="rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-2xl font-bold">Run</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Compile and inspect solutions on the spot.</p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-4 lg:grid-cols-[1.06fr_0.94fr]">
-                                <div className="rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
-                                        In One Session
-                                    </p>
-                                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                        {heroSessionPoints.map((point, index) => (
-                                            <div key={point} className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                                    {`0${index + 1}`}
-                                                </p>
-                                                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{point}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
-                                        Why It Clicks
-                                    </p>
-                                    <div className="mt-4 space-y-3">
-                                        {heroSignals.map((item) => (
-                                            <div key={item.label} className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/60">
-                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
-                                                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{item.value}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 pb-20 pt-20 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
+                    <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                            Realtime rooms for interview practice, DSA mentoring, and revision
                         </div>
 
-                        <div id="join-session" className="scroll-mt-24">
-                            <FormComp />
+                        <div className="mt-8 space-y-5">
+                            <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">
+                                Practice interviews and teach DSA live in one shared coding room.
+                            </h1>
+                            <p className="mx-auto max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
+                                ForkSpace helps mentors, interviewers, and learners open a room quickly, solve problems together, and run code without screen sharing or extra setup.
+                            </p>
                         </div>
+
+                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                            <button
+                                type="button"
+                                onClick={focusQuickEntry}
+                                className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                            >
+                                Start a Room
+                            </button>
+                            <Link
+                                to="/analyse"
+                                className="inline-flex items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
+                            >
+                                Solution Analyser
+                            </Link>
+                        </div>
+
+                        <form
+                            id="join-session"
+                            onSubmit={handleQuickJoin}
+                            className="mt-8 flex w-full max-w-2xl flex-col gap-3 rounded-[1.75rem] border border-stone-200 bg-white/85 p-4 shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75 sm:flex-row sm:items-center"
+                        >
+                            <input
+                                ref={quickRoomRef}
+                                type="text"
+                                value={quickRoomId}
+                                onChange={(event) => setQuickRoomId(event.target.value.toUpperCase())}
+                                placeholder="Enter Room ID or leave blank to create one instantly"
+                                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                            />
+                            <button
+                                type="submit"
+                                className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                            >
+                                Enter
+                            </button>
+                        </form>
+
+                        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                            {currentUser ? `Jump in as ${currentUser.name}.` : 'Jump in as a guest now, or sign in below to save rooms and history.'}
+                        </p>
                     </div>
                 </section>
 
-                <section id="how-it-works" className="scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
+                <section id="how-it-works" className="scroll-mt-24 bg-white px-4 py-14 dark:bg-slate-950 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">How It Works</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Designed around the interview-practice loop.</h2>
-                            <p className="text-slate-600 dark:text-slate-400">
-                                ForkSpace works best when it stays focused on one workflow: open a room, discuss the problem, code together, and run the solution immediately.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-3">
-                            {capabilityCards.map((card) => (
-                                <article key={card.title} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                                    <h3 className="text-xl font-semibold">{card.title}</h3>
-                                    <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{card.description}</p>
-                                </article>
-                            ))}
-                        </div>
-
-                        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                            <div className="max-w-3xl space-y-3">
-                                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Recommended Flow</p>
-                                <h3 className="text-2xl font-semibold tracking-tight">Keep the session practical instead of over-automated.</h3>
-                                <p className="text-sm leading-7 text-slate-600 dark:text-slate-400">
-                                    ForkSpace is strongest when it acts like a shared problem-solving room, especially for Codeforces-style practice where pairs want one editor, one test case source, and one place to compare outputs.
-                                </p>
-                            </div>
-
-                            <div className="mt-6 grid gap-4 md:grid-cols-3">
-                                {recommendedFlow.map((step, index) => (
-                                    <div key={step} className="rounded-2xl border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-800 dark:bg-slate-950/60">
-                                        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
-                                            Flow {index + 1}
-                                        </p>
-                                        <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{step}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="use-cases" className="scroll-mt-24 border-y border-stone-200 bg-stone-100/70 px-4 py-16 dark:border-slate-800 dark:bg-slate-900/40 sm:px-6 lg:px-8">
-                    <div className="mx-auto max-w-7xl space-y-8">
-                        <div className="max-w-2xl space-y-3">
-                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Use Cases</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Built for interview preparation and guided problem solving.</h2>
-                            <p className="text-slate-600 dark:text-slate-400">
-                                Instead of trying to be a full IDE, the product stays useful by centering on sessions where one person teaches, evaluates, or practices with another.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-3">
-                            {useCases.map((item) => (
-                                <article key={item.title} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                                    <h3 className="text-xl font-semibold">{item.title}</h3>
-                                    <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{item.description}</p>
-                                </article>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                <section id="quick-start" className="scroll-mt-24 px-4 py-16 sm:px-6 lg:px-8">
-                    <div className="mx-auto max-w-7xl space-y-8">
-                        <div className="max-w-2xl space-y-3">
-                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Quick Start</p>
                             <h2 className="text-3xl font-bold tracking-tight">Three steps to start a mock round or mentoring session.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                This keeps the product grounded in the actual practice flow and helps first-time users get into a room quickly.
+                                ForkSpace stays focused on one practical loop: enter a room, align on roles, and solve together in the same space.
                             </p>
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-3">
                             {quickStartSteps.map((step, index) => (
-                                <div key={step} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <div key={step} className="rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                                     <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
                                         Step {index + 1}
                                     </p>
@@ -247,7 +163,70 @@ function Login() {
                         </div>
                     </div>
                 </section>
+
+                <section id="use-cases" className="scroll-mt-24 border-y border-stone-200 bg-stone-100/70 px-4 py-14 dark:border-slate-800 dark:bg-slate-900/40 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-7xl space-y-8">
+                        <div className="max-w-2xl space-y-3">
+                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Use Cases</p>
+                            <h2 className="text-3xl font-bold tracking-tight">Built for the sessions people actually search for.</h2>
+                            <p className="text-slate-600 dark:text-slate-400">
+                                Instead of trying to be everything, ForkSpace is strongest when it supports focused interview prep, guided DSA learning, and fast pair practice.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-6 md:grid-cols-3">
+                            {useCases.map((item) => (
+                                <article key={item.title} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                    <div className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                        <item.icon size={18} strokeWidth={2} />
+                                    </div>
+                                    <h3 className="text-xl font-semibold">{item.title}</h3>
+                                    <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{item.description}</p>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                <section id="auth-entry" className="scroll-mt-24 bg-white px-4 py-12 dark:bg-slate-950 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-6xl space-y-6">
+                        <div className="mx-auto max-w-2xl space-y-3 text-center">
+                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Save Your Progress</p>
+                            <h2 className="text-3xl font-bold tracking-tight">Sign in when you want rooms, runs, and history attached to your profile.</h2>
+                            <p className="text-slate-600 dark:text-slate-400">
+                                The hero is optimized for quick entry. This section is here for users who want accounts, saved room history, and a fuller setup flow.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-center">
+                            <FormComp />
+                        </div>
+                    </div>
+                </section>
             </main>
+
+            <footer className="border-t border-stone-200 bg-stone-100/70 px-4 py-6 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 sm:px-6 lg:px-8">
+                <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
+                    <p>ForkSpace</p>
+                    <div className="flex flex-wrap items-center justify-center gap-4">
+                        <a
+                            href="https://github.com/PiyushAryan/ForkSpace"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="transition hover:text-slate-900 dark:hover:text-white"
+                        >
+                            GitHub | 0 stars
+                        </a>
+                        <a
+                            href="/LICENSE"
+                            className="transition hover:text-slate-900 dark:hover:text-white"
+                        >
+                            MIT License
+                        </a>
+                        <span>Made by Sundram Kumar Rai, NIT Raipur</span>
+                    </div>
+                </div>
+            </footer>
         </div>
     );
 }
