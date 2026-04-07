@@ -149,9 +149,9 @@ function FormComp() {
 
     return (
         <div className="flex items-center justify-center">
-            <div className="relative w-full max-w-[28rem]">
-                <div className="overflow-hidden rounded-[2rem] border border-gray-200/80 bg-white/92 shadow-[0_28px_120px_-42px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-gray-700/80 dark:bg-gray-800/92">
-                    <div className="border-b border-gray-100 px-7 pb-6 pt-7 text-center dark:border-gray-700">
+            <div className="relative w-full max-w-[30rem]">
+                <div className="overflow-hidden rounded-[1.5rem] border border-gray-200/90 bg-white shadow-[0_24px_80px_-46px_rgba(15,23,42,0.5)] dark:border-gray-700/80 dark:bg-gray-900">
+                    <div className="border-b border-gray-100 px-5 pb-5 pt-6 text-center dark:border-gray-700 sm:px-7 sm:pb-6 sm:pt-7">
                         <div className="mb-4 flex items-center justify-center">
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-900 shadow-lg dark:bg-gray-100">
                                 <svg className="h-6 w-6 text-white dark:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,8 +167,8 @@ function FormComp() {
                         </p>
                     </div>
 
-                    <div className="space-y-5 p-7">
-                        <div id="auth-entry" className="rounded-[1.6rem] border border-gray-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.78))] p-4 dark:border-gray-700 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.78))]">
+                    <div className="space-y-4 p-4 sm:space-y-5 sm:p-7">
+                        <div id="auth-entry" className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-slate-900/70">
                             {currentUser ? (
                                 <div className="space-y-3">
                                     <div className="flex items-start justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800">
@@ -283,7 +283,7 @@ function FormComp() {
                         </div>
 
                         {canShowJoinForm && (
-                            <form onSubmit={joinRoom} className="space-y-5 rounded-[1.6rem] border border-gray-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.88))] p-5 dark:border-gray-700 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.72),rgba(2,6,23,0.8))]">
+                            <form onSubmit={joinRoom} className="space-y-5 rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-slate-900/70 sm:p-5">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Step 2</p>
@@ -417,8 +417,8 @@ function FormComp() {
 
                 </div>
 
-                <div className="absolute -left-6 top-10 h-14 w-14 rounded-[1.5rem] border border-white/60 bg-white/20 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-white/5"></div>
-                <div className="absolute -right-4 top-20 h-24 w-24 rounded-full bg-amber-300/20 blur-2xl dark:bg-amber-400/10"></div>
+                <div className="absolute -left-6 top-10 hidden h-14 w-14 rounded-[1.5rem] border border-white/60 bg-white/20 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:block"></div>
+                <div className="absolute -right-4 top-20 hidden h-24 w-24 rounded-full bg-amber-300/20 blur-2xl dark:bg-amber-400/10 sm:block"></div>
             </div>
         </div>
     );

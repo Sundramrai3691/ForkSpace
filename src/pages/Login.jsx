@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import axios from 'axios';
-import { GraduationCap, Sword, Zap } from 'lucide-react';
+import { GraduationCap, Sword, X, Zap } from 'lucide-react';
 import FormComp from '../components/forms/FormComp';
 import Navbar from '../components/common/Navbar';
 import { getAuthHeaders, getAuthToken } from '../lib/auth';
@@ -40,6 +40,7 @@ function Login() {
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [currentUser, setCurrentUser] = useState(null);
     const [quickRoomId, setQuickRoomId] = useState('');
+    const [showAuthPanel, setShowAuthPanel] = useState(false);
 
     useEffect(() => {
         const loadCurrentUser = async () => {
@@ -138,8 +139,42 @@ function Login() {
                         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
                             {currentUser ? `Jump in as ${currentUser.name}.` : 'Jump in as a guest now, or sign in below to save rooms and history.'}
                         </p>
+
+                        {!currentUser && (
+                            <button
+                                type="button"
+                                onClick={() => setShowAuthPanel((prev) => !prev)}
+                                className="mt-5 text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
+                            >
+                                {showAuthPanel ? 'Close account access' : 'Need saved history? Sign in'}
+                            </button>
+                        )}
                     </div>
                 </section>
+
+                {(!currentUser && showAuthPanel) && (
+                    <section id="auth-entry" className="scroll-mt-24 border-b border-stone-200 bg-white px-4 py-10 dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:px-8">
+                        <div className="mx-auto max-w-6xl space-y-5">
+                            <div className="mx-auto flex w-full max-w-2xl items-start justify-between gap-4">
+                                <div className="space-y-2 text-left">
+                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Account Access</p>
+                                    <h2 className="text-2xl font-bold tracking-tight">Sign in only when you want saved history and rooms.</h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAuthPanel(false)}
+                                    className="rounded-xl border border-stone-200 bg-white p-2 text-slate-500 transition hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
+                                    aria-label="Close sign-in panel"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                            <div className="flex justify-center">
+                                <FormComp />
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 <section id="how-it-works" className="scroll-mt-24 bg-white px-4 py-14 dark:bg-slate-950 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl space-y-8">
@@ -188,21 +223,6 @@ function Login() {
                     </div>
                 </section>
 
-                <section id="auth-entry" className="scroll-mt-24 bg-white px-4 py-12 dark:bg-slate-950 sm:px-6 lg:px-8">
-                    <div className="mx-auto max-w-6xl space-y-6">
-                        <div className="mx-auto max-w-2xl space-y-3 text-center">
-                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Save Your Progress</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Sign in when you want rooms, runs, and history attached to your profile.</h2>
-                            <p className="text-slate-600 dark:text-slate-400">
-                                The hero is optimized for quick entry. This section is here for users who want accounts, saved room history, and a fuller setup flow.
-                            </p>
-                        </div>
-
-                        <div className="flex justify-center">
-                            <FormComp />
-                        </div>
-                    </div>
-                </section>
             </main>
 
             <footer className="border-t border-stone-200 bg-stone-100/70 px-4 py-6 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400 sm:px-6 lg:px-8">
