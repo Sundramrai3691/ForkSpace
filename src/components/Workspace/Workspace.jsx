@@ -180,6 +180,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         : rawServerUrl;
 
     const editorRef = useRef(null);
+    const remoteCursorMarkersRef = useRef({});
+    const myColorRef = useRef('#f59e0b');
     const settingsRef = useRef(null);
     const selectedLanguageRef = useRef(DEFAULT_LANGUAGE);
     const navigate = useNavigate();
@@ -210,6 +212,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [isReviewLoading, setIsReviewLoading] = useState(false);
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState("output");
+    const [runBy, setRunBy] = useState('');
 
     const renderReviewContent = () => {
         if (isReviewLoading) {
@@ -317,6 +320,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const isLearnerRole = normalizedRole === 'learner';
     const isInterviewerRole = normalizedRole === 'interviewer';
     const isCandidateRole = normalizedRole === 'candidate';
+    const canRunInCurrentMode = !isMockMode || !hasAssignedDriver || isDriver;
 
     const canEdit =
         isMentoringMode
@@ -435,6 +439,21 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     });
                 }
             });
+
+            editorRef.current.on("cursorActivity", (instance) => {
+                const socket = socketRef.current;
+                if (!socket) return;
+                const selections = instance.listSelections?.() || [];
+                const primary = selections[0];
+                if (!primary) return;
+                const anchorIndex = instance.indexFromPos(primary.anchor);
+                const headIndex = instance.indexFromPos(primary.head);
+                socket.emit("cursor-move", {
+                    roomId,
+                    anchor: anchorIndex,
+                    head: headIndex,
+                });
+            });
         }
         connect();
     }, [roomId, socketRef]);
@@ -494,6 +513,99 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         };
 
         socket.on("code-change", handleCodeChange);
+        socket.on("user-color-assigned", ({ color }) => {
+            if (typeof color === 'string' && color.trim()) {
+                myColorRef.current = color;
+            }
+        });
+        socket.on("remote-cursor-update", ({ socketId, anchor, head, username, color }) => {
+            if (!editorRef.current || !socketId) return;
+            if (socketId === currentSocketId) return;
+
+            const existingMarkers = remoteCursorMarkersRef.current[socketId] || [];
+            existingMarkers.forEach((marker) => marker?.clear?.());
+
+            const safeAnchor = Math.max(0, Math.min(anchor, editorRef.current.getValue().length));
+            const safeHead = Math.max(0, Math.min(head, editorRef.current.getValue().length));
+            const cursorPos = editorRef.current.posFromIndex(safeHead);
+            const anchorPos = editorRef.current.posFromIndex(safeAnchor);
+            const selectionStart = safeAnchor <= safeHead ? anchorPos : cursorPos;
+            const selectionEnd = safeAnchor <= safeHead ? cursorPos : anchorPos;
+            const userColor = color || '#f59e0b';
+
+            const cursorEl = document.createElement('span');
+            cursorEl.className = 'remote-cursor-widget';
+            cursorEl.style.borderLeft = `2px solid ${userColor}`;
+
+            const labelEl = document.createElement('span');
+            labelEl.className = 'remote-cursor-label';
+            labelEl.style.backgroundColor = userColor;
+            labelEl.textContent = username || 'Guest';
+            cursorEl.appendChild(labelEl);
+
+            const cursorMarker = editorRef.current.setBookmark(cursorPos, {
+                widget: cursorEl,
+                insertLeft: false,
+            });
+
+            const markers = [cursorMarker];
+            if (safeAnchor !== safeHead) {
+                const selectionMarker = editorRef.current.markText(selectionStart, selectionEnd, {
+                    className: 'remote-selection',
+                    css: `background: ${userColor}33; border-radius: 2px;`,
+                });
+                markers.push(selectionMarker);
+            }
+
+            remoteCursorMarkersRef.current[socketId] = markers;
+        });
+        socket.on("user-left", ({ socketId }) => {
+            const markers = remoteCursorMarkersRef.current[socketId] || [];
+            markers.forEach((marker) => marker?.clear?.());
+            delete remoteCursorMarkersRef.current[socketId];
+        });
+        socket.on("run-result", ({ result, runBy: resultRunBy }) => {
+            const languageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
+            const { stdout, stderr, compile_output, message, time, memory } = result || {};
+            const normalizedStdout = normalizeOutput(stdout || "");
+            const normalizedExpectedOutput = normalizeOutput(expectedOutput);
+            const hasCompileError = Boolean(compile_output);
+            const hasRuntimeError = Boolean(stderr);
+            const sampleMatched =
+                normalizedExpectedOutput &&
+                !hasCompileError &&
+                !hasRuntimeError &&
+                normalizedStdout === normalizedExpectedOutput;
+            const sampleMismatched =
+                normalizedExpectedOutput &&
+                !hasCompileError &&
+                !hasRuntimeError &&
+                normalizedStdout !== normalizedExpectedOutput;
+
+            setRunBy(resultRunBy || '');
+            setLastRunMeta({
+                languageLabel: languageConfig.label,
+                hasStdin: sampleInput.trim().length > 0,
+                inputSource: sampleInput.trim().length > 0 ? "sample" : "none",
+                status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
+                time: time || "N/A",
+                memory: memory || "N/A",
+                sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
+            });
+
+            const nextOutput = (
+                <div className="space-y-4 text-sm">
+                    {sampleMatched && <OutputSection tone="success" title="Passed Sample">Actual output matches the expected output for the shared sample test case.</OutputSection>}
+                    {sampleMismatched && <ComparisonPanel expectedOutput={expectedOutput} actualOutput={stdout} />}
+                    {compile_output && <OutputSection tone="warning" title="Compilation Error">{compile_output}</OutputSection>}
+                    {stderr && <OutputSection tone="error" title="Runtime Error">{stderr}</OutputSection>}
+                    {stdout && <OutputSection tone="success" title="Program Output">{stdout}</OutputSection>}
+                    {message && <OutputSection tone="info" title="System Message">{message}</OutputSection>}
+                </div>
+            );
+            setOutput(nextOutput);
+            setShowOutputModal(true);
+        });
         socket.on("language-change", ({ language }) => {
             if (!LANGUAGE_OPTIONS[language]) return;
 
@@ -504,9 +616,17 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
         return () => {
             socket.off("code-change", handleCodeChange);
+            socket.off("user-color-assigned");
+            socket.off("remote-cursor-update");
+            socket.off("user-left");
+            socket.off("run-result");
             socket.off("language-change");
+            Object.values(remoteCursorMarkersRef.current).forEach((markers) => {
+                markers.forEach((marker) => marker?.clear?.());
+            });
+            remoteCursorMarkersRef.current = {};
         };
-    }, [socketRef, roomId]);
+    }, [socketRef, roomId, currentSocketId, expectedOutput, sampleInput]);
 
     // AI Hint Keymap
     useEffect(() => {
@@ -766,7 +886,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     };
 
 
-const runCode = async () => {
+    const runCode = async () => {
+  if (!canRunInCurrentMode) {
+    toast.error("Only the Driver can run code in mock mode.");
+    return;
+  }
   const rawCode = editorRef.current.getValue();
   const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
   const fallbackSampleInput = sampleInput.trim();
@@ -794,118 +918,18 @@ const runCode = async () => {
   );
 
   try {
-    const response = await axios.post(`${serverUrl}/api/run-code`, {
-      code: rawCode,
-      stdin: effectiveStdin,
-      languageId: languageConfig.judge0Id,
-      roomId,
-    }, {
-      headers: getAuthHeaders(),
-    });
-
-    const { stdout, stderr, compile_output, message, time, memory } = response.data;
-    const normalizedStdout = normalizeOutput(stdout || "");
-    const hasCompileError = Boolean(compile_output);
-    const hasRuntimeError = Boolean(stderr);
-    const hasOutput = Boolean(stdout);
-    const hasSystemMessage = Boolean(message);
-    const sampleMatched =
-      normalizedExpectedOutput &&
-      !hasCompileError &&
-      !hasRuntimeError &&
-      normalizedStdout === normalizedExpectedOutput;
-    const sampleMismatched =
-      normalizedExpectedOutput &&
-      !hasCompileError &&
-      !hasRuntimeError &&
-      normalizedStdout !== normalizedExpectedOutput;
-
-    setLastRunMeta({
-      languageLabel: languageConfig.label,
-      hasStdin: effectiveStdin.trim().length > 0,
-      inputSource,
-      status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
-      time: time || "N/A",
-      memory: memory || "N/A",
-      sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
-    });
-
-    socketRef.current?.emit('run-history-update', {
-      roomId,
-      run: {
-        status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
-        time: time || "N/A",
-        memory: memory || "N/A",
-        passed: sampleMatched,
-        languageLabel: languageConfig.label,
+    const ack = await new Promise((resolve) => {
+      socketRef.current?.emit("run-code", {
+        roomId,
+        code: rawCode,
+        languageId: languageConfig.judge0Id,
         stdin: effectiveStdin,
-        stdout: normalizeOutput(stdout || ""),
-        expectedOutput: normalizedExpectedOutput,
-        sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : "not_checked",
-      },
+      }, (payload) => resolve(payload));
     });
 
-    const finalOutput = (
-      <div className="space-y-4 text-sm">
-        {sampleMatched && (
-          <OutputSection tone="success" title="Passed Sample">
-            Actual output matches the expected output for the shared sample test case.
-          </OutputSection>
-        )}
-
-        {sampleMismatched && (
-          <>
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-100">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">Sample Check Failed</p>
-                  <p className="mt-1 text-sm leading-6">
-                    Your program ran, but the output does not match the expected output for the shared sample test.
-                  </p>
-                </div>
-                <span className="rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200">
-                  Mismatch
-                </span>
-              </div>
-            </div>
-            <ComparisonPanel expectedOutput={expectedOutput} actualOutput={stdout} />
-          </>
-        )}
-
-        {compile_output && (
-          <OutputSection tone="warning" title="Compilation Error">
-            {compile_output}
-          </OutputSection>
-        )}
-
-        {stderr && (
-          <OutputSection tone="error" title="Runtime Error">
-            {stderr}
-          </OutputSection>
-        )}
-
-        {stdout && (
-          <OutputSection tone="success" title="Program Output">
-            {stdout}
-          </OutputSection>
-        )}
-
-        {message && (
-          <OutputSection tone="info" title="System Message">
-            {message}
-          </OutputSection>
-        )}
-
-        {!hasCompileError && !hasRuntimeError && !hasOutput && !hasSystemMessage && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-700 dark:border-slate-700/50 dark:bg-slate-900/50 dark:text-slate-300">
-            The program finished without compiler messages or stdout output.
-          </div>
-        )}
-      </div>
-    );
-
-    setOutput(finalOutput);
-    setShowOutputModal(true);
+    if (!ack?.ok) {
+      throw new Error(ack?.error || "Failed to run code");
+    }
   } catch (error) {
     setLastRunMeta({
       languageLabel: languageConfig.label,
@@ -965,6 +989,8 @@ const runCode = async () => {
                     <button
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-800 bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-200 dark:bg-white dark:text-black dark:hover:bg-gray-100"
                         onClick={runCode}
+                        disabled={!canRunInCurrentMode}
+                        title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <polygon points="5,3 19,12 5,21"/>
@@ -1074,6 +1100,20 @@ const runCode = async () => {
                                 </div>
                             )}
                         </div>
+                        {users.length > 0 && (
+                            <div className="flex items-center pl-1">
+                                {users.slice(0, 5).map((user, index) => (
+                                    <div
+                                        key={user.socketId}
+                                        style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
+                                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold text-black dark:border-[#081121]"
+                                        title={user.username}
+                                    >
+                                        {(user.username || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <button
                             type="button"
                             onClick={() => setIsOutputCollapsed((current) => !current)}
@@ -1176,6 +1216,11 @@ const runCode = async () => {
                             {activeRightTab === "output" && (
                                 <div className="space-y-4">
                                     <div className="flex flex-wrap items-center gap-2">
+                                        {runBy && (
+                                            <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                Run by {runBy}
+                                            </div>
+                                        )}
                                         <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                             {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
                                         </div>

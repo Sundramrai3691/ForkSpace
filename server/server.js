@@ -23,6 +23,7 @@ import Analysis from "./models/Analysis.js";
 import MockSummary from "./models/MockSummary.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
+mongoose.set("bufferCommands", false);
 
 const redisUrl = process.env.REDIS_URL;
 let pubClient, subClient;
@@ -58,6 +59,10 @@ mongoose
   .connect(MONGODB_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
+
+function isDatabaseConnected() {
+  return mongoose.connection.readyState === 1;
+}
 
 const allowedOrigins = [
   ...new Set(
@@ -96,7 +101,7 @@ app.use(express.json());
 // Middleware to check database connection
 app.use((req, res, next) => {
   if (
-    mongoose.connection.readyState !== 1 &&
+    !isDatabaseConnected() &&
     req.path.startsWith("/api/auth")
   ) {
     return res.status(503).json({
@@ -109,7 +114,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "https://fork-space.vercel.app",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -478,6 +483,7 @@ function getOrCreateRoomState(roomId) {
 }
 
 async function getUserFromAuthHeader(req) {
+  if (!isDatabaseConnected()) return null;
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (!token) return null;
@@ -491,6 +497,7 @@ async function getUserFromAuthHeader(req) {
 }
 
 async function persistRoomDocument(roomId, roomState) {
+  if (!isDatabaseConnected()) return;
   try {
     await Room.findOneAndUpdate(
       { roomId },
@@ -820,6 +827,7 @@ async function getAiReview(prompt, apiKey, model = "mistral") {
 }
 
 async function upsertRecentRoom(userId, roomEntry) {
+  if (!isDatabaseConnected()) return;
   try {
     const user = await User.findById(userId);
     if (!user) return;
@@ -848,6 +856,7 @@ async function upsertRecentRoom(userId, roomEntry) {
 }
 
 async function appendRunHistory(userId, runEntry) {
+  if (!isDatabaseConnected()) return;
   try {
     const user = await User.findById(userId);
     if (!user) return;
@@ -2236,6 +2245,24 @@ app.post("/api/run-sample-suite", async (req, res) => {
 // Socket.io connection handlers
 
 const userSocketMap = {};
+const USER_COLORS = [
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#f43f5e",
+  "#a855f7",
+  "#06b6d4",
+];
+
+function pickColorForRoom(roomId, currentSocketId) {
+  const roomUsers = Array.from(io.sockets.adapter.rooms.get(roomId) || [])
+    .filter((socketId) => socketId !== currentSocketId)
+    .map((socketId) => userSocketMap[socketId])
+    .filter(Boolean);
+  const usedColors = new Set(roomUsers.map((user) => user.color).filter(Boolean));
+  const availableColor = USER_COLORS.find((color) => !usedColors.has(color));
+  return availableColor || USER_COLORS[roomUsers.length % USER_COLORS.length];
+}
 
 function getUsersInRoom(roomId) {
   return Array.from(io.sockets.adapter.rooms.get(roomId) || []).map(
@@ -2244,6 +2271,7 @@ function getUsersInRoom(roomId) {
         socketId,
         username: userSocketMap[socketId]?.username,
         role: userSocketMap[socketId]?.role || "Peer",
+        color: userSocketMap[socketId]?.color || USER_COLORS[0],
         isOnline: true,
       };
     },
@@ -2260,16 +2288,20 @@ io.on("connection", (socket) => {
 
       if (!roomState) {
         try {
-          const savedRoom = await Room.findOne({ roomId });
-          if (savedRoom) {
-            roomState = {
-              ...createDefaultRoomState(),
-              code: savedRoom.code,
-              language: savedRoom.language,
-            };
-            roomStateMap.set(roomId, roomState);
-          } else {
+          if (!isDatabaseConnected()) {
             roomState = getOrCreateRoomState(roomId);
+          } else {
+            const savedRoom = await Room.findOne({ roomId });
+            if (savedRoom) {
+              roomState = {
+                ...createDefaultRoomState(),
+                code: savedRoom.code,
+                language: savedRoom.language,
+              };
+              roomStateMap.set(roomId, roomState);
+            } else {
+              roomState = getOrCreateRoomState(roomId);
+            }
           }
         } catch (err) {
           console.error("Error fetching room from MongoDB:", err);
@@ -2281,7 +2313,7 @@ io.on("connection", (socket) => {
         ? jwt.verify(authToken, process.env.JWT_SECRET || "secret")
         : null;
       let authenticatedUser = null;
-      if (authPayload?.userId) {
+      if (authPayload?.userId && isDatabaseConnected()) {
         authenticatedUser = await User.findById(authPayload.userId);
       }
       const resolvedUsername = authenticatedUser?.name || username;
@@ -2289,6 +2321,7 @@ io.on("connection", (socket) => {
       userSocketMap[socket.id] = {
         username: resolvedUsername,
         role: role || "Peer",
+        color: pickColorForRoom(roomId, socket.id),
         userId: authenticatedUser?._id || null,
       };
       socket.join(roomId);
@@ -2323,6 +2356,9 @@ io.on("connection", (socket) => {
       }
 
       socket.emit("room-state", roomState);
+      socket.emit("user-color-assigned", {
+        color: userSocketMap[socket.id].color,
+      });
     },
   );
 
@@ -2426,6 +2462,92 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("cursor-move", ({ roomId, anchor, head }) => {
+    if (!roomId || typeof anchor !== "number" || typeof head !== "number") {
+      return;
+    }
+
+    socket.to(roomId).emit("remote-cursor-update", {
+      socketId: socket.id,
+      anchor,
+      head,
+      username: userSocketMap[socket.id]?.username || "Anonymous",
+      color: userSocketMap[socket.id]?.color || USER_COLORS[0],
+    });
+  });
+
+  socket.on("run-code", async ({ roomId, code, languageId, stdin = "" }, callback) => {
+    if (!roomId || !code) {
+      callback?.({ ok: false, error: "Missing roomId or code" });
+      return;
+    }
+
+    const supportedLanguageIds = new Set(
+      Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id),
+    );
+    if (!supportedLanguageIds.has(languageId)) {
+      callback?.({ ok: false, error: "Unsupported language" });
+      return;
+    }
+    if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
+      callback?.({ ok: false, error: "Judge0 is not configured" });
+      return;
+    }
+
+    try {
+      const execution = await executeSubmission({ code, stdin, languageId });
+      const runBy = userSocketMap[socket.id]?.username || "Guest";
+      const roomState = getOrCreateRoomState(roomId);
+      const normalizedStdout = normalizeOutput(execution.stdout || "");
+      const normalizedExpected = normalizeOutput(roomState?.problem?.sampleOutput || "");
+      const hasCompileError = Boolean(execution.compile_output);
+      const hasRuntimeError = Boolean(execution.stderr);
+      const sampleMatched =
+        normalizedExpected &&
+        !hasCompileError &&
+        !hasRuntimeError &&
+        normalizedStdout === normalizedExpected;
+      const sampleMismatched =
+        normalizedExpected &&
+        !hasCompileError &&
+        !hasRuntimeError &&
+        normalizedStdout !== normalizedExpected;
+      const runEntry = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
+        time: execution.time || "N/A",
+        memory: execution.memory || "N/A",
+        passed: sampleMatched,
+        languageLabel:
+          Object.values(SUPPORTED_LANGUAGES).find((language) => language.id === languageId)?.label || "Unknown",
+        stdin,
+        stdout: normalizedStdout,
+        expectedOutput: normalizedExpected,
+        sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : "not_checked",
+      };
+      roomState.session.runHistory = [runEntry, ...roomState.session.runHistory].slice(0, 5);
+      scheduleRoomStatePersist();
+
+      io.to(roomId).emit("run-result", {
+        result: execution,
+        runBy,
+      });
+      io.to(roomId).emit("session-update", {
+        session: roomState.session,
+      });
+
+      callback?.({ ok: true });
+    } catch (error) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Error running code";
+      callback?.({ ok: false, error: message });
+      socket.emit("run-error", { error: message });
+    }
+  });
+
   socket.on("disconnecting", async () => {
     const rooms = [...socket.rooms];
     for (const roomId of rooms) {
@@ -2465,6 +2587,9 @@ io.on("connection", (socket) => {
         socket.in(roomId).emit("left", {
           socketId: socket.id,
           username: userSocketMap[socket.id]?.username,
+        });
+        socket.in(roomId).emit("user-left", {
+          socketId: socket.id,
         });
       }
     }
