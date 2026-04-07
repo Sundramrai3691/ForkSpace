@@ -321,6 +321,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const isInterviewerRole = normalizedRole === 'interviewer';
     const isCandidateRole = normalizedRole === 'candidate';
     const canRunInCurrentMode = !isMockMode || !hasAssignedDriver || isDriver;
+    const checklistTotal = session.edgeCaseChecklist.length;
+    const checklistCompleted = session.edgeCaseChecklist.filter((item) => item.checked).length;
+    const criticalOpenCount = session.edgeCaseChecklist.filter(
+        (item) => item.priority === 'critical' && !item.checked
+    ).length;
 
     const canEdit =
         isMentoringMode
@@ -1330,19 +1335,45 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             {activeRightTab === "ai" && (
                                 <div className="space-y-5">
                                     <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                                        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
+                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-gray-600 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-300">
+                                                    {checklistCompleted}/{checklistTotal}
+                                                </span>
+                                                {criticalOpenCount > 0 && (
+                                                    <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-red-700 dark:border-red-800/50 dark:bg-red-950/20 dark:text-red-300">
+                                                        {criticalOpenCount} critical open
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                         <div className="grid grid-cols-1 gap-2">
                                             {session.edgeCaseChecklist.map((item) => (
-                                                <label key={item.id} className="flex cursor-pointer items-center gap-3 group">
+                                                <label key={item.id} className="group flex cursor-pointer items-start gap-3 rounded-lg border border-transparent px-2 py-1.5 hover:border-gray-200 dark:hover:border-gray-700">
                                                     <input
                                                         type="checkbox"
                                                         checked={item.checked}
                                                         onChange={() => toggleEdgeCase(item.id)}
-                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
                                                     />
-                                                    <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                        {item.label}
-                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                {item.label}
+                                                            </span>
+                                                            {!item.checked && item.priority === 'critical' && (
+                                                                <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700 dark:border-red-800/50 dark:bg-red-950/20 dark:text-red-300">
+                                                                    Critical
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {item.hint && (
+                                                            <p className="mt-0.5 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                                                {item.hint}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </label>
                                             ))}
                                         </div>
