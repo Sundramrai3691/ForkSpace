@@ -152,6 +152,15 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    service: "ForkSpace API",
+    ok: true,
+    message: "Backend is running. Use the frontend app to access UI.",
+    health: "/health",
+  });
+});
+
 app.post("/api/auth/register", async (req, res) => {
   const { name = "", email = "", password = "" } = req.body || {};
   const normalizedEmail = email.trim().toLowerCase();
