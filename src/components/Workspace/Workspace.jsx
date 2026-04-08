@@ -611,6 +611,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             setOutput(nextOutput);
             setShowOutputModal(true);
         });
+        socket.on("run-error", ({ error }) => {
+            const message = error || "Run request failed";
+            toast.error(message);
+            setLastRunMeta((prev) => ({
+                ...(prev || {}),
+                status: "Request Failed",
+            }));
+        });
         socket.on("language-change", ({ language }) => {
             if (!LANGUAGE_OPTIONS[language]) return;
 
@@ -625,6 +633,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             socket.off("remote-cursor-update");
             socket.off("user-left");
             socket.off("run-result");
+            socket.off("run-error");
             socket.off("language-change");
             Object.values(remoteCursorMarkersRef.current).forEach((markers) => {
                 markers.forEach((marker) => marker?.clear?.());

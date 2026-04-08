@@ -64,6 +64,15 @@ function isDatabaseConnected() {
   return mongoose.connection.readyState === 1;
 }
 
+function safeVerifyJwt(token) {
+  if (!token) return null;
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET || "secret");
+  } catch {
+    return null;
+  }
+}
+
 const configuredOrigins = [
   process.env.CLIENT_URL,
   ...(process.env.CORS_ORIGIN || "")
@@ -2160,6 +2169,10 @@ function extractUpstreamError(error, fallbackMessage = "Request failed") {
     return error.message.trim();
   }
 
+  if (error?.response?.status) {
+    return `${fallbackMessage} (upstream status ${error.response.status})`;
+  }
+
   return fallbackMessage;
 }
 
@@ -2457,7 +2470,7 @@ io.on("connection", (socket) => {
       }
 
       const authPayload = authToken
-        ? jwt.verify(authToken, process.env.JWT_SECRET || "secret")
+        ? safeVerifyJwt(authToken)
         : null;
       let authenticatedUser = null;
       if (authPayload?.userId && isDatabaseConnected()) {
@@ -2763,4 +2776,12 @@ process.on("SIGTERM", async () => {
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT} (host 0.0.0.0)`);
   console.log(`Socket origins: ${allowedOrigins.join(", ")}`);
+  const judge0 = getJudge0Config();
+  console.log(
+    `Startup diagnostics -> Mongo: ${
+      isDatabaseConnected() ? "connected" : "disconnected"
+    }, Redis: ${redisUrl ? "configured" : "not configured"}, Judge0: ${
+      judge0.ok ? "configured" : judge0.error
+    }`,
+  );
 });
