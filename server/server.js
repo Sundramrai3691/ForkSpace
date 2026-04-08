@@ -2104,23 +2104,87 @@ function decodeBase64Utf8(value) {
   return Buffer.from(value, "base64").toString("utf8");
 }
 
+function getJudge0Config() {
+  const apiUrl = (process.env.JUDGE0_API_URL || "").trim();
+  const apiKey = (process.env.JUDGE0_API_KEY || "").trim();
+  const usingRapidApi = /rapidapi\.com/i.test(apiUrl);
+  const normalizedKey = apiKey.toLowerCase();
+  const keyLooksPlaceholder =
+    !apiKey ||
+    ["n", "na", "none", "null", "undefined"].includes(normalizedKey) ||
+    normalizedKey.includes("your_");
+
+  if (!apiUrl) {
+    return { ok: false, error: "JUDGE0_API_URL is missing" };
+  }
+
+  if (usingRapidApi && keyLooksPlaceholder) {
+    return {
+      ok: false,
+      error:
+        "Judge0 RapidAPI key is missing or invalid. Set a real JUDGE0_API_KEY in Render env.",
+    };
+  }
+
+  return {
+    ok: true,
+    apiUrl,
+    apiKey,
+    usingRapidApi,
+  };
+}
+
+function extractUpstreamError(error, fallbackMessage = "Request failed") {
+  const responseData = error?.response?.data;
+
+  if (typeof responseData === "string" && responseData.trim()) {
+    return responseData.trim();
+  }
+
+  if (responseData && typeof responseData === "object") {
+    const primaryMessage =
+      responseData.error ||
+      responseData.message ||
+      responseData.detail ||
+      responseData.details;
+    if (typeof primaryMessage === "string" && primaryMessage.trim()) {
+      return primaryMessage.trim();
+    }
+  }
+
+  if (typeof error?.message === "string" && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  return fallbackMessage;
+}
+
 async function executeSubmission({
   code,
   stdin = "",
   languageId = getLanguageConfig(DEFAULT_LANGUAGE).id,
 }) {
+  const judge0 = getJudge0Config();
+  if (!judge0.ok) {
+    throw new Error(judge0.error);
+  }
+
   const createOptions = (useBase64 = false) => ({
     method: "POST",
-    url: `${process.env.JUDGE0_API_URL}/submissions`,
+    url: `${judge0.apiUrl}/submissions`,
     params: {
       ...(useBase64 ? { base64_encoded: "true" } : {}),
       wait: "true",
       fields: "*",
     },
     headers: {
-      "x-rapidapi-key": process.env.JUDGE0_API_KEY,
-      "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
       "Content-Type": "application/json",
+      ...(judge0.usingRapidApi
+        ? {
+            "x-rapidapi-key": judge0.apiKey,
+            "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
+          }
+        : {}),
     },
     data: {
       language_id: languageId,
@@ -2190,8 +2254,9 @@ app.post("/api/run-code", async (req, res) => {
     return res.status(400).json({ error: "Unsupported language" });
   }
 
-  if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
-    return res.status(503).json({ error: "Judge0 is not configured" });
+  const judge0 = getJudge0Config();
+  if (!judge0.ok) {
+    return res.status(503).json({ error: judge0.error });
   }
 
   try {
@@ -2219,10 +2284,7 @@ app.post("/api/run-code", async (req, res) => {
     return res.json(execution);
   } catch (error) {
     return res.status(error.response?.status || 500).json({
-      error:
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        "Error running code",
+      error: extractUpstreamError(error, "Error running code"),
     });
   }
 });
@@ -2253,8 +2315,9 @@ app.post("/api/run-sample-suite", async (req, res) => {
       .json({ error: "No sample tests are available for this problem yet." });
   }
 
-  if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
-    return res.status(503).json({ error: "Judge0 is not configured" });
+  const judge0 = getJudge0Config();
+  if (!judge0.ok) {
+    return res.status(503).json({ error: judge0.error });
   }
 
   try {
@@ -2317,10 +2380,7 @@ app.post("/api/run-sample-suite", async (req, res) => {
     });
   } catch (error) {
     return res.status(error.response?.status || 500).json({
-      error:
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        "Error running the sample suite",
+      error: extractUpstreamError(error, "Error running the sample suite"),
     });
   }
 });
@@ -2572,8 +2632,9 @@ io.on("connection", (socket) => {
       callback?.({ ok: false, error: "Unsupported language" });
       return;
     }
-    if (!process.env.JUDGE0_API_URL || !process.env.JUDGE0_API_KEY) {
-      callback?.({ ok: false, error: "Judge0 is not configured" });
+    const judge0 = getJudge0Config();
+    if (!judge0.ok) {
+      callback?.({ ok: false, error: judge0.error });
       return;
     }
 
@@ -2622,10 +2683,7 @@ io.on("connection", (socket) => {
 
       callback?.({ ok: true });
     } catch (error) {
-      const message =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        "Error running code";
+      const message = extractUpstreamError(error, "Error running code");
       callback?.({ ok: false, error: message });
       socket.emit("run-error", { error: message });
     }
