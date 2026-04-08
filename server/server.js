@@ -64,6 +64,14 @@ function isDatabaseConnected() {
   return mongoose.connection.readyState === 1;
 }
 
+const configuredOrigins = [
+  process.env.CLIENT_URL,
+  ...(process.env.CORS_ORIGIN || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+];
+
 const allowedOrigins = [
   ...new Set(
     [
@@ -71,11 +79,26 @@ const allowedOrigins = [
       "http://127.0.0.1:5173",
       "http://localhost:5000",
       "http://127.0.0.1:5000",
-      process.env.CLIENT_URL,
-      process.env.CORS_ORIGIN,
+      "https://fork-space.vercel.app",
+      ...configuredOrigins,
     ].filter(Boolean),
   ),
 ];
+
+function corsOriginResolver(origin, callback) {
+  // Allow non-browser and server-to-server calls without an Origin header.
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  callback(new Error(`CORS origin not allowed: ${origin}`), false);
+}
 
 const app = express();
 
@@ -90,7 +113,7 @@ app.use(
 
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: corsOriginResolver,
     methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
   }),
@@ -114,7 +137,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOriginResolver,
     methods: ["GET", "POST"],
     credentials: true,
   },
