@@ -1027,6 +1027,10 @@ function normalizeForComparison(value = "") {
     .trim();
 }
 
+function normalizeOutput(value = "") {
+  return String(value || "").replace(/\r\n/g, "\n").trim();
+}
+
 function buildSamplesFromJoinedText(sampleInput = "", sampleOutput = "") {
   const inputs = normalizeWhitespace(sampleInput)
     .split(/\n\s*\n/)
