@@ -924,18 +924,29 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
   try {
     const ack = await new Promise((resolve) => {
+      const timeoutId = window.setTimeout(() => {
+        resolve({ ok: false, error: "Realtime run request timed out" });
+      }, 15000);
+
       socketRef.current?.emit("run-code", {
         roomId,
         code: rawCode,
         languageId: languageConfig.judge0Id,
         stdin: effectiveStdin,
-      }, (payload) => resolve(payload));
+      }, (payload) => {
+        window.clearTimeout(timeoutId);
+        resolve(payload);
+      });
     });
 
     if (!ack?.ok) {
-      throw new Error(ack?.error || "Failed to run code");
+      throw new Error(ack?.error || "Run request failed");
     }
   } catch (error) {
+    const runErrorMessage =
+      error?.response?.data?.error ||
+      error?.message ||
+      "Run request failed";
     setLastRunMeta({
       languageLabel: languageConfig.label,
       hasStdin: effectiveStdin.trim().length > 0,
@@ -947,11 +958,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     });
     setOutput(
       <div className="dark:text-red-200 p-4 text-red-800">
-        <p>Error running code: {error.response?.data?.error || error.message}</p>
+        <p>Error running code: {runErrorMessage}</p>
       </div>
     );
     setShowOutputModal(true);
-    toast.error("Run Code failed. Check your Judge0 configuration.");
+    toast.error(runErrorMessage);
   }
 };
 
