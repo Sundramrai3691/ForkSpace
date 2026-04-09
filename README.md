@@ -41,6 +41,8 @@ The product is currently strongest for Codeforces-style practice and general int
 - Live participant list and room presence
 - Session modes: `Peer Practice`, `Mock Interview`, `Mentoring`
 - Driver / Navigator role assignment for structured pair coding
+- **Live collaboration cues:** remote cursors with username labels, per-user colors, and shared selection highlights so everyone sees who is working where
+- **Shared runs:** when someone executes code, run status and output can surface for the whole room (pair debugging without re-running blindly)
 
 ### Problem-Solving Workflow
 
@@ -49,6 +51,14 @@ The product is currently strongest for Codeforces-style practice and general int
 - Codeforces-first workflow with problem URL / platform / code context
 - Clear output comparison with visible `Passed sample` / `Mismatch` feedback
 - Shared approach notes for discussing brute force, optimized ideas, and edge cases
+- **Edge-case checklist (mentoring / AI panel):** priority-tagged items (for example critical vs high), short hints, and progress so interviews stay concrete instead of checkbox theater
+
+### Language & starter templates
+
+- Per-room **language** is part of shared state: **C++**, **Python**, or **JavaScript**, chosen from the workspace settings
+- Language changes **propagate over Socket.IO** and stay aligned with the server (client room state merges `language-change` so the UI does not snap back to a stale default)
+- Switching language loads that language’s **default starter snippet** in the editor and syncs it as a normal `code-change` for the room
+- If your buffer is **not** still empty or a stock starter template, you get a **confirmation** before replacing code so accidental wipes are harder
 
 ### Code Execution
 
@@ -57,6 +67,7 @@ The product is currently strongest for Codeforces-style practice and general int
   - Python
   - JavaScript
 - Execution status with visible time and memory
+- **Run failures:** clearer feedback when execution or configuration breaks (for example Judge0 / network), instead of only a generic error toast
 - Formatter support for cleaner code before review or reruns
 - Output panel designed for quick debugging during pair sessions
 
@@ -123,7 +134,7 @@ Express + Socket Server
 
 ### Notes
 
-- Socket.IO powers realtime room sync
+- Socket.IO powers realtime room sync (code, language, cursors, selections, and run notifications)
 - Judge0 handles code execution
 - Room state is persisted locally in `server/data/room-state.json`
 - Auth and saved history currently use JWT plus MongoDB-backed user storage
@@ -220,8 +231,9 @@ Recommended workflow for the current product:
 1. Choose `Continue as Guest` for fast sessions, or sign in if you want saved rooms and runs.
 2. Create or enter a room ID.
 3. Add the problem context and shared sample input / expected output.
-4. Solve together in the shared editor.
-5. Run once and use the mismatch view to discuss what needs to change.
+4. Pick the **room language** in workspace settings when you need Python or JavaScript instead of the default (C++). If you already edited beyond the starter template, you will be asked to confirm before the buffer is replaced.
+5. Solve together in the shared editor.
+6. Run once and use the mismatch view to discuss what needs to change.
 
 For now, this manual sample-based workflow is more reliable than trying to automate every external problem platform.
 
@@ -270,6 +282,8 @@ It is intentionally narrower: shared coding rooms for problem-solving sessions.
 - [x] Realtime shared rooms
 - [x] Driver / Navigator session roles
 - [x] Multi-language execution for C++, Python, and JavaScript
+- [x] Reliable **room language sync** and **starter-template** behavior when switching languages
+- [x] **Live cursors**, **selection highlights**, and **shared run** visibility for collaboration
 - [x] Sample output comparison
 - [x] AI hints and review flow
 - [x] Guest entry plus sign-in flow
