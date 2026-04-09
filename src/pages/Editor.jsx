@@ -56,6 +56,13 @@ function Editor() {
         socketRef.current.on('room-state', (nextRoomState) => {
           setRoomState(nextRoomState);
         });
+        socketRef.current.on('language-change', ({ language }) => {
+          if (!language) return;
+          setRoomState((prev) => ({
+            ...(prev || {}),
+            language,
+          }));
+        });
         socketRef.current.on('problem-update', ({ problem }) => {
           setRoomState((prev) => ({
             ...(prev || {}),
@@ -94,6 +101,7 @@ function Editor() {
         socketRef.current.off('connect');
         socketRef.current.off('disconnect');
         socketRef.current.off('room-state');
+        socketRef.current.off('language-change');
         socketRef.current.off('problem-update');
         socketRef.current.off('session-update');
         socketRef.current.off('joined');

@@ -17,6 +17,20 @@ import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
 import { formatCode } from "./formatCode";
 import { getAuthHeaders } from "../../lib/auth";
 
+function normalizeEditorText(text) {
+    return String(text ?? "").replace(/\r\n/g, "\n");
+}
+
+/** Empty/whitespace or still exactly one of the built-in starter templates (safe to swap on language change). */
+function codeIsSafeToReplaceForLanguageSwitch(raw) {
+    const normalized = normalizeEditorText(raw).trimEnd();
+    if (!normalized.trim()) return true;
+    return Object.values(LANGUAGE_OPTIONS).some((opt) => {
+        const starter = normalizeEditorText(opt.starterCode).trimEnd();
+        return starter === normalized;
+    });
+}
+
 function OutputSection({ tone, title, children }) {
     const toneClasses = {
         success: "border-green-200 bg-green-50 text-green-900 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-100",
@@ -175,8 +189,8 @@ const SESSION_MODE_LABELS = {
 function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole = 'Peer', currentUsername = 'Anonymous', users = [] }) {
     const rawServerUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     // Fallback for development if frontend is on 5173 and backend is on 5000
-    const serverUrl = (rawServerUrl.includes(":5173") && !import.meta.env.VITE_SERVER_URL) 
-        ? rawServerUrl.replace(":5173", ":5000") 
+    const serverUrl = (rawServerUrl.includes(":5173") && !import.meta.env.VITE_SERVER_URL)
+        ? rawServerUrl.replace(":5173", ":5000")
         : rawServerUrl;
 
     const editorRef = useRef(null);
@@ -184,21 +198,22 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const myColorRef = useRef('#f59e0b');
     const settingsRef = useRef(null);
     const selectedLanguageRef = useRef(DEFAULT_LANGUAGE);
+    const isUserLanguageChangeRef = useRef(false);
     const navigate = useNavigate();
-    const { 
-      ghostHint, 
-      fetchHint, 
-      acceptGhostHint, 
-      showDropdown, 
-      aiHints, 
-      isLoading, 
-      fetchAIHints, 
-      closeDropdown, 
-      applyHint 
+    const {
+        ghostHint,
+        fetchHint,
+        acceptGhostHint,
+        showDropdown,
+        aiHints,
+        isLoading,
+        fetchAIHints,
+        closeDropdown,
+        applyHint
     } = useAIHint(
-      editorRef,
-      socketRef,
-      roomId
+        editorRef,
+        socketRef,
+        roomId
     );
     const [output, setOutput] = useState("");
     const [showSettings, setShowSettings] = useState(false);
@@ -402,7 +417,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             const response = await axios.post(`${serverUrl}/api/ai/review`, {
                 code,
                 problem: roomState?.problem,
-                language: selectedLanguage,
+                language: selectedLanguageRef.current,
             }, {
                 headers: getAuthHeaders(),
             });
@@ -485,10 +500,23 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     useEffect(() => {
         if (!editorRef.current || !roomState) return;
 
-        const nextLanguage = LANGUAGE_OPTIONS[roomState.language] ? roomState.language : DEFAULT_LANGUAGE;
-        selectedLanguageRef.current = nextLanguage;
-        setSelectedLanguage(nextLanguage);
-        editorRef.current.setOption("mode", LANGUAGE_OPTIONS[nextLanguage].editorMode);
+        const serverLanguage = roomState.language;
+        if (serverLanguage && LANGUAGE_OPTIONS[serverLanguage]) {
+            if (serverLanguage === selectedLanguageRef.current) {
+                isUserLanguageChangeRef.current = false;
+            } else if (!isUserLanguageChangeRef.current) {
+                const nextLanguage = serverLanguage;
+                selectedLanguageRef.current = nextLanguage;
+                setSelectedLanguage(nextLanguage);
+                editorRef.current.setOption("mode", LANGUAGE_OPTIONS[nextLanguage].editorMode);
+                const cur = editorRef.current.getValue();
+                if (codeIsSafeToReplaceForLanguageSwitch(cur)) {
+                    const nextCode = LANGUAGE_OPTIONS[nextLanguage].starterCode;
+                    editorRef.current.setValue(nextCode);
+                    socketRef.current?.emit("code-change", { roomId, code: nextCode });
+                }
+            }
+        }
 
         // Only set the value if the editor is currently empty (initial load)
         const currentCode = editorRef.current.getValue();
@@ -622,9 +650,19 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         socket.on("language-change", ({ language }) => {
             if (!LANGUAGE_OPTIONS[language]) return;
 
+            // Don't override if this is a user-initiated change (to prevent echo)
+            if (isUserLanguageChangeRef.current) return;
+
             selectedLanguageRef.current = language;
             setSelectedLanguage(language);
             editorRef.current?.setOption("mode", LANGUAGE_OPTIONS[language].editorMode);
+
+            const cur = editorRef.current?.getValue() ?? "";
+            if (codeIsSafeToReplaceForLanguageSwitch(cur)) {
+                const nextCode = LANGUAGE_OPTIONS[language].starterCode;
+                editorRef.current?.setValue(nextCode);
+                socketRef.current?.emit("code-change", { roomId, code: nextCode });
+            }
         });
 
         return () => {
@@ -670,7 +708,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             if (showDropdown) {
                 const dropdown = event.target.closest('.ai-dropdown');
                 const aiButton = event.target.closest('.ai-button');
-                
+
                 if (!dropdown && !aiButton) {
                     closeDropdown();
                 }
@@ -849,131 +887,136 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     };
 
     const syncCodeToRoom = (nextCode) => {
-      socketRef.current?.emit("code-change", {
-        roomId,
-        code: nextCode,
-      });
+        socketRef.current?.emit("code-change", {
+            roomId,
+            code: nextCode,
+        });
     };
 
+    const handleLanguageChange = useCallback((event) => {
+        const next = event.target.value;
+        if (!LANGUAGE_OPTIONS[next]) return;
+
+        const prevLang = selectedLanguageRef.current;
+        if (prevLang === next) return;
+
+        const currentCode = editorRef.current?.getValue() ?? "";
+        const safeReplace = codeIsSafeToReplaceForLanguageSwitch(currentCode);
+
+        if (!safeReplace) {
+            const ok = window.confirm(
+                `Switch to ${LANGUAGE_OPTIONS[next].label}? The editor will be reset to the default template for that language and your current code will be replaced.`,
+            );
+            if (!ok) {
+                event.target.value = prevLang;
+                return;
+            }
+        }
+
+        const nextCode = LANGUAGE_OPTIONS[next].starterCode;
+
+        isUserLanguageChangeRef.current = true;
+        selectedLanguageRef.current = next;
+        setSelectedLanguage(next);
+        editorRef.current?.setOption("mode", LANGUAGE_OPTIONS[next].editorMode);
+        editorRef.current?.setValue(nextCode);
+        socketRef.current?.emit("code-change", { roomId, code: nextCode });
+        socketRef.current?.emit("language-change", { roomId, language: next });
+    }, [roomId]);
+
     const handleResetCode = () => {
-      const nextCode = LANGUAGE_OPTIONS[selectedLanguage].starterCode;
-      editorRef.current?.setValue(nextCode);
-      syncCodeToRoom(nextCode);
+        const nextCode = LANGUAGE_OPTIONS[selectedLanguageRef.current].starterCode;
+        editorRef.current?.setValue(nextCode);
+        syncCodeToRoom(nextCode);
     };
 
     const handleFormatCode = () => {
-      const currentCode = editorRef.current?.getValue() ?? "";
-      const formattedCode = formatCode(selectedLanguage, currentCode);
+        const currentCode = editorRef.current?.getValue() ?? "";
+        const formattedCode = formatCode(selectedLanguageRef.current, currentCode);
 
-      if (formattedCode !== currentCode) {
-        editorRef.current?.setValue(formattedCode);
-        syncCodeToRoom(formattedCode);
-        toast.success("Code formatted");
-      } else {
-        toast("Code is already formatted enough for the current formatter.");
-      }
+        if (formattedCode !== currentCode) {
+            editorRef.current?.setValue(formattedCode);
+            syncCodeToRoom(formattedCode);
+            toast.success("Code formatted");
+        } else {
+            toast("Code is already formatted enough for the current formatter.");
+        }
     };
-
-    const handleLanguageChange = (event) => {
-      const nextLanguage = event.target.value;
-      const nextLanguageConfig = LANGUAGE_OPTIONS[nextLanguage];
-      const currentLanguageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current];
-      const currentCode = editorRef.current?.getValue() ?? "";
-      const currentStarterCode = currentLanguageConfig?.starterCode ?? "";
-      const nextStarterCode = nextLanguageConfig.starterCode;
-      const shouldReplaceCode =
-        currentCode.trim().length === 0 || currentCode === currentStarterCode;
-
-      selectedLanguageRef.current = nextLanguage;
-      setSelectedLanguage(nextLanguage);
-      editorRef.current?.setOption("mode", nextLanguageConfig.editorMode);
-
-      socketRef.current?.emit("language-change", {
-        roomId,
-        language: nextLanguage,
-      });
-
-      if (shouldReplaceCode && editorRef.current) {
-        editorRef.current.setValue(nextStarterCode);
-        syncCodeToRoom(nextStarterCode);
-      }
-    };
-
 
     const runCode = async () => {
-  if (!canRunInCurrentMode) {
-    toast.error("Only the Driver can run code in mock mode.");
-    return;
-  }
-  const rawCode = editorRef.current.getValue();
-  const languageConfig = LANGUAGE_OPTIONS[selectedLanguage] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
-  const fallbackSampleInput = sampleInput.trim();
-  const effectiveStdin = sampleInput;
-  const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
-  const normalizedExpectedOutput = normalizeOutput(expectedOutput);
-  setActiveRightTab("output");
+        if (!canRunInCurrentMode) {
+            toast.error("Only the Driver can run code in mock mode.");
+            return;
+        }
+        const rawCode = editorRef.current.getValue();
+        const languageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
+        const fallbackSampleInput = sampleInput.trim();
+        const effectiveStdin = sampleInput;
+        const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
+        const normalizedExpectedOutput = normalizeOutput(expectedOutput);
+        setActiveRightTab("output");
 
-  setLastRunMeta({
-    languageLabel: languageConfig.label,
-    hasStdin: effectiveStdin.trim().length > 0,
-    inputSource,
-    status: "Running",
-    time: null,
-    memory: null,
-    sampleCheck: normalizedExpectedOutput ? "pending" : "not_available",
-  });
-  setOutput(
-    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
-      <div className="flex items-center gap-3">
-        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <span className="text-blue-700 dark:text-blue-400 font-medium">Running Code...</span>
-      </div>
-    </div>
-  );
+        setLastRunMeta({
+            languageLabel: languageConfig.label,
+            hasStdin: effectiveStdin.trim().length > 0,
+            inputSource,
+            status: "Running",
+            time: null,
+            memory: null,
+            sampleCheck: normalizedExpectedOutput ? "pending" : "not_available",
+        });
+        setOutput(
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-blue-700 dark:text-blue-400 font-medium">Running Code...</span>
+                </div>
+            </div>
+        );
 
-  try {
-    const ack = await new Promise((resolve) => {
-      const timeoutId = window.setTimeout(() => {
-        resolve({ ok: false, error: "Realtime run request timed out" });
-      }, 15000);
+        try {
+            const ack = await new Promise((resolve) => {
+                const timeoutId = window.setTimeout(() => {
+                    resolve({ ok: false, error: "Realtime run request timed out" });
+                }, 15000);
 
-      socketRef.current?.emit("run-code", {
-        roomId,
-        code: rawCode,
-        languageId: languageConfig.judge0Id,
-        stdin: effectiveStdin,
-      }, (payload) => {
-        window.clearTimeout(timeoutId);
-        resolve(payload);
-      });
-    });
+                socketRef.current?.emit("run-code", {
+                    roomId,
+                    code: rawCode,
+                    languageId: languageConfig.judge0Id,
+                    stdin: effectiveStdin,
+                }, (payload) => {
+                    window.clearTimeout(timeoutId);
+                    resolve(payload);
+                });
+            });
 
-    if (!ack?.ok) {
-      throw new Error(ack?.error || "Run request failed");
-    }
-  } catch (error) {
-    const runErrorMessage =
-      error?.response?.data?.error ||
-      error?.message ||
-      "Run request failed";
-    setLastRunMeta({
-      languageLabel: languageConfig.label,
-      hasStdin: effectiveStdin.trim().length > 0,
-      inputSource,
-      status: "Request Failed",
-      time: null,
-      memory: null,
-      sampleCheck: normalizedExpectedOutput ? "not_checked" : "not_available",
-    });
-    setOutput(
-      <div className="dark:text-red-200 p-4 text-red-800">
-        <p>Error running code: {runErrorMessage}</p>
-      </div>
-    );
-    setShowOutputModal(true);
-    toast.error(runErrorMessage);
-  }
-};
+            if (!ack?.ok) {
+                throw new Error(ack?.error || "Run request failed");
+            }
+        } catch (error) {
+            const runErrorMessage =
+                error?.response?.data?.error ||
+                error?.message ||
+                "Run request failed";
+            setLastRunMeta({
+                languageLabel: languageConfig.label,
+                hasStdin: effectiveStdin.trim().length > 0,
+                inputSource,
+                status: "Request Failed",
+                time: null,
+                memory: null,
+                sampleCheck: normalizedExpectedOutput ? "not_checked" : "not_available",
+            });
+            setOutput(
+                <div className="dark:text-red-200 p-4 text-red-800">
+                    <p>Error running code: {runErrorMessage}</p>
+                </div>
+            );
+            setShowOutputModal(true);
+            toast.error(runErrorMessage);
+        }
+    };
 
     return (
         <div className="flex h-full min-h-0 flex-col bg-transparent">
@@ -987,7 +1030,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         <div className="grid gap-3 md:grid-cols-4">
                             <div className="rounded-[1.35rem] border border-gray-200/80 bg-white/90 p-4 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Language</p>
-                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguageRef.current].label}</p>
                             </div>
                             <div className="rounded-[1.35rem] border border-gray-200/80 bg-white/90 p-4 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Status</p>
@@ -1018,7 +1061,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <polygon points="5,3 19,12 5,21"/>
+                            <polygon points="5,3 19,12 5,21" />
                         </svg>
                         Run
                     </button>
@@ -1029,11 +1072,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         title={editorUnlocked ? 'Reset the shared editor' : 'Only the active editor owner can clear code right now'}
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M3 6h18"/>
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                            <line x1="10" x2="10" y1="11" y2="17"/>
-                            <line x1="14" x2="14" y1="11" y2="17"/>
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                            <line x1="10" x2="10" y1="11" y2="17" />
+                            <line x1="14" x2="14" y1="11" y2="17" />
                         </svg>
                         Clear
                     </button>
@@ -1059,7 +1102,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </select>
                     </div>
                     <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
                     <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
@@ -1086,8 +1129,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 title="Practice room settings"
                             >
                                 <svg className="h-4 w-4 text-gray-600 dark:text-gray-400 group-hover:text-gray-800 dark:group-hover:text-gray-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                                    <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/>
-                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                                    <circle cx="12" cy="12" r="3" />
                                 </svg>
                             </button>
 
@@ -1191,13 +1234,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             </div>
 
             <div className={`grid min-h-0 flex-1 grid-cols-1 ${isOutputCollapsed ? 'xl:grid-cols-[minmax(0,1fr)]' : 'xl:grid-cols-[minmax(0,1fr)_24rem]'}`}>
-                <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${
-                    editorUnlocked
-                        ? 'border-emerald-200/80 dark:border-emerald-800/40'
-                        : 'border-rose-200/80 dark:border-rose-800/40'
-                } bg-white dark:bg-[#0a1324]`}>
-                    <textarea 
-                        id="realtimeEditor" 
+                <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${editorUnlocked
+                    ? 'border-emerald-200/80 dark:border-emerald-800/40'
+                    : 'border-rose-200/80 dark:border-rose-800/40'
+                    } bg-white dark:bg-[#0a1324]`}>
+                    <textarea
+                        id="realtimeEditor"
                         className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
                         placeholder="// Start coding here..."
                     />
@@ -1225,11 +1267,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                         key={tab.key}
                                         type="button"
                                         onClick={() => setActiveRightTab(tab.key)}
-                                        className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${
-                                            activeRightTab === tab.key
-                                                ? "bg-white text-gray-900 shadow-sm dark:bg-slate-900 dark:text-white"
-                                                : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                                        }`}
+                                        className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${activeRightTab === tab.key
+                                            ? "bg-white text-gray-900 shadow-sm dark:bg-slate-900 dark:text-white"
+                                            : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                                            }`}
                                     >
                                         {tab.label}
                                     </button>
@@ -1247,18 +1288,17 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                             </div>
                                         )}
                                         <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                            {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguage].label}
+                                            {lastRunMeta?.languageLabel || LANGUAGE_OPTIONS[selectedLanguageRef.current].label}
                                         </div>
                                         <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                             status: {lastRunMeta?.status || "idle"}
                                         </div>
-                                        <div className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                                            lastRunMeta?.sampleCheck === "passed"
-                                                ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-200"
-                                                : lastRunMeta?.sampleCheck === "mismatch"
-                                                    ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200"
-                                                    : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                                        }`}>
+                                        <div className={`rounded-full border px-3 py-1 text-xs font-medium ${lastRunMeta?.sampleCheck === "passed"
+                                            ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-200"
+                                            : lastRunMeta?.sampleCheck === "mismatch"
+                                                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200"
+                                                : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                                            }`}>
                                             sample: {lastRunMeta?.sampleCheck === "passed"
                                                 ? "passed"
                                                 : lastRunMeta?.sampleCheck === "mismatch"
@@ -1312,13 +1352,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                                     <div className="flex items-center gap-2">
                                                         <div className={`h-1.5 w-1.5 rounded-full ${run.passed ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{run.status}</span>
-                                                        <span className={`rounded-full px-2 py-0.5 text-xs ${
-                                                            run.sampleCheck === 'passed'
-                                                                ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-200'
-                                                                : run.sampleCheck === 'mismatch'
-                                                                    ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-200'
-                                                                    : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-300'
-                                                        }`}>
+                                                        <span className={`rounded-full px-2 py-0.5 text-xs ${run.sampleCheck === 'passed'
+                                                            ? 'bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-200'
+                                                            : run.sampleCheck === 'mismatch'
+                                                                ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-200'
+                                                                : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-300'
+                                                            }`}>
                                                             {run.sampleCheck === 'passed' ? 'Passed sample' : run.sampleCheck === 'mismatch' ? 'Mismatch' : 'No check'}
                                                         </span>
                                                     </div>
