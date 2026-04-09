@@ -287,10 +287,11 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
 
     const handleCopyRoomId = async () => {
         try {
-            await navigator.clipboard.writeText(roomId);
-            toast.success('Room ID copied');
+            const inviteUrl = `${window.location.origin}/editor/${roomId}`;
+            await navigator.clipboard.writeText(inviteUrl);
+            toast.success('Room link copied');
         } catch {
-            toast.error('Failed to copy room ID');
+            toast.error('Failed to copy link');
         }
     };
 
@@ -413,11 +414,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                         <div className="mb-4 flex items-center justify-between">
                             <div>
                                 <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                                    Workspace Brief
+                                    Brief
                                 </h3>
-                                <p className="mt-1 text-xs text-stone-500 dark:text-slate-400">
-                                    Keep problem details and session tools separated.
-                                </p>
                             </div>
                             <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:bg-[#111d33] dark:text-slate-300">
                                 Shared
@@ -428,10 +426,10 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('problem')}
-                                className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${
+                                className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm font-medium transition ${
                                     activeTab === 'problem'
-                                        ? 'bg-white text-stone-900 shadow-sm dark:bg-slate-900 dark:text-white'
-                                        : 'text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
+                                        ? 'border-amber-500 bg-white text-stone-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white'
+                                        : 'border-transparent text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
                                 }`}
                             >
                                 Problem
@@ -439,10 +437,10 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('session')}
-                                className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${
+                                className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm font-medium transition ${
                                     activeTab === 'session'
-                                        ? 'bg-white text-stone-900 shadow-sm dark:bg-slate-900 dark:text-white'
-                                        : 'text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
+                                        ? 'border-amber-500 bg-white text-stone-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white'
+                                        : 'border-transparent text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
                                 }`}
                             >
                                 Session
@@ -743,8 +741,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                     <button
                         onClick={handleCopyRoomId}
                         className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                        aria-label="Copy practice room ID"
-                        title="Copy practice room ID"
+                        aria-label="Copy room link"
+                        title="Copy room link"
                     >
                         <svg className="h-4 w-4 text-gray-700 dark:text-gray-300 group-hover:text-black dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
                             <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
@@ -756,7 +754,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                     <button
                         onClick={handleGoHome}
                         className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
-                        aria-label="Go to home"
+                        aria-label="Home"
                         title="Home"
                     >
                         <svg className="h-4 w-4 text-gray-700 dark:text-gray-300 group-hover:text-black dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">

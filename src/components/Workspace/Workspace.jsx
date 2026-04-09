@@ -31,6 +31,14 @@ function codeIsSafeToReplaceForLanguageSwitch(raw) {
     });
 }
 
+function codeMatchesLanguageStarter(raw, languageKey) {
+    const opt = LANGUAGE_OPTIONS[languageKey];
+    if (!opt) return false;
+    return (
+        normalizeEditorText(raw).trimEnd() === normalizeEditorText(opt.starterCode).trimEnd()
+    );
+}
+
 function OutputSection({ tone, title, children }) {
     const toneClasses = {
         success: "border-green-200 bg-green-50 text-green-900 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-100",
@@ -228,6 +236,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState("output");
     const [runBy, setRunBy] = useState('');
+    const [editorContentVersion, setEditorContentVersion] = useState(0);
+    const [collabHintDismissed, setCollabHintDismissed] = useState(false);
+
+    useEffect(() => {
+        setCollabHintDismissed(false);
+    }, [roomId]);
 
     const renderReviewContent = () => {
         if (isReviewLoading) {
@@ -451,6 +465,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
             editorRef.current.on("change", (instance, changes) => {
                 const { origin } = changes;
+                setEditorContentVersion((v) => v + 1);
+                if (origin !== "setValue") {
+                    setCollabHintDismissed(true);
+                }
                 const code = instance.getValue();
                 if (origin !== "setValue") {
                     socketRef.current.emit("code-change", {
@@ -829,11 +847,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
     const handleCopyRoomId = async () => {
         try {
-            await navigator.clipboard.writeText(roomId);
-            toast.success("Room ID copied");
+            const inviteUrl = `${window.location.origin}/editor/${roomId}`;
+            await navigator.clipboard.writeText(inviteUrl);
+            toast.success("Room link copied");
             setShowSettings(false);
         } catch {
-            toast.error("Failed to copy room ID");
+            toast.error("Failed to copy link");
         }
     };
 
@@ -915,6 +934,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
         const nextCode = LANGUAGE_OPTIONS[next].starterCode;
 
+        setCollabHintDismissed(false);
         isUserLanguageChangeRef.current = true;
         selectedLanguageRef.current = next;
         setSelectedLanguage(next);
@@ -925,6 +945,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     }, [roomId]);
 
     const handleResetCode = () => {
+        setCollabHintDismissed(false);
         const nextCode = LANGUAGE_OPTIONS[selectedLanguageRef.current].starterCode;
         editorRef.current?.setValue(nextCode);
         syncCodeToRoom(nextCode);
@@ -1018,6 +1039,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         }
     };
 
+    /* editorContentVersion bumps on each CodeMirror change so visibility recomputes when the buffer updates. */
+    const collaborationHintVisible = useMemo(() => {
+        if (collabHintDismissed || !editorRef.current) return false;
+        return codeMatchesLanguageStarter(editorRef.current.getValue(), selectedLanguage);
+    }, [collabHintDismissed, selectedLanguage, editorContentVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- editorContentVersion is an intentional invalidation signal
+
     return (
         <div className="flex h-full min-h-0 flex-col bg-transparent">
             {showOutputModal && output && (
@@ -1055,23 +1082,23 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-2.5 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
                     <button
-                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-800 bg-black px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-200 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                        className="inline-flex h-11 min-h-[2.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-teal-600 px-6 text-base font-semibold text-white shadow-md shadow-teal-600/25 ring-2 ring-amber-400/55 ring-offset-2 ring-offset-white transition-all hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-[#081121] dark:hover:bg-teal-500"
                         onClick={runCode}
                         disabled={!canRunInCurrentMode}
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
                     >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <polygon points="5,3 19,12 5,21" />
                         </svg>
                         Run
                     </button>
                     <button
-                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gray-200 bg-white/92 px-4 text-sm font-medium text-black shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white dark:hover:bg-gray-700"
+                        className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-gray-100 px-2.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                         onClick={handleResetCode}
                         disabled={!editorUnlocked}
                         title={editorUnlocked ? 'Reset the shared editor' : 'Only the active editor owner can clear code right now'}
                     >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h18" />
                             <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                             <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
@@ -1092,11 +1119,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             value={selectedLanguage}
                             onChange={handleLanguageChange}
                             disabled={!editorUnlocked}
-                            className="h-8 min-w-[110px] rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-[#111d33] dark:text-white"
+                            title={LANGUAGE_OPTIONS[selectedLanguage]?.label || "Language"}
+                            className="h-8 min-w-[128px] rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-[#111d33] dark:text-white"
                         >
                             {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
                                 <option key={languageKey} value={languageKey}>
-                                    {config.label}
+                                    {`${config.optionGlyph ?? ""} ${config.label}`.trim()}
                                 </option>
                             ))}
                         </select>
@@ -1151,7 +1179,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                         onClick={handleCopyRoomId}
                                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                     >
-                                        Copy room ID
+                                        Copy room link
                                     </button>
                                     <button
                                         onClick={handleGoHome}
@@ -1175,7 +1203,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                         key={user.socketId}
                                         style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
                                         className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold text-black dark:border-[#081121]"
-                                        title={user.username}
+                                        title={`${user.username || "Guest"} (${user.role || "Peer"})`}
                                     >
                                         {(user.username || '?').charAt(0).toUpperCase()}
                                     </div>
@@ -1240,9 +1268,19 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     } bg-white dark:bg-[#0a1324]`}>
                     <textarea
                         id="realtimeEditor"
-                        className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none placeholder:text-gray-500 dark:text-white dark:placeholder:text-gray-400"
-                        placeholder="// Start coding here..."
+                        className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none dark:text-white"
+                        placeholder=""
                     />
+                    {collaborationHintVisible ? (
+                        <div
+                            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-8"
+                            aria-hidden
+                        >
+                            <p className="max-w-sm text-center text-sm font-medium leading-relaxed text-gray-400 select-none dark:text-gray-500">
+                                Start coding together...
+                            </p>
+                        </div>
+                    ) : null}
                 </div>
 
                 <aside className={`${isOutputCollapsed ? 'hidden xl:hidden' : 'block'} overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left`}>
@@ -1253,7 +1291,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
                                 <div className="h-3 w-3 rounded-full bg-green-500"></div>
                             </div>
-                            <span className="ml-2 text-sm font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Right Panel</span>
                         </div>
 
                         <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-3 dark:border-gray-700/80 dark:bg-[#0d172b]">
@@ -1267,9 +1304,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                         key={tab.key}
                                         type="button"
                                         onClick={() => setActiveRightTab(tab.key)}
-                                        className={`rounded-[0.95rem] px-3 py-2 text-sm font-medium transition ${activeRightTab === tab.key
-                                            ? "bg-white text-gray-900 shadow-sm dark:bg-slate-900 dark:text-white"
-                                            : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                                        className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm font-medium transition ${activeRightTab === tab.key
+                                            ? "border-amber-500 bg-white text-gray-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white"
+                                            : "border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                                             }`}
                                     >
                                         {tab.label}

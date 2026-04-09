@@ -123,10 +123,13 @@ function SolutionAnalyzer() {
                                 <select
                                     value={language}
                                     onChange={(event) => setLanguage(event.target.value)}
+                                    title={LANGUAGE_OPTIONS[language]?.label || "Language"}
                                     className="w-full rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                                 >
                                     {Object.entries(LANGUAGE_OPTIONS).map(([key, value]) => (
-                                        <option key={key} value={key}>{value.label}</option>
+                                        <option key={key} value={key}>
+                                            {`${value.optionGlyph ?? ""} ${value.label}`.trim()}
+                                        </option>
                                     ))}
                                 </select>
                             </label>
