@@ -21,6 +21,18 @@ import User from "./models/User.js";
 import Room from "./models/Room.js";
 import Analysis from "./models/Analysis.js";
 import MockSummary from "./models/MockSummary.js";
+import {
+  appendIntelligenceEvent,
+  aggregateSessionReport,
+  buildProblemSnapshot,
+  deriveIssueLabelsFromReview,
+  fetchIntelligenceLog,
+  loadIntelligenceLogsFromFile,
+  markIntelligenceSessionEnded,
+  saveShareableReport,
+  getReportByShareId,
+  listReportsForUser,
+} from "./services/sessionIntelligence.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
 mongoose.set("bufferCommands", false);
@@ -324,6 +336,9 @@ function createDefaultProblemState() {
     sampleInput: "",
     sampleOutput: "",
     samples: [],
+    tags: [],
+    rating: "",
+    difficulty: "",
   };
 }
 
@@ -395,6 +410,8 @@ function createDefaultSessionState() {
     mentorNotes: "",
     mockSummary: null,
     mockLocked: false,
+    intelligenceSessionId: "",
+    intelligenceStartedAt: "",
   };
 }
 
@@ -437,6 +454,14 @@ function attachNormalizedSession(session = {}) {
       typeof session?.mockLocked === "boolean"
         ? session.mockLocked
         : defaults.mockLocked,
+    intelligenceSessionId:
+      typeof session?.intelligenceSessionId === "string"
+        ? session.intelligenceSessionId
+        : defaults.intelligenceSessionId,
+    intelligenceStartedAt:
+      typeof session?.intelligenceStartedAt === "string"
+        ? session.intelligenceStartedAt
+        : defaults.intelligenceStartedAt,
   };
 }
 
@@ -572,6 +597,18 @@ function getOrCreateRoomState(roomId) {
   }
 
   return roomStateMap.get(roomId);
+}
+
+function ensureIntelligenceSession(roomState) {
+  if (!roomState?.session) return;
+  if (!roomState.session.intelligenceSessionId) {
+    roomState.session = attachNormalizedSession({
+      ...roomState.session,
+      intelligenceSessionId: crypto.randomUUID(),
+      intelligenceStartedAt: new Date().toISOString(),
+    });
+    scheduleRoomStatePersist();
+  }
 }
 
 async function getUserFromAuthHeader(req) {
@@ -1077,6 +1114,16 @@ function attachNormalizedSamples(problem = {}) {
           normalizedProblem.sampleOutput,
         );
 
+  const tagsRaw = normalizedProblem.tags;
+  const tags = Array.isArray(tagsRaw)
+    ? tagsRaw.map((t) => String(t).trim()).filter(Boolean)
+    : typeof tagsRaw === "string"
+      ? tagsRaw
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+
   return {
     ...normalizedProblem,
     problemUrl:
@@ -1086,6 +1133,9 @@ function attachNormalizedSamples(problem = {}) {
     sampleInput: normalizeWhitespace(normalizedProblem.sampleInput),
     sampleOutput: normalizeWhitespace(normalizedProblem.sampleOutput),
     samples,
+    tags,
+    rating: normalizedProblem.rating || "",
+    difficulty: normalizedProblem.difficulty || normalizedProblem.rating || "",
   };
 }
 
@@ -1746,7 +1796,8 @@ app.post("/api/ai-hints", aiLimiter, async (req, res) => {
 });
 
 app.post("/api/ai/review", aiLimiter, async (req, res) => {
-  const { code, problem, language } = req.body || {};
+  const { code, problem, language, roomId: reviewRoomId = "" } = req.body || {};
+  const reviewUser = await getUserFromAuthHeader(req);
   const mistralKey = getMistralApiKey();
   const geminiKey = getGeminiApiKey();
   const groqKey = getGroqApiKey();
@@ -1835,6 +1886,31 @@ ${code}
         optimization_suggestion: null,
         summary: review,
       };
+    }
+
+    if (reviewRoomId && reviewUser) {
+      const rs = getOrCreateRoomState(reviewRoomId);
+      ensureIntelligenceSession(rs);
+      const sid = rs.session.intelligenceSessionId;
+      if (sid) {
+        const issueLabels = deriveIssueLabelsFromReview(jsonResponse);
+        void appendIntelligenceEvent(
+          isDatabaseConnected,
+          sid,
+          reviewRoomId,
+          buildProblemSnapshot(rs.problem),
+          {
+            type: "ai_review",
+            userId: String(reviewUser._id),
+            username: reviewUser.name || "User",
+            socketId: "",
+            payload: {
+              ...jsonResponse,
+              issueLabels,
+            },
+          },
+        );
+      }
     }
 
     res.json(jsonResponse);
@@ -2385,6 +2461,33 @@ app.post("/api/run-sample-suite", async (req, res) => {
           ? "samples_passed"
           : "samples_failed",
       });
+
+      if (roomId && roomState) {
+        ensureIntelligenceSession(roomState);
+        const sid = roomState.session.intelligenceSessionId;
+        const summary = {
+          total: results.length,
+          passed: results.filter((result) => result.passed).length,
+          failed: results.filter((result) => !result.passed).length,
+        };
+        void appendIntelligenceEvent(
+          isDatabaseConnected,
+          sid,
+          roomId,
+          buildProblemSnapshot(roomState.problem),
+          {
+            type: "submit_samples",
+            userId: String(authenticatedUser._id),
+            username: authenticatedUser.name || "User",
+            socketId: "",
+            payload: {
+              summary,
+              allPassed: results.every((result) => result.passed),
+              compileHalt: results.some((result) => result.compile_output),
+            },
+          },
+        );
+      }
     }
 
     return res.json({
@@ -2400,6 +2503,105 @@ app.post("/api/run-sample-suite", async (req, res) => {
       error: extractUpstreamError(error, "Error running the sample suite"),
     });
   }
+});
+
+app.post("/api/session-intelligence/report", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  const {
+    roomId,
+    endSession = false,
+    saveShare = true,
+    personal,
+    endReason = "session_end",
+  } = req.body || {};
+  /* personal: omit or true = only this user's events when signed in; false / "all" = whole room */
+
+  if (!roomId) {
+    return res.status(400).json({ error: "Missing roomId" });
+  }
+
+  const roomState = getOrCreateRoomState(roomId);
+  ensureIntelligenceSession(roomState);
+  const sessionId = roomState.session.intelligenceSessionId;
+  const logDoc = await fetchIntelligenceLog(isDatabaseConnected, sessionId);
+
+  if (!logDoc || !Array.isArray(logDoc.events) || logDoc.events.length === 0) {
+    return res.status(400).json({
+      error:
+        "No session intelligence data yet. Run code, submit samples against parsed tests, or run a signed-in solution review first.",
+    });
+  }
+
+  const usePersonal =
+    Boolean(user) && personal !== "all" && personal !== false;
+  const filter = usePersonal
+    ? { userId: String(user._id), username: user.name }
+    : {};
+
+  const report = aggregateSessionReport(logDoc, filter);
+  let shareId = null;
+  if (saveShare !== false && saveShare !== "false") {
+    shareId = await saveShareableReport(isDatabaseConnected, {
+      userId: user?._id ? String(user._id) : "",
+      roomId,
+      sessionId,
+      problemTitle: report.problemTitle,
+      report,
+    });
+  }
+
+  if (endSession === true || endSession === "true") {
+    await markIntelligenceSessionEnded(
+      isDatabaseConnected,
+      sessionId,
+      roomId,
+      endReason,
+    );
+    roomState.session = attachNormalizedSession({
+      ...roomState.session,
+      intelligenceSessionId: crypto.randomUUID(),
+      intelligenceStartedAt: new Date().toISOString(),
+    });
+    scheduleRoomStatePersist();
+    persistRoomDocument(roomId, roomState);
+    io.to(roomId).emit("session-update", { session: roomState.session });
+  }
+
+  return res.json({ report, shareId, sessionId });
+});
+
+app.get("/api/session-intelligence/report/:shareId", async (req, res) => {
+  const doc = await getReportByShareId(
+    isDatabaseConnected,
+    req.params.shareId,
+  );
+  if (!doc) {
+    return res.status(404).json({ error: "Report not found" });
+  }
+  return res.json({
+    shareId: doc.shareId,
+    problemTitle: doc.problemTitle,
+    report: doc.report,
+    createdAt: doc.createdAt,
+  });
+});
+
+app.get("/api/session-intelligence/my-reports", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  if (!user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const rows = await listReportsForUser(isDatabaseConnected, String(user._id));
+  return res.json({
+    reports: rows.map((r) => ({
+      shareId: r.shareId,
+      problemTitle: r.problemTitle,
+      sessionId: r.sessionId,
+      roomId: r.roomId,
+      sessionScore: r.report?.sessionScore,
+      createdAt: r.createdAt,
+    })),
+  });
 });
 
 // Socket.io connection handlers
@@ -2493,6 +2695,8 @@ io.on("connection", (socket) => {
         });
         scheduleRoomStatePersist();
       }
+
+      ensureIntelligenceSession(roomState);
 
       const users = getUsersInRoom(roomId);
 
@@ -2659,6 +2863,7 @@ io.on("connection", (socket) => {
       const execution = await executeSubmission({ code, stdin, languageId });
       const runBy = userSocketMap[socket.id]?.username || "Guest";
       const roomState = getOrCreateRoomState(roomId);
+      ensureIntelligenceSession(roomState);
       const normalizedStdout = normalizeOutput(execution.stdout || "");
       const normalizedExpected = normalizeOutput(roomState?.problem?.sampleOutput || "");
       const hasCompileError = Boolean(execution.compile_output);
@@ -2690,6 +2895,32 @@ io.on("connection", (socket) => {
       roomState.session.runHistory = [runEntry, ...roomState.session.runHistory].slice(0, 5);
       scheduleRoomStatePersist();
 
+      const intelId = roomState.session.intelligenceSessionId;
+      const runner = userSocketMap[socket.id];
+      void appendIntelligenceEvent(
+        isDatabaseConnected,
+        intelId,
+        roomId,
+        buildProblemSnapshot(roomState.problem),
+        {
+          type: "run",
+          userId: runner?.userId ? String(runner.userId) : "",
+          username: runner?.username || "Guest",
+          socketId: socket.id,
+          payload: {
+            errorType: hasCompileError
+              ? "compile"
+              : hasRuntimeError
+                ? "runtime"
+                : null,
+            sampleCheck: runEntry.sampleCheck,
+            status: runEntry.status,
+            passed: sampleMatched,
+            languageLabel: runEntry.languageLabel,
+          },
+        },
+      );
+
       io.to(roomId).emit("run-result", {
         result: execution,
         runBy,
@@ -2704,6 +2935,24 @@ io.on("connection", (socket) => {
       callback?.({ ok: false, error: message });
       socket.emit("run-error", { error: message });
     }
+  });
+
+  socket.on("intelligence-session-end", async ({ roomId, reason }) => {
+    if (!roomId) return;
+    const roomState = roomStateMap.get(roomId);
+    const sid = roomState?.session?.intelligenceSessionId;
+    if (!roomState || !sid) return;
+
+    await markIntelligenceSessionEnded(
+      isDatabaseConnected,
+      sid,
+      roomId,
+      reason || "manual_end",
+    );
+    io.to(roomId).emit("intelligence-session-ended", {
+      sessionId: sid,
+      reason: reason || "manual_end",
+    });
   });
 
   socket.on("disconnecting", async () => {
@@ -2760,6 +3009,7 @@ const PORT = process.env.PORT || 5000;
 
 await loadPersistedRoomStates();
 await loadPersistedUserState();
+await loadIntelligenceLogsFromFile();
 
 process.on("SIGINT", async () => {
   await flushRoomStatePersist();

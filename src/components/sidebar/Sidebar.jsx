@@ -208,6 +208,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         sampleInput: '',
         sampleOutput: '',
         samples: [],
+        tags: [],
+        rating: '',
+        difficulty: '',
     });
 
     const hasJoinState = Boolean(location.state);
@@ -253,6 +256,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     };
 
     useEffect(() => {
+        const tagList = roomState?.problem?.tags;
+        const tags = Array.isArray(tagList)
+            ? tagList
+            : typeof tagList === 'string'
+                ? tagList.split(',').map((t) => t.trim()).filter(Boolean)
+                : [];
         setProblemDraft({
             platform: roomState?.problem?.platform || 'codeforces',
             problemCode: roomState?.problem?.problemCode || '',
@@ -264,6 +273,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
             sampleInput: roomState?.problem?.sampleInput || '',
             sampleOutput: roomState?.problem?.sampleOutput || '',
             samples: roomState?.problem?.samples || [],
+            tags,
+            rating: roomState?.problem?.rating || '',
+            difficulty: roomState?.problem?.difficulty || roomState?.problem?.rating || '',
         });
     }, [roomState?.problem]);
 
@@ -485,6 +497,46 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                 className="mt-1.5 h-20 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                             />
                                         </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Tags (comma-separated)
+                                                </p>
+                                                <input
+                                                    type="text"
+                                                    value={Array.isArray(problemDraft.tags) ? problemDraft.tags.join(', ') : ''}
+                                                    onChange={(event) =>
+                                                        setProblemDraft((prev) => ({
+                                                            ...prev,
+                                                            tags: event.target.value
+                                                                .split(',')
+                                                                .map((t) => t.trim())
+                                                                .filter(Boolean),
+                                                        }))
+                                                    }
+                                                    placeholder="dp, greedy, graphs"
+                                                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Rating / difficulty
+                                                </p>
+                                                <input
+                                                    type="text"
+                                                    value={problemDraft.rating || ''}
+                                                    onChange={(event) =>
+                                                        setProblemDraft((prev) => ({
+                                                            ...prev,
+                                                            rating: event.target.value,
+                                                            difficulty: event.target.value,
+                                                        }))
+                                                    }
+                                                    placeholder="e.g. 1200, Medium"
+                                                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="grid gap-3">
                                         <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
@@ -686,6 +738,27 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                             </div>
                                         </div>
                                     )}
+                                    <div className="rounded-[1.35rem] border border-teal-200/80 bg-teal-50/50 p-4 dark:border-teal-800/40 dark:bg-teal-950/20">
+                                        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-800 dark:text-teal-200">
+                                            Session Intelligence
+                                        </h4>
+                                        <p className="mt-2 text-xs leading-5 text-teal-900/90 dark:text-teal-100/80">
+                                            Mark the end of this practice block for logging, then generate a shareable report from the workspace panel.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                socketRef?.current?.emit('intelligence-session-end', {
+                                                    roomId,
+                                                    reason: 'host_end',
+                                                });
+                                                toast.success('Session marked as ended for intelligence logs.');
+                                            }}
+                                            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-900 transition hover:bg-teal-50 dark:border-teal-700 dark:bg-slate-900 dark:text-teal-100 dark:hover:bg-teal-950/40"
+                                        >
+                                            End Session
+                                        </button>
+                                    </div>
                                 </>
                             )}
                         </div>
@@ -737,6 +810,14 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
             </div>
             
             <div className="flex-shrink-0 border-t border-stone-200/80 bg-white p-6 dark:border-slate-700/80 dark:bg-[#081121]">
+                <div className="mb-4 text-center">
+                    <Link
+                        to="/history/reports"
+                        className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700 underline-offset-4 hover:underline dark:text-amber-300"
+                    >
+                        History → Analysis Reports
+                    </Link>
+                </div>
                 <div className="flex justify-center gap-4">
                     <button
                         onClick={handleCopyRoomId}

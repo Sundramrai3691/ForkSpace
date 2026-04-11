@@ -15,7 +15,7 @@ import "codemirror/addon/edit/closebrackets";
 import useAIHint from "./AIHint";
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
 import { formatCode } from "./formatCode";
-import { getAuthHeaders } from "../../lib/auth";
+import { getAuthHeaders, getAuthToken } from "../../lib/auth";
 
 function normalizeEditorText(text) {
     return String(text ?? "").replace(/\r\n/g, "\n");
@@ -236,6 +236,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState("output");
     const [runBy, setRunBy] = useState('');
+    const [reportLoading, setReportLoading] = useState(false);
+    const [lastReportPayload, setLastReportPayload] = useState(null);
+    const [lastShareId, setLastShareId] = useState('');
     const [editorContentVersion, setEditorContentVersion] = useState(0);
     const [collabHintDismissed, setCollabHintDismissed] = useState(false);
 
@@ -432,6 +435,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 code,
                 problem: roomState?.problem,
                 language: selectedLanguageRef.current,
+                roomId,
             }, {
                 headers: getAuthHeaders(),
             });
@@ -822,6 +826,29 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 },
             });
             toast.success("Mock timer complete. Session snapshot saved.");
+
+            if (getAuthToken()) {
+                try {
+                    const intelRes = await axios.post(
+                        `${serverUrl}/api/session-intelligence/report`,
+                        {
+                            roomId,
+                            saveShare: true,
+                            endSession: true,
+                            endReason: "mock_timer",
+                        },
+                        { headers: getAuthHeaders() },
+                    );
+                    if (intelRes.data?.shareId) {
+                        setLastShareId(intelRes.data.shareId);
+                        setLastReportPayload(intelRes.data.report);
+                        setActiveRightTab("report");
+                        toast.success("Session intelligence report saved.");
+                    }
+                } catch {
+                    /* optional — room may have no intelligence events yet */
+                }
+            }
         };
 
         finishMockRound();
@@ -840,6 +867,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         roomId,
         roomState?.problem?.title,
         session,
+        serverUrl,
         socketRef,
         timeRemaining,
         timerDuration,
@@ -1039,6 +1067,127 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         }
     };
 
+    const generateSessionReport = async (options = {}) => {
+        const { endSession = false, endReason = "manual", wholeRoom = false } = options;
+        setReportLoading(true);
+        try {
+            const res = await axios.post(
+                `${serverUrl}/api/session-intelligence/report`,
+                {
+                    roomId,
+                    saveShare: true,
+                    endSession,
+                    endReason: endSession ? endReason : undefined,
+                    personal: wholeRoom ? "all" : undefined,
+                },
+                { headers: getAuthHeaders() },
+            );
+            setLastReportPayload(res.data.report);
+            setLastShareId(res.data.shareId || "");
+            setActiveRightTab("report");
+            toast.success("Session intelligence report is ready.");
+        } catch (error) {
+            const msg =
+                error?.response?.data?.error ||
+                error?.message ||
+                "Could not generate report";
+            toast.error(msg);
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
+    const submitSamples = async () => {
+        if (!canRunInCurrentMode) {
+            toast.error("Only the Driver can run code in mock mode.");
+            return;
+        }
+        const samples = roomState?.problem?.samples || [];
+        if (!samples.length) {
+            toast.error("Add sample tests in the brief (parsed samples) before submitting.");
+            return;
+        }
+        const rawCode = editorRef.current?.getValue() || "";
+        const languageConfig =
+            LANGUAGE_OPTIONS[selectedLanguageRef.current] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
+        setActiveRightTab("output");
+        setLastRunMeta({
+            languageLabel: languageConfig.label,
+            hasStdin: true,
+            inputSource: "suite",
+            status: "Submitting samples...",
+            time: null,
+            memory: null,
+            sampleCheck: "pending",
+        });
+        setOutput(
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Running full sample suite…</p>
+            </div>,
+        );
+        try {
+            const { data } = await axios.post(
+                `${serverUrl}/api/run-sample-suite`,
+                {
+                    code: rawCode,
+                    languageId: languageConfig.judge0Id,
+                    samples,
+                    roomId,
+                },
+                { headers: getAuthHeaders() },
+            );
+            const { results, summary } = data;
+            const allPass = summary?.failed === 0 && summary?.passed === summary?.total;
+            setLastRunMeta({
+                languageLabel: languageConfig.label,
+                hasStdin: true,
+                inputSource: "suite",
+                status: allPass ? "All samples passed" : "Some samples failed",
+                time: null,
+                memory: null,
+                sampleCheck: allPass ? "passed" : "mismatch",
+            });
+            const blocks = (
+                <div className="space-y-3 text-sm">
+                    <OutputSection tone={allPass ? "success" : "warning"} title="Sample suite">
+                        {`Passed ${summary?.passed ?? 0} / ${summary?.total ?? 0}`}
+                    </OutputSection>
+                    {results?.map((r) => (
+                        <div key={r.id || r.index} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+                            <p className="font-semibold text-gray-900 dark:text-white">Test {r.index}{r.passed ? " ✓" : " ✗"}</p>
+                            {r.compile_output ? (
+                                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-gray-800 dark:text-gray-200">{r.compile_output}</pre>
+                            ) : null}
+                            {r.stderr ? (
+                                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-red-700 dark:text-red-300">{r.stderr}</pre>
+                            ) : null}
+                            {!r.passed && !r.compile_output && !r.stderr ? (
+                                <div className="mt-2">
+                                    <ComparisonPanel expectedOutput={r.expectedOutput} actualOutput={r.actualOutput} />
+                                </div>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+            );
+            setOutput(blocks);
+            setShowOutputModal(true);
+            if (allPass) {
+                toast.success("All parsed samples passed.");
+            } else {
+                toast.error("Sample suite reported failures.");
+            }
+        } catch (error) {
+            const msg = error?.response?.data?.error || error?.message || "Submit failed";
+            toast.error(msg);
+            setLastRunMeta((prev) => ({
+                ...(prev || {}),
+                status: "Submit failed",
+                sampleCheck: "not_checked",
+            }));
+        }
+    };
+
     /* editorContentVersion bumps on each CodeMirror change so visibility recomputes when the buffer updates. */
     const collaborationHintVisible = useMemo(() => {
         if (collabHintDismissed || !editorRef.current) return false;
@@ -1091,6 +1240,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             <polygon points="5,3 19,12 5,21" />
                         </svg>
                         Run
+                    </button>
+                    <button
+                        className="inline-flex h-11 min-h-[2.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-teal-500/80 bg-white px-5 text-base font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-teal-600 dark:bg-[#0a1324] dark:text-teal-100 dark:hover:bg-teal-950/40 dark:ring-offset-[#081121]"
+                        onClick={submitSamples}
+                        disabled={!canRunInCurrentMode}
+                        title={canRunInCurrentMode ? "Run all parsed sample tests (Judge0)" : "Only the Driver can submit in mock mode"}
+                    >
+                        Submit
                     </button>
                     <button
                         className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-gray-100 px-2.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -1294,11 +1451,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </div>
 
                         <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-3 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                            <div className="grid grid-cols-3 gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1 dark:border-gray-700/80 dark:bg-slate-950/40">
+                            <div className="flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1 dark:border-gray-700/80 dark:bg-slate-950/40">
                                 {[
                                     { key: "output", label: "Output" },
                                     { key: "history", label: "History" },
-                                    { key: "ai", label: "AI" },
+                                    { key: "ai", label: "Intelligence" },
+                                    { key: "report", label: "Report" },
                                 ].map((tab) => (
                                     <button
                                         key={tab.key}
@@ -1430,6 +1588,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
                             {activeRightTab === "ai" && (
                                 <div className="space-y-5">
+                                    <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                        Session Intelligence: edge checklist, AI hints, and solution review (same flow as before).
+                                    </p>
                                     <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                                         <div className="mb-3 flex items-center justify-between gap-3">
                                             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
@@ -1481,7 +1642,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                             onClick={reviewSolution}
                                             className="inline-flex flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
                                         >
-                                            Review Solution
+                                            Review solution
                                         </button>
                                         <button
                                             type="button"
@@ -1516,6 +1677,107 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     </div>
 
                                     {renderReviewContent()}
+                                </div>
+                            )}
+
+                            {activeRightTab === "report" && (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={reportLoading}
+                                            onClick={() => generateSessionReport({ endSession: false })}
+                                            className="inline-flex flex-1 min-w-[8rem] items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200 dark:hover:bg-amber-900/35"
+                                        >
+                                            {reportLoading ? "Working…" : "Generate Report"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={reportLoading}
+                                            onClick={() =>
+                                                generateSessionReport({
+                                                    endSession: true,
+                                                    endReason: "manual_end",
+                                                })
+                                            }
+                                            className="inline-flex flex-1 min-w-[8rem] items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-stone-50 disabled:opacity-60 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:bg-[#16243d]"
+                                        >
+                                            Generate and end session
+                                        </button>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={reportLoading}
+                                        onClick={() => generateSessionReport({ wholeRoom: true })}
+                                        className="w-full rounded-xl border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-stone-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-slate-800/60"
+                                    >
+                                        Use whole-room activity (all participants)
+                                    </button>
+                                    {lastShareId ? (
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const url = `${window.location.origin}/report/${lastShareId}`;
+                                                await navigator.clipboard.writeText(url);
+                                                toast.success("Share link copied");
+                                            }}
+                                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+                                        >
+                                            Copy share link
+                                        </button>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Generate a report to get a shareable link. Sign in to keep reports in History → Analysis Reports.
+                                        </p>
+                                    )}
+                                    {lastReportPayload ? (
+                                        <div className="space-y-4 rounded-[1.35rem] border border-gray-200/80 bg-white/95 p-4 dark:border-gray-700/80 dark:bg-slate-900/80">
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Session score</p>
+                                                <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{lastReportPayload.sessionScore}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">How you think</p>
+                                                <p className="mt-1 text-sm leading-6 text-gray-800 dark:text-gray-200">{lastReportPayload.howYouThink}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">Strongest signals</p>
+                                                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
+                                                    {(lastReportPayload.strongestSignals || []).map((s, i) => (
+                                                        <li key={i}>{s}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300">Biggest gaps</p>
+                                                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
+                                                    {(lastReportPayload.biggestGaps || []).map((s, i) => (
+                                                        <li key={i}>{s}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Next steps</p>
+                                                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
+                                                    {(lastReportPayload.nextSteps || []).map((s, i) => (
+                                                        <li key={i}>{s}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">Next practice targets</p>
+                                                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
+                                                    {(lastReportPayload.nextPracticeTargets || []).map((s, i) => (
+                                                        <li key={i}>{s}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+                                            Run code, submit samples, or run a signed-in solution review, then generate your report here.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
