@@ -4,6 +4,7 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { ThemeContext } from '../../../Context/ThemeContext';
 import { clearAuthToken, getAuthHeaders, getAuthToken, onAuthChange, setAuthToken } from '../../lib/auth';
+import CodeforcesProblemPicker from '../codeforces/CodeforcesProblemPicker';
 
 function FormComp() {
     const navigate = useNavigate();
@@ -19,6 +20,9 @@ function FormComp() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [history, setHistory] = useState({ rooms: [], runs: [] });
+    const [problemSource, setProblemSource] = useState('manual');
+    const [cfInternalProblemId, setCfInternalProblemId] = useState('');
+    const [showCfPicker, setShowCfPicker] = useState(false);
     const [authForm, setAuthForm] = useState({
         name: '',
         email: '',
@@ -105,11 +109,19 @@ function FormComp() {
             return;
         }
 
+        if (problemSource === 'codeforces' && !cfInternalProblemId.trim()) {
+            toast.error('Choose a Codeforces problem or switch Problem source to Manual.', { style: toastStyle });
+            return;
+        }
+
         navigate(`/editor/${roomId}`, {
             state: {
                 username,
                 role,
                 sessionMode: sessionModeRef.current?.value?.trim() || 'peer_practice',
+                problemSource,
+                cfInternalProblemId:
+                    problemSource === 'codeforces' ? cfInternalProblemId.trim() : undefined,
             }
         });
     };
@@ -149,6 +161,17 @@ function FormComp() {
 
     return (
         <div className="flex items-center justify-center">
+            <CodeforcesProblemPicker
+                isOpen={showCfPicker}
+                onClose={() => setShowCfPicker(false)}
+                serverUrl={serverUrl}
+                onSelect={(internalProblemId) => {
+                    setCfInternalProblemId(internalProblemId);
+                    setProblemSource('codeforces');
+                    setShowCfPicker(false);
+                    toast.success(`Selected ${internalProblemId}`, { style: toastStyle });
+                }}
+            />
             <div className="relative w-full max-w-[30rem]">
                 <div className="overflow-hidden rounded-[1.5rem] border border-gray-200/90 bg-white shadow-[0_24px_80px_-46px_rgba(15,23,42,0.5)] dark:border-gray-700/80 dark:bg-gray-900">
                     <div className="border-b border-gray-100 px-5 pb-5 pt-6 text-center dark:border-gray-700 sm:px-7 sm:pb-6 sm:pt-7">
@@ -320,6 +343,61 @@ function FormComp() {
                                         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 outline-none transition-all duration-200 placeholder:text-gray-500 focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-gray-100"
                                         required
                                     />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <span className="block text-sm font-medium text-black dark:text-gray-300">
+                                        Problem source
+                                    </span>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setProblemSource('manual');
+                                                setCfInternalProblemId('');
+                                            }}
+                                            className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${
+                                                problemSource === 'manual'
+                                                    ? 'border-gray-900 bg-gray-900 text-white dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900'
+                                                    : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            Manual
+                                            <span className="mt-1 block text-xs font-normal opacity-80">
+                                                Paste samples and brief like today
+                                            </span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setProblemSource('codeforces')}
+                                            className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${
+                                                problemSource === 'codeforces'
+                                                    ? 'border-amber-500 bg-amber-50 text-amber-950 dark:border-amber-400 dark:bg-amber-500/15 dark:text-amber-100'
+                                                    : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            Codeforces
+                                            <span className="mt-1 block text-xs font-normal opacity-80">
+                                                Pick from catalog (metadata only)
+                                            </span>
+                                        </button>
+                                    </div>
+                                    {problemSource === 'codeforces' && (
+                                        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200/80 bg-amber-50/50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                                            <span className="text-xs text-amber-900 dark:text-amber-100">
+                                                {cfInternalProblemId
+                                                    ? `Selected: ${cfInternalProblemId}`
+                                                    : 'No problem selected yet.'}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCfPicker(true)}
+                                                className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400"
+                                            >
+                                                Browse catalog
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="grid gap-4 sm:grid-cols-2">

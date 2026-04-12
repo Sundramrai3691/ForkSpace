@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router';
+import axios from 'axios';
 import Sidebar from '../components/sidebar/Sidebar';
 import Workspace from '../components/Workspace/Workspace';
 import { connectSocket } from '../socket';
@@ -14,6 +15,9 @@ function Editor() {
   const enteredUsername = state?.username;
   const enteredRole = state?.role || 'Peer';
   const enteredSessionMode = state?.sessionMode || 'peer_practice';
+  const enteredProblemSource = state?.problemSource || 'manual';
+  const enteredCfProblemId = state?.cfInternalProblemId || '';
+  const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
   const [socketConnected, setSocketConnected] = useState(false);
   const [users, setUsers] = useState([]); // Add this to track users
   const [roomState, setRoomState] = useState(null);
@@ -22,6 +26,8 @@ function Editor() {
   const username = enteredUsername || 'Anonymous';
   
   useEffect(() => {
+    let cancelled = false;
+
     function handleErrors() {
       setSocketConnected(false);
 
@@ -32,6 +38,33 @@ function Editor() {
     }
 
     const initSocket = async () => {
+      if (
+        enteredProblemSource === 'codeforces' &&
+        enteredCfProblemId.trim() &&
+        roomId
+      ) {
+        try {
+          await axios.post(
+            `${serverUrl}/api/rooms/${encodeURIComponent(roomId)}/problem-selection`,
+            {
+              problemSource: 'codeforces',
+              internalProblemId: enteredCfProblemId.trim(),
+            },
+          );
+        } catch (error) {
+          if (!cancelled) {
+            toast.error(
+              error.response?.data?.error ||
+                'Could not load the selected Codeforces problem. You can pick one from the sidebar.',
+            );
+          }
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
       try {
         socketRef.current = await connectSocket();
 
@@ -76,26 +109,28 @@ function Editor() {
           }));
         });
 
-        // Listen for user events at the top level
         socketRef.current.on('joined', ({ users, username, role }) => {
           setUsers(users);
           if (enteredUsername !== username) {
             toast.success(`${username} joined as ${role}`);
           }
         });
-        
+
         socketRef.current.on('left', ({ socketId, username }) => {
           toast.success(`${username} left the room`);
-          setUsers(prev => prev.filter(user => user.socketId !== socketId));
+          setUsers((prev) => prev.filter((user) => user.socketId !== socketId));
         });
       } catch {
-        toast.error('Failed to connect to server');
+        if (!cancelled) {
+          toast.error('Failed to connect to server');
+        }
       }
     };
 
     initSocket();
-    
+
     return () => {
+      cancelled = true;
       if (socketRef.current) {
         socketRef.current.off('connect_error', handleErrors);
         socketRef.current.off('connect');
@@ -109,7 +144,16 @@ function Editor() {
         socketRef.current.disconnect();
       }
     };
-  }, [roomId, enteredRole, enteredSessionMode, enteredUsername, username]);
+  }, [
+    roomId,
+    enteredRole,
+    enteredSessionMode,
+    enteredUsername,
+    username,
+    enteredProblemSource,
+    enteredCfProblemId,
+    serverUrl,
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_22%),linear-gradient(180deg,#020617_0%,#0f172a_52%,#020617_100%)] lg:h-screen lg:overflow-hidden lg:flex-row">

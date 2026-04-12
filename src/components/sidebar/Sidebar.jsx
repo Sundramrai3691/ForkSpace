@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import axios from 'axios';
 import User from '../common/User';
+import CodeforcesProblemPicker from '../codeforces/CodeforcesProblemPicker';
 import { Link, useLocation, Navigate, useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
 import { useEffect, useState } from 'react';
@@ -196,6 +197,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     const [isImporting, setIsImporting] = useState(false);
     const [importNotice, setImportNotice] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
+    const [showCfPicker, setShowCfPicker] = useState(false);
     const [activeTab, setActiveTab] = useState('problem');
     const [problemDraft, setProblemDraft] = useState({
         platform: 'codeforces',
@@ -211,6 +213,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         tags: [],
         rating: '',
         difficulty: '',
+        difficultyLabel: '',
+        problemSource: 'manual',
+        problemSnapshot: null,
     });
 
     const hasJoinState = Boolean(location.state);
@@ -276,6 +281,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
             tags,
             rating: roomState?.problem?.rating || '',
             difficulty: roomState?.problem?.difficulty || roomState?.problem?.rating || '',
+            difficultyLabel: roomState?.problem?.difficultyLabel || '',
+            problemSource: roomState?.problem?.problemSource || 'manual',
+            problemSnapshot: roomState?.problem?.problemSnapshot || null,
         });
     }, [roomState?.problem]);
 
@@ -371,6 +379,30 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         }
     };
 
+    const handleCfCatalogSelect = async (internalProblemId) => {
+        setShowCfPicker(false);
+        try {
+            await axios.post(`${serverUrl}/api/rooms/${encodeURIComponent(roomId)}/problem-selection`, {
+                problemSource: 'codeforces',
+                internalProblemId,
+            });
+            toast.success(`Applied Codeforces problem ${internalProblemId}`);
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Could not apply Codeforces problem');
+        }
+    };
+
+    const handleSwitchToManualBrief = async () => {
+        try {
+            await axios.post(`${serverUrl}/api/rooms/${encodeURIComponent(roomId)}/problem-selection`, {
+                problemSource: 'manual',
+            });
+            toast.success('Problem source set to manual (snapshot cleared)');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Could not update problem source');
+        }
+    };
+
     const handleImportProblemUrl = async () => {
         if (!problemDraft.problemUrl.trim()) {
             toast.error('Add a problem URL first.');
@@ -408,8 +440,23 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         }
     };
 
+    const snap = problemDraft.problemSnapshot;
+    const metaTags = Array.isArray(snap?.tags) && snap.tags.length ? snap.tags : problemDraft.tags;
+    const metaRating =
+        snap?.rating != null ? String(snap.rating) : problemDraft.rating || '';
+    const metaSolved =
+        typeof snap?.solvedCount === 'number' ? snap.solvedCount : null;
+    const metaDifficulty =
+        snap?.difficultyLabel || problemDraft.difficultyLabel || problemDraft.difficulty || '';
+
     return (
         <div className="flex h-full w-full flex-col border-r border-stone-200/80 bg-transparent dark:border-slate-700/80 dark:bg-transparent">
+            <CodeforcesProblemPicker
+                isOpen={showCfPicker}
+                onClose={() => setShowCfPicker(false)}
+                serverUrl={serverUrl}
+                onSelect={handleCfCatalogSelect}
+            />
             <ImportProblemModal
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
@@ -432,6 +479,72 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:bg-[#111d33] dark:text-slate-300">
                                 Shared
                             </span>
+                        </div>
+
+                        <div className="mb-3 rounded-[1.2rem] border border-stone-200/70 bg-white/90 p-3 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                    Problem source
+                                </span>
+                                <span
+                                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                        problemDraft.problemSource === 'codeforces'
+                                            ? 'bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100'
+                                            : 'bg-stone-100 text-stone-700 dark:bg-slate-800 dark:text-slate-200'
+                                    }`}
+                                >
+                                    {problemDraft.problemSource === 'codeforces' ? 'Codeforces' : 'Manual'}
+                                </span>
+                            </div>
+                            {(metaTags?.length > 0 || metaRating || metaDifficulty || metaSolved != null) && (
+                                <div className="mt-2 space-y-2">
+                                    {metaTags?.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                            {metaTags.slice(0, 12).map((t) => (
+                                                <span
+                                                    key={t}
+                                                    className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-700 dark:bg-slate-800 dark:text-slate-200"
+                                                >
+                                                    {t}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-2 text-[11px] text-stone-600 dark:text-slate-400">
+                                        {metaRating ? (
+                                            <span className="rounded-md bg-stone-50 px-2 py-0.5 dark:bg-slate-900/80">
+                                                Rating {metaRating}
+                                            </span>
+                                        ) : null}
+                                        {metaDifficulty ? (
+                                            <span className="rounded-md bg-stone-50 px-2 py-0.5 dark:bg-slate-900/80">
+                                                {metaDifficulty}
+                                            </span>
+                                        ) : null}
+                                        {metaSolved != null ? (
+                                            <span className="rounded-md bg-stone-50 px-2 py-0.5 dark:bg-slate-900/80">
+                                                {metaSolved.toLocaleString()} solves
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCfPicker(true)}
+                                    className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 transition hover:border-amber-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                                >
+                                    Browse Codeforces
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSwitchToManualBrief}
+                                    className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                >
+                                    Use manual brief
+                                </button>
+                            </div>
                         </div>
 
                         <div className="mb-4 grid grid-cols-2 gap-2 rounded-[1.2rem] border border-stone-200/80 bg-stone-50 p-1 dark:border-slate-700/80 dark:bg-[#0d172b]">

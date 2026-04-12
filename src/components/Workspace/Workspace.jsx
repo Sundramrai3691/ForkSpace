@@ -341,6 +341,34 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             mockLocked: false,
         }
     ), [roomState?.session]);
+
+    const problemToolbarMeta = useMemo(() => {
+        const prob = roomState?.problem;
+        const snap = prob?.problemSnapshot;
+        if (!prob && !snap) return null;
+        const title = snap?.title || prob?.title || "";
+        const tags =
+            Array.isArray(snap?.tags) && snap.tags.length
+                ? snap.tags
+                : Array.isArray(prob?.tags)
+                  ? prob.tags
+                  : [];
+        const rating = snap?.rating != null ? snap.rating : prob?.rating;
+        const solved =
+            typeof snap?.solvedCount === "number" ? snap.solvedCount : null;
+        const diff =
+            snap?.difficultyLabel || prob?.difficultyLabel || prob?.difficulty;
+        const showBar =
+            (title && title !== "Untitled Practice Problem") ||
+            tags.length > 0 ||
+            (rating != null && String(rating).length > 0) ||
+            solved != null ||
+            (diff != null && String(diff).length > 0) ||
+            prob?.problemSource === "codeforces";
+        if (!showBar) return null;
+        return { title, tags, rating, solved, diff };
+    }, [roomState?.problem]);
+
     const normalizedRole = (currentRole || 'Peer').toLowerCase();
     const isDriver = session.driverSocketId === currentSocketId;
     const isNavigator = session.navigatorSocketId === currentSocketId;
@@ -1290,6 +1318,34 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
+                    {problemToolbarMeta && (
+                        <div className="hidden min-w-0 max-w-[min(380px,42vw)] flex-col gap-1 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-left shadow-sm dark:border-amber-900/50 dark:bg-amber-950/25 md:flex md:flex-col">
+                            <span className="truncate text-xs font-semibold text-gray-900 dark:text-white">
+                                {problemToolbarMeta.title || "Practice problem"}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+                                {problemToolbarMeta.tags?.slice(0, 5).map((t) => (
+                                    <span
+                                        key={t}
+                                        className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium text-gray-700 ring-1 ring-amber-200/80 dark:bg-slate-900/80 dark:text-gray-200 dark:ring-amber-900/40"
+                                    >
+                                        {t}
+                                    </span>
+                                ))}
+                                {problemToolbarMeta.rating != null && problemToolbarMeta.rating !== "" ? (
+                                    <span className="whitespace-nowrap">Rating {String(problemToolbarMeta.rating)}</span>
+                                ) : null}
+                                {problemToolbarMeta.diff ? (
+                                    <span className="whitespace-nowrap">{String(problemToolbarMeta.diff)}</span>
+                                ) : null}
+                                {problemToolbarMeta.solved != null ? (
+                                    <span className="whitespace-nowrap">
+                                        {problemToolbarMeta.solved.toLocaleString()} solves
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Room</span>
                         <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">

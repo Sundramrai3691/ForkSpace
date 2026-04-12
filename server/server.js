@@ -33,6 +33,13 @@ import {
   getReportByShareId,
   listReportsForUser,
 } from "./services/sessionIntelligence.js";
+import {
+  loadCodeforcesCatalog,
+  filterProblems,
+  findNormalizedProblem,
+  buildRoomProblemPayloadFromCf,
+  parseInternalProblemId,
+} from "./services/codeforcesCatalog.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
 mongoose.set("bufferCommands", false);
@@ -339,6 +346,9 @@ function createDefaultProblemState() {
     tags: [],
     rating: "",
     difficulty: "",
+    difficultyLabel: "",
+    problemSource: "manual",
+    problemSnapshot: null,
   };
 }
 
@@ -1136,6 +1146,20 @@ function attachNormalizedSamples(problem = {}) {
     tags,
     rating: normalizedProblem.rating || "",
     difficulty: normalizedProblem.difficulty || normalizedProblem.rating || "",
+    difficultyLabel:
+      typeof normalizedProblem.difficultyLabel === "string"
+        ? normalizedProblem.difficultyLabel
+        : "",
+    problemSource:
+      typeof normalizedProblem.problemSource === "string" &&
+      normalizedProblem.problemSource.trim()
+        ? normalizedProblem.problemSource
+        : "manual",
+    problemSnapshot:
+      normalizedProblem.problemSnapshot &&
+      typeof normalizedProblem.problemSnapshot === "object"
+        ? normalizedProblem.problemSnapshot
+        : null,
   };
 }
 
@@ -2604,6 +2628,115 @@ app.get("/api/session-intelligence/my-reports", async (req, res) => {
   });
 });
 
+app.get("/api/codeforces/problems", async (req, res) => {
+  try {
+    const { problems, source, stale, warning } =
+      await loadCodeforcesCatalog(dataDirectory);
+    const filtered = filterProblems(problems, req.query);
+    return res.json({
+      rows: filtered.rows,
+      total: filtered.total,
+      offset: filtered.offset,
+      limit: filtered.limit,
+      source,
+      stale: Boolean(stale),
+      warning: warning || undefined,
+    });
+  } catch (error) {
+    console.error("[codeforces] list error:", error.message);
+    return res.status(500).json({ error: error.message || "Catalog error" });
+  }
+});
+
+app.get("/api/codeforces/problem/:internalProblemId", async (req, res) => {
+  const rawId = req.params.internalProblemId || "";
+  if (!parseInternalProblemId(rawId)) {
+    return res.status(400).json({ error: "Invalid problem id" });
+  }
+  try {
+    const normalized = await findNormalizedProblem(dataDirectory, rawId);
+    if (!normalized) {
+      return res.status(404).json({ error: "Problem not found in catalog" });
+    }
+    return res.json({ problem: normalized });
+  } catch (error) {
+    console.error("[codeforces] problem lookup:", error.message);
+    return res.status(500).json({ error: error.message || "Lookup failed" });
+  }
+});
+
+app.get("/api/rooms/:roomId/problem-snapshot", (req, res) => {
+  const { roomId } = req.params;
+  const roomState = roomStateMap.get(roomId);
+  const snapshot = roomState?.problem?.problemSnapshot || null;
+  return res.json({
+    roomId,
+    snapshot,
+    sessionId: roomState?.session?.intelligenceSessionId || null,
+  });
+});
+
+app.post("/api/rooms/:roomId/problem-selection", async (req, res) => {
+  const { roomId } = req.params;
+  const { problemSource, internalProblemId } = req.body || {};
+
+  try {
+    const roomState = getOrCreateRoomState(roomId);
+    ensureIntelligenceSession(roomState);
+    const sessionId = roomState.session?.intelligenceSessionId || "";
+
+    if (problemSource === "manual") {
+      roomState.problem = attachNormalizedSamples({
+        ...roomState.problem,
+        problemSource: "manual",
+        problemSnapshot: null,
+      });
+      scheduleRoomStatePersist();
+      persistRoomDocument(roomId, roomState);
+      io.to(roomId).emit("problem-update", { problem: roomState.problem });
+      return res.json({ ok: true, problem: roomState.problem });
+    }
+
+    if (problemSource !== "codeforces" || !internalProblemId) {
+      return res.status(400).json({
+        error:
+          "Set problemSource to \"manual\" or provide problemSource \"codeforces\" with internalProblemId.",
+      });
+    }
+
+    const normalized = await findNormalizedProblem(
+      dataDirectory,
+      String(internalProblemId),
+    );
+    if (!normalized) {
+      return res.status(404).json({
+        error:
+          "Problem not found in catalog. Try again when the API or cache is available.",
+      });
+    }
+
+    const payload = buildRoomProblemPayloadFromCf(normalized, {
+      roomId,
+      sessionId,
+    });
+
+    roomState.problem = attachNormalizedSamples({
+      ...roomState.problem,
+      ...payload,
+    });
+    scheduleRoomStatePersist();
+    persistRoomDocument(roomId, roomState);
+    io.to(roomId).emit("problem-update", { problem: roomState.problem });
+
+    return res.json({ ok: true, problem: roomState.problem });
+  } catch (error) {
+    console.error("[problem-selection]", error.message);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to apply problem selection" });
+  }
+});
+
 // Socket.io connection handlers
 
 const userSocketMap = {};
@@ -2749,10 +2882,18 @@ io.on("connection", (socket) => {
 
   socket.on("problem-update", ({ roomId, problem }) => {
     const roomState = getOrCreateRoomState(roomId);
-    roomState.problem = attachNormalizedSamples({
+    const incoming = problem || {};
+    const merged = {
       ...roomState.problem,
-      ...(problem || {}),
-    });
+      ...incoming,
+    };
+    if (!Object.prototype.hasOwnProperty.call(incoming, "problemSnapshot")) {
+      merged.problemSnapshot = roomState.problem?.problemSnapshot ?? null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(incoming, "problemSource")) {
+      merged.problemSource = roomState.problem?.problemSource ?? "manual";
+    }
+    roomState.problem = attachNormalizedSamples(merged);
     scheduleRoomStatePersist();
     persistRoomDocument(roomId, roomState);
 
