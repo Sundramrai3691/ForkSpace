@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import axios from "axios";
 import toast from "react-hot-toast";
+import SessionIntelligenceReportDashboard from "../components/sessionIntelligence/SessionIntelligenceReportDashboard.jsx";
 
 function SessionReportPage() {
     const { shareId } = useParams();
@@ -36,87 +37,52 @@ function SessionReportPage() {
     const report = payload?.report;
 
     return (
-        <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] px-4 py-10 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_52%,#020617_100%)]">
-            <div className="mx-auto max-w-lg">
-                <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] px-4 py-8 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_52%,#020617_100%)] sm:px-6 sm:py-12">
+            <div className="mx-auto max-w-3xl">
+                <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                     <Link
                         to="/"
-                        className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
+                        className="text-sm font-semibold text-amber-700 transition hover:underline dark:text-amber-300"
                     >
-                        Home
+                        ← Home
                     </Link>
                     <Link
                         to="/history/reports"
-                        className="text-sm font-medium text-gray-600 hover:underline dark:text-gray-400"
+                        className="text-sm font-medium text-gray-600 transition hover:underline dark:text-gray-400"
                     >
                         Analysis Reports
                     </Link>
                 </div>
 
                 {loading ? (
-                    <p className="text-center text-sm text-gray-600 dark:text-gray-400">Loading report…</p>
+                    <p className="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Loading report…
+                    </p>
                 ) : !report ? (
-                    <p className="text-center text-sm text-gray-600 dark:text-gray-400">Nothing to show.</p>
+                    <p className="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Nothing to show.
+                    </p>
                 ) : (
-                    <div className="rounded-[1.5rem] border border-gray-200/90 bg-white/95 p-6 shadow-lg dark:border-gray-700 dark:bg-slate-900/90">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                            Session Intelligence
+                    <div className="space-y-6">
+                        <div className="text-center sm:text-left">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500 dark:text-gray-400">
+                                ForkSpace · Session intelligence
+                            </p>
+                            <h1 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
+                                Shared report
+                            </h1>
+                            <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                Polished summary for screenshots and portfolios. Same data as the workspace Report tab.
+                            </p>
+                        </div>
+                        <SessionIntelligenceReportDashboard
+                            report={report}
+                            title={payload.problemTitle || "Practice session"}
+                            variant="standalone"
+                        />
+                        <p className="text-center text-[11px] text-gray-500 dark:text-gray-500">
+                            ForkSpace session report · ID {shareId}
                         </p>
-                        <h1 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">
-                            {payload.problemTitle || "Practice session"}
-                        </h1>
-                        <div className="mt-6">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                                Session score
-                            </p>
-                            <p className="mt-1 text-4xl font-bold text-gray-900 dark:text-white">{report.sessionScore}</p>
-                        </div>
-                        <div className="mt-6">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                                How you think
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-gray-800 dark:text-gray-200">{report.howYouThink}</p>
-                        </div>
-                        <div className="mt-6">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">
-                                Strongest signals
-                            </p>
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
-                                {(report.strongestSignals || []).map((s, i) => (
-                                    <li key={i}>{s}</li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="mt-6">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300">
-                                Biggest gaps
-                            </p>
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
-                                {(report.biggestGaps || []).map((s, i) => (
-                                    <li key={i}>{s}</li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="mt-6">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                                Next steps
-                            </p>
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
-                                {(report.nextSteps || []).map((s, i) => (
-                                    <li key={i}>{s}</li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="mt-6">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                                Next practice targets
-                            </p>
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-800 dark:text-gray-200">
-                                {(report.nextPracticeTargets || []).map((s, i) => (
-                                    <li key={i}>{s}</li>
-                                ))}
-                            </ul>
-                        </div>
                     </div>
                 )}
             </div>

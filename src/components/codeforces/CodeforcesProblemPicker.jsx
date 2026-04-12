@@ -12,7 +12,7 @@ const defaultFilters = {
 };
 
 /**
- * Modal to browse Codeforces problems from the server catalog (cached API).
+ * Large modal to browse Codeforces problems from the server catalog (cached API).
  */
 function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
     const [filters, setFilters] = useState(defaultFilters);
@@ -79,22 +79,33 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-            <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[1.5rem] border border-stone-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#081121]">
-                <div className="flex items-start justify-between gap-3 border-b border-stone-200 px-5 py-4 dark:border-slate-700">
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/65 p-2 backdrop-blur-md sm:p-4">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="cf-picker-title"
+                className="flex h-[min(92vh,920px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.45)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_32px_100px_-32px_rgba(0,0,0,0.85)] dark:ring-white/5"
+            >
+                {/* Title bar — fixed height */}
+                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-stone-200/90 px-5 py-4 sm:px-7 sm:py-5 dark:border-slate-700/80">
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
                             Codeforces catalog
                         </p>
-                        <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">Pick a problem</h3>
-                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                            Filter by tags, rating, and solved count. Data is cached on the server.
+                        <h3
+                            id="cf-picker-title"
+                            className="mt-1 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl"
+                        >
+                            Pick a problem
+                        </h3>
+                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                            Filter by tags, rating, and solves. Data is cached on the server — scroll results while filters stay visible.
                         </p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:bg-stone-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                         aria-label="Close"
                     >
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,143 +114,174 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                     </button>
                 </div>
 
-                <form onSubmit={handleSearch} className="space-y-3 border-b border-stone-100 px-5 py-4 dark:border-slate-800">
+                {/* Scroll region: sticky filters + results */}
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     {warning && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100">
+                        <div className="mx-5 mt-4 rounded-xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-sm text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/35 dark:text-amber-100 sm:mx-7">
                             {warning}
                         </div>
                     )}
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <label className="space-y-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Tags (comma, AND)</span>
-                            <input
-                                value={filters.tags}
-                                onChange={(e) => setFilters((f) => ({ ...f, tags: e.target.value }))}
-                                placeholder="dp, greedy"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </label>
-                        <label className="space-y-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Search title / id</span>
-                            <input
-                                value={filters.search}
-                                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                                placeholder="e.g. 1885 or xor"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </label>
-                        <label className="space-y-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Min rating</span>
-                            <input
-                                type="number"
-                                value={filters.minRating}
-                                onChange={(e) => setFilters((f) => ({ ...f, minRating: e.target.value }))}
-                                placeholder="800"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </label>
-                        <label className="space-y-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Max rating</span>
-                            <input
-                                type="number"
-                                value={filters.maxRating}
-                                onChange={(e) => setFilters((f) => ({ ...f, maxRating: e.target.value }))}
-                                placeholder="2000"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </label>
-                        <label className="space-y-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Min solves</span>
-                            <input
-                                type="number"
-                                value={filters.minSolved}
-                                onChange={(e) => setFilters((f) => ({ ...f, minSolved: e.target.value }))}
-                                placeholder="0"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </label>
-                        <label className="space-y-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Max solves</span>
-                            <input
-                                type="number"
-                                value={filters.maxSolved}
-                                onChange={(e) => setFilters((f) => ({ ...f, maxSolved: e.target.value }))}
-                                placeholder="optional"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </label>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                        >
-                            {loading ? 'Loading…' : 'Apply filters'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setFilters(defaultFilters);
-                                fetchWithFilters(0, false, defaultFilters);
-                            }}
-                            className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-stone-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                            Reset
-                        </button>
-                    </div>
-                </form>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-4">
-                    <p className="mb-2 px-2 text-xs text-slate-500 dark:text-slate-400">
-                        Showing {rows.length} of {total} matches
-                    </p>
-                    <ul className="space-y-2">
-                        {rows.map((row) => (
-                            <li key={row.internalProblemId}>
+                    <div className="sticky top-0 z-10 border-b border-stone-200/90 bg-white/95 px-5 py-4 shadow-[0_8px_24px_-16px_rgba(15,23,42,0.15)] backdrop-blur-md dark:border-slate-700/80 dark:bg-[#060d18]/95 sm:px-7">
+                        <form onSubmit={handleSearch} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+                                <label className="space-y-1.5 lg:col-span-2">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        Tags (comma, AND)
+                                    </span>
+                                    <input
+                                        value={filters.tags}
+                                        onChange={(e) => setFilters((f) => ({ ...f, tags: e.target.value }))}
+                                        placeholder="dp, greedy"
+                                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </label>
+                                <label className="space-y-1.5 lg:col-span-2">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        Search title / id
+                                    </span>
+                                    <input
+                                        value={filters.search}
+                                        onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                                        placeholder="e.g. 1885 or xor"
+                                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </label>
+                                <label className="space-y-1.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        Min rating
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={filters.minRating}
+                                        onChange={(e) => setFilters((f) => ({ ...f, minRating: e.target.value }))}
+                                        placeholder="800"
+                                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </label>
+                                <label className="space-y-1.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        Max rating
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={filters.maxRating}
+                                        onChange={(e) => setFilters((f) => ({ ...f, maxRating: e.target.value }))}
+                                        placeholder="2000"
+                                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </label>
+                                <label className="space-y-1.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        Min solves
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={filters.minSolved}
+                                        onChange={(e) => setFilters((f) => ({ ...f, minSolved: e.target.value }))}
+                                        placeholder="0"
+                                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </label>
+                                <label className="space-y-1.5">
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        Max solves
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={filters.maxSolved}
+                                        onChange={(e) => setFilters((f) => ({ ...f, maxSolved: e.target.value }))}
+                                        placeholder="optional"
+                                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </label>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-amber-500 dark:text-slate-950 dark:hover:bg-amber-400"
+                                >
+                                    {loading ? 'Loading…' : 'Apply filters'}
+                                </button>
                                 <button
                                     type="button"
-                                    onClick={() => onSelect(row.internalProblemId)}
-                                    className="w-full rounded-2xl border border-stone-200 bg-stone-50/80 px-4 py-3 text-left transition hover:border-amber-300 hover:bg-white dark:border-slate-700 dark:bg-[#0d172b] dark:hover:border-amber-700/60"
+                                    onClick={() => {
+                                        setFilters(defaultFilters);
+                                        fetchWithFilters(0, false, defaultFilters);
+                                    }}
+                                    className="rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-stone-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                        <span className="font-mono text-sm font-semibold text-slate-900 dark:text-white">
-                                            {row.internalProblemId}
-                                        </span>
-                                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                                            {row.rating != null ? `Rating ${row.rating}` : 'Unrated'} · {row.solvedCount.toLocaleString()} solves
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 text-sm text-slate-800 dark:text-slate-200">{row.title}</p>
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                        {(row.tags || []).slice(0, 8).map((t) => (
-                                            <span
-                                                key={t}
-                                                className="rounded-full bg-white px-2 py-0.5 text-[11px] text-slate-600 ring-1 ring-stone-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-600"
-                                            >
-                                                {t}
-                                            </span>
-                                        ))}
-                                    </div>
+                                    Reset
                                 </button>
-                            </li>
-                        ))}
-                    </ul>
-                    {rows.length === 0 && !loading && (
-                        <p className="px-2 py-8 text-center text-sm text-slate-500">No problems match. Relax filters or try again later.</p>
-                    )}
-                    {rows.length < total && (
-                        <div className="p-4 text-center">
-                            <button
-                                type="button"
-                                onClick={loadMore}
-                                disabled={loading}
-                                className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-stone-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                                {loading ? 'Loading…' : 'Load more'}
-                            </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="px-5 py-5 sm:px-7 sm:py-6">
+                        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                                <span className="tabular-nums text-slate-900 dark:text-white">{rows.length}</span>
+                                <span className="text-slate-500 dark:text-slate-500"> of </span>
+                                <span className="tabular-nums text-slate-900 dark:text-white">{total}</span>
+                                <span className="text-slate-500 dark:text-slate-500"> matches</span>
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500">Click a card to select</p>
                         </div>
-                    )}
+
+                        <ul className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 xl:grid-cols-2">
+                            {rows.map((row) => (
+                                <li key={row.internalProblemId}>
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelect(row.internalProblemId)}
+                                        className="group flex h-full w-full flex-col rounded-2xl border border-stone-200/90 bg-stone-50/90 px-4 py-3 text-left transition hover:border-amber-400/80 hover:bg-white hover:shadow-md dark:border-slate-700/90 dark:bg-[#0c1629] dark:hover:border-amber-600/50 dark:hover:bg-[#0f1e35]"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                                                {row.internalProblemId}
+                                            </span>
+                                            <span className="shrink-0 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                                {row.rating != null ? `${row.rating}` : '—'} · {row.solvedCount.toLocaleString()} solves
+                                            </span>
+                                        </div>
+                                        <p className="mt-1.5 line-clamp-2 text-sm leading-snug text-slate-800 dark:text-slate-100">
+                                            {row.title}
+                                        </p>
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            {(row.tags || []).slice(0, 6).map((t) => (
+                                                <span
+                                                    key={t}
+                                                    className="rounded-md bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-stone-200/90 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-600"
+                                                >
+                                                    {t}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+
+                        {rows.length === 0 && !loading && (
+                            <p className="py-16 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
+                                No problems match. Relax filters or try again later.
+                            </p>
+                        )}
+
+                        {rows.length < total && (
+                            <div className="mt-6 flex justify-center pb-2">
+                                <button
+                                    type="button"
+                                    onClick={loadMore}
+                                    disabled={loading}
+                                    className="rounded-xl border border-stone-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-stone-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                                >
+                                    {loading ? 'Loading…' : 'Load more'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
