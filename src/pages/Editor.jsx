@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router';
 import axios from 'axios';
 import Sidebar from '../components/sidebar/Sidebar';
@@ -7,6 +7,22 @@ import { connectSocket } from '../socket';
 import toast from 'react-hot-toast';
 import { getAuthToken } from '../lib/auth';
 
+const SIDEBAR_WIDTH_KEY = 'forkspace.sidebarWidth';
+const SIDEBAR_MIN = 260;
+const SIDEBAR_MAX = 500;
+const SIDEBAR_DEFAULT = 320;
+
+function readInitialSidebarWidth() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (!raw) return SIDEBAR_DEFAULT;
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= SIDEBAR_MIN && n <= SIDEBAR_MAX) return n;
+  } catch {
+    /* ignore */
+  }
+  return SIDEBAR_DEFAULT;
+}
 
 function Editor() {
   const socketRef = useRef(null);
@@ -24,6 +40,55 @@ function Editor() {
   const [currentSocketId, setCurrentSocketId] = useState('');
   const hasShownConnectionError = useRef(false);
   const username = enteredUsername || 'Anonymous';
+
+  const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
+  const [isLg, setIsLg] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
+  );
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+  const sidebarResizeRef = useRef(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setIsLg(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const onSidebarResizeStart = useCallback((event) => {
+    event.preventDefault();
+    sidebarResizeRef.current = {
+      startX: event.clientX,
+      startW: sidebarWidthRef.current,
+    };
+    const onMove = (ev) => {
+      const s = sidebarResizeRef.current;
+      if (!s) return;
+      const delta = ev.clientX - s.startX;
+      const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, s.startW + delta));
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      sidebarResizeRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      try {
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthRef.current));
+      } catch {
+        /* ignore */
+      }
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      /* cleanup if unmount mid-drag */
+      sidebarResizeRef.current = null;
+    };
+  }, []);
   
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +222,14 @@ function Editor() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_22%),linear-gradient(180deg,#020617_0%,#0f172a_52%,#020617_100%)] lg:h-screen lg:overflow-hidden lg:flex-row">
-      <aside className="w-full border-b border-gray-200/80 bg-white/75 backdrop-blur-xl dark:border-gray-700/80 dark:bg-slate-950/55 lg:h-screen lg:w-80 lg:min-w-[320px] lg:max-w-[420px] lg:flex-none lg:border-b-0 lg:border-r lg:panel-resize">
+      <aside
+        className="relative w-full border-b border-gray-200/80 bg-white/75 backdrop-blur-xl dark:border-gray-700/80 dark:bg-slate-950/55 lg:h-screen lg:shrink-0 lg:border-b-0 lg:border-r"
+        style={
+          isLg
+            ? { width: sidebarWidth, minWidth: SIDEBAR_MIN, maxWidth: SIDEBAR_MAX }
+            : undefined
+        }
+      >
         <Sidebar 
           socketRef={socketRef} 
           roomId={roomId} 
@@ -167,6 +239,15 @@ function Editor() {
           currentSocketId={currentSocketId}
           currentRole={enteredRole}
         />
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          onMouseDown={onSidebarResizeStart}
+          className="absolute right-0 top-0 z-30 hidden h-full w-3 translate-x-1/2 cursor-col-resize lg:block"
+        >
+          <div className="mx-auto h-full w-1 rounded-full bg-gray-300/80 transition hover:bg-amber-400/90 dark:bg-slate-600 dark:hover:bg-amber-500/80" />
+        </div>
       </aside>
       <main className="flex min-h-[60vh] min-w-0 flex-1 flex-col bg-transparent lg:min-h-0 lg:h-screen">
         {socketConnected ? (

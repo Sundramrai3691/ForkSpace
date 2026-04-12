@@ -236,6 +236,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [isReviewLoading, setIsReviewLoading] = useState(false);
     const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState("output");
+    /** Brief highlight after a new report is generated (Output-like priority). */
+    const [isNewReport, setIsNewReport] = useState(false);
     const [runBy, setRunBy] = useState('');
     const [reportLoading, setReportLoading] = useState(false);
     const [lastReportPayload, setLastReportPayload] = useState(null);
@@ -246,6 +248,18 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     useEffect(() => {
         setCollabHintDismissed(false);
     }, [roomId]);
+
+    useEffect(() => {
+        if (activeRightTab !== "report") {
+            setIsNewReport(false);
+        }
+    }, [activeRightTab]);
+
+    useEffect(() => {
+        if (!isNewReport) return undefined;
+        const id = window.setTimeout(() => setIsNewReport(false), 12000);
+        return () => window.clearTimeout(id);
+    }, [isNewReport]);
 
     const renderReviewContent = () => {
         if (isReviewLoading) {
@@ -871,6 +885,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     if (intelRes.data?.shareId) {
                         setLastShareId(intelRes.data.shareId);
                         setLastReportPayload(intelRes.data.report);
+                        setIsOutputCollapsed(false);
+                        setIsNewReport(true);
                         setActiveRightTab("report");
                         toast.success("Session intelligence report saved.");
                     }
@@ -1113,6 +1129,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             );
             setLastReportPayload(res.data.report);
             setLastShareId(res.data.shareId || "");
+            setIsOutputCollapsed(false);
+            setIsNewReport(true);
             setActiveRightTab("report");
             toast.success("Session intelligence report is ready.");
         } catch (error) {
@@ -1507,30 +1525,37 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             </div>
                         </div>
 
-                        <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-3 dark:border-gray-700/80 dark:bg-[#0d172b]">
-                            <div className="flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1 dark:border-gray-700/80 dark:bg-slate-950/40">
+                        <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-3.5 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                            <div className="flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1.5 shadow-sm dark:border-gray-700/80 dark:bg-slate-950/40">
                                 {[
                                     { key: "output", label: "Output" },
                                     { key: "history", label: "History" },
                                     { key: "ai", label: "Intelligence" },
                                     { key: "report", label: "Report" },
-                                ].map((tab) => (
-                                    <button
-                                        key={tab.key}
-                                        type="button"
-                                        onClick={() => setActiveRightTab(tab.key)}
-                                        className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm font-medium transition ${activeRightTab === tab.key
-                                            ? "border-amber-500 bg-white text-gray-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white"
-                                            : "border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                                            }`}
-                                    >
-                                        {tab.label}
-                                    </button>
-                                ))}
+                                ].map((tab) => {
+                                    const isActive = activeRightTab === tab.key;
+                                    const isReport = tab.key === "report";
+                                    const reportFresh = isReport && isNewReport && isActive;
+                                    return (
+                                        <button
+                                            key={tab.key}
+                                            type="button"
+                                            onClick={() => setActiveRightTab(tab.key)}
+                                            className={`rounded-[0.95rem] border-b-2 px-3.5 py-2.5 text-sm font-semibold transition ${isActive
+                                                ? isReport
+                                                    ? `border-amber-500 bg-white text-gray-900 shadow-md dark:border-amber-400 dark:bg-slate-900 dark:text-white ${reportFresh ? "ring-2 ring-amber-400/70 ring-offset-2 ring-offset-stone-50 dark:ring-offset-[#0d172b]" : ""}`
+                                                    : "border-amber-500 bg-white text-gray-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white"
+                                                : `border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white ${isReport && isNewReport && !isActive ? "ring-2 ring-amber-400/55 animate-pulse bg-amber-50/90 dark:bg-amber-950/30" : ""}`
+                                                }`}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+                        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scroll-smooth p-5">
                             {activeRightTab === "output" && (
                                 <div className="space-y-4">
                                     <div className="flex flex-wrap items-center gap-2">
@@ -1777,7 +1802,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     ) : null}
 
                                     {lastReportPayload ? (
-                                        <div className="relative rounded-[1.5rem] border border-amber-200/35 bg-gradient-to-b from-amber-50/40 to-transparent p-1 shadow-[0_8px_40px_-16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/15 dark:border-amber-900/40 dark:from-amber-950/25 dark:shadow-[0_12px_48px_-20px_rgba(0,0,0,0.75)] dark:ring-amber-500/10">
+                                        <div
+                                            className={`relative rounded-[1.5rem] border border-amber-200/35 bg-gradient-to-b from-amber-50/40 to-transparent p-1 shadow-[0_8px_40px_-16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/15 transition-[box-shadow,ring] duration-500 dark:border-amber-900/40 dark:from-amber-950/25 dark:shadow-[0_12px_48px_-20px_rgba(0,0,0,0.75)] dark:ring-amber-500/10 ${isNewReport && activeRightTab === "report" ? "ring-2 ring-amber-400/60 shadow-[0_12px_48px_-12px_rgba(251,191,36,0.55)] dark:shadow-[0_16px_56px_-16px_rgba(251,191,36,0.25)]" : ""}`}
+                                        >
                                             <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 rounded-t-[1.25rem] border-b border-amber-200/40 bg-white/90 px-3 py-2.5 backdrop-blur-md dark:border-amber-900/35 dark:bg-[#0a1324]/92">
                                                 <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
                                                     Session report

@@ -467,9 +467,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 onImportProblem={handleImportProblem}
                 onImportProblemUrl={handleImportProblemUrl}
             />
-            <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="flex flex-col space-y-3 p-5">
-                    <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-4 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
+            <div className="flex-1 min-h-0 overflow-y-auto scroll-smooth">
+                <div className="flex flex-col space-y-6 p-6 sm:p-7">
+                    <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-5 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
                                 <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
@@ -922,7 +922,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 </div>
             </div>
             
-            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white p-6 dark:border-slate-700/80 dark:bg-[#081121]">
+            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white px-6 py-7 dark:border-slate-700/80 dark:bg-[#081121]">
                 <div className="mb-4 text-center">
                     <Link
                         to="/history/reports"
