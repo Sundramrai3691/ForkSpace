@@ -172,6 +172,15 @@ function OverlayPanel({ title, subtitle, onClose, children }) {
     );
 }
 
+function ButtonSpinner() {
+    return (
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="9" className="opacity-30" stroke="currentColor" strokeWidth="2.2" />
+            <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+    );
+}
+
 function normalizeOutput(value = "") {
     return value.replace(/\r\n/g, "\n").trim();
 }
@@ -246,6 +255,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [lastShareId, setLastShareId] = useState('');
     const [showReportModal, setShowReportModal] = useState(false);
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    const [showChecklist, setShowChecklist] = useState(false);
     const [rightPanelWidthPct, setRightPanelWidthPct] = useState(() => {
         const raw = Number(localStorage.getItem("forkspace.rightPanelWidthPct"));
         if (Number.isFinite(raw) && raw >= 25 && raw <= 50) return raw;
@@ -436,6 +446,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const criticalOpenCount = session.edgeCaseChecklist.filter(
         (item) => item.priority === 'critical' && !item.checked
     ).length;
+    const isRunBusy = lastRunMeta?.status === "Running";
+    const isSubmitBusy = lastRunMeta?.status === "Submitting samples...";
 
     const canEdit =
         isMentoringMode
@@ -726,6 +738,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 time: time || "N/A",
                 memory: memory || "N/A",
                 sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
+                updatedAt: Date.now(),
             });
 
             const nextOutput = (
@@ -1088,7 +1101,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         const effectiveStdin = sampleInput;
         const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
         const normalizedExpectedOutput = normalizeOutput(expectedOutput);
-        setActiveRightTab("submissions");
+        setActiveRightTab("output");
 
         setLastRunMeta({
             languageLabel: languageConfig.label,
@@ -1098,6 +1111,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             time: null,
             memory: null,
             sampleCheck: normalizedExpectedOutput ? "pending" : "not_available",
+            updatedAt: Date.now(),
         });
         setOutput(
             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
@@ -1206,6 +1220,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             time: null,
             memory: null,
             sampleCheck: "pending",
+            updatedAt: Date.now(),
         });
         setOutput(
             <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
@@ -1233,6 +1248,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 time: null,
                 memory: null,
                 sampleCheck: allPass ? "passed" : "mismatch",
+                updatedAt: Date.now(),
             });
             const blocks = (
                 <div className="space-y-3 text-sm">
@@ -1271,6 +1287,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 ...(prev || {}),
                 status: "Submit failed",
                 sampleCheck: "not_checked",
+                updatedAt: Date.now(),
             }));
         }
     };
@@ -1285,7 +1302,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         <div className="flex h-full min-h-0 flex-col bg-transparent">
             {showOutputModal && output && (
                 <OverlayPanel
-                    title="Run Output"
+                    title={lastRunMeta?.inputSource === "suite" ? "Submission Output" : "Run Output"}
                     subtitle="Execution Results"
                     onClose={() => setShowOutputModal(false)}
                 >
@@ -1351,7 +1368,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     <div className="space-y-5">
                         <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
                             <div className="mb-3 flex items-center justify-between gap-3">
-                                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowChecklist((v) => !v)}
+                                    className="text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                    Edge Case Checklist {showChecklist ? "Hide" : "Show"}
+                                </button>
                                 <div className="flex items-center gap-2 text-[11px]">
                                     <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-gray-600 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-300">
                                         {checklistCompleted}/{checklistTotal}
@@ -1363,6 +1386,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     )}
                                 </div>
                             </div>
+                            {showChecklist ? (
                             <div className="grid grid-cols-1 gap-2">
                                 {session.edgeCaseChecklist.map((item) => (
                                     <label key={item.id} className="group flex cursor-pointer items-start gap-3 rounded-lg border border-transparent px-2 py-1.5 hover:border-gray-200 dark:hover:border-gray-700">
@@ -1387,6 +1411,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     </label>
                                 ))}
                             </div>
+                            ) : (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Checklist is collapsed so analysis stays focused. Expand when you want to verify edge cases.
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex gap-2">
@@ -1395,6 +1424,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 onClick={reviewSolution}
                                 className="inline-flex flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
                             >
+                                {isReviewLoading ? <ButtonSpinner /> : null}
                                 Re-run analysis
                             </button>
                             <button
@@ -1402,6 +1432,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 onClick={fetchAIHints}
                                 className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-stone-50 hover:text-gray-900 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-[#16243d] dark:hover:text-white"
                             >
+                                {isLoading ? <ButtonSpinner /> : null}
                                 Refresh AI Hints
                             </button>
                         </div>
@@ -1439,21 +1470,28 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     <button
                         className="inline-flex h-11 min-h-[2.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-teal-600 px-6 text-base font-semibold text-white shadow-md shadow-teal-600/25 ring-2 ring-amber-400/55 ring-offset-2 ring-offset-white transition-all hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-[#081121] dark:hover:bg-teal-500"
                         onClick={runCode}
-                        disabled={!canRunInCurrentMode}
+                        disabled={!canRunInCurrentMode || isRunBusy}
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
                     >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <polygon points="5,3 19,12 5,21" />
-                        </svg>
-                        Run
+                        {isRunBusy ? <ButtonSpinner /> : (
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <polygon points="5,3 19,12 5,21" />
+                            </svg>
+                        )}
+                        {isRunBusy ? "Running..." : "Run"}
                     </button>
                     <button
                         className="inline-flex h-11 min-h-[2.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-teal-500/80 bg-white px-5 text-base font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-teal-600 dark:bg-[#0a1324] dark:text-teal-100 dark:hover:bg-teal-950/40 dark:ring-offset-[#081121]"
                         onClick={submitSamples}
-                        disabled={!canRunInCurrentMode}
+                        disabled={!canRunInCurrentMode || isSubmitBusy}
                         title={canRunInCurrentMode ? "Run all parsed sample tests (Judge0)" : "Only the Driver can submit in mock mode"}
                     >
-                        Submit
+                        {isSubmitBusy ? <ButtonSpinner /> : (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                        {isSubmitBusy ? "Submitting..." : "Submit"}
                     </button>
                     <span className="mx-1 h-7 w-px bg-gray-300/80 dark:bg-gray-700" />
                     <button
@@ -1466,6 +1504,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         }}
                         className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/90 px-4 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-blue-200"
                     >
+                        {isReviewLoading ? <ButtonSpinner /> : (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17l-4-4 4-4m6 8l4-4-4-4" />
+                            </svg>
+                        )}
                         Analyze
                     </button>
                     <button
@@ -1477,9 +1520,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             }
                             void generateSessionReport({ endSession: false });
                         }}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200"
+                        disabled={reportLoading}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200"
                     >
-                        Report
+                        {reportLoading ? <ButtonSpinner /> : (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-6m3 6V7m3 10v-3m3 7H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+                            </svg>
+                        )}
+                        {reportLoading ? "Working..." : "Report"}
                     </button>
                     <button
                         type="button"
@@ -1489,7 +1538,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         }}
                         className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50/90 px-4 text-sm font-semibold text-violet-800 transition hover:bg-violet-100 dark:border-violet-800/40 dark:bg-violet-900/20 dark:text-violet-200"
                     >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+                        </svg>
                         Generate Tests
+                        <span className="rounded-full border border-violet-300/80 bg-white/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-violet-700 dark:border-violet-700/60 dark:bg-violet-950/30 dark:text-violet-200">
+                            Beta
+                        </span>
                     </button>
                     <button
                         className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-gray-100 px-2.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -1509,6 +1564,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 </div>
 
                 <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={() => navigate('/')}
+                        className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-800/92"
+                        title="Go to home"
+                    >
+                        <img src="/logo.png" alt="ForkSpace logo" className="h-5 w-5 rounded" />
+                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">ForkSpace</span>
+                    </button>
                     <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <label htmlFor="language-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
@@ -1797,6 +1861,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                                             ? "not checked"
                                                             : "n/a"}
                                         </div>
+                                        {lastRunMeta?.updatedAt ? (
+                                            <div className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                updated {new Date(lastRunMeta.updatedAt).toLocaleTimeString()}
+                                            </div>
+                                        ) : null}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">

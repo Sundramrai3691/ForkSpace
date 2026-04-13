@@ -182,7 +182,7 @@ export default function SessionIntelligenceReportDashboard({
             </div>
 
             <div className="rounded-xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs text-gray-600 dark:border-gray-700/70 dark:bg-slate-900/60 dark:text-gray-400">
-                <span className="font-semibold">Session score:</span> {report.sessionScore}
+                <span className="font-semibold">Session score (beta signal):</span> {report.sessionScore}
             </div>
         </div>
     );

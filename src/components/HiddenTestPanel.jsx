@@ -3,6 +3,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 
+function Spinner() {
+  return (
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" className="opacity-30" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function statusPill(test) {
   if (test.timedOut) return { label: "timeout", cls: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100" };
   if (test.runtimeError) return { label: "crash", cls: "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-800/50 dark:bg-rose-950/30 dark:text-rose-100" };
@@ -246,23 +255,39 @@ export default function HiddenTestPanel({
             type="button"
             disabled={loading || !canGenerate}
             onClick={generateTests}
-            className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200"
+            className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200"
           >
+            {loading ? <Spinner /> : (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+              </svg>
+            )}
             {loading ? "Generating..." : "Generate tests"}
+            <span className="rounded-full border border-amber-300/70 bg-white/70 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em]">
+              Beta
+            </span>
           </button>
           <button
             type="button"
             disabled={running || !tests.length}
             onClick={runAll}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-stone-50 disabled:opacity-60 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-stone-50 disabled:opacity-60 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
           >
+            {running ? <Spinner /> : (
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
             {running ? "Running..." : "Run all tests"}
           </button>
           <button
             type="button"
             onClick={refresh}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-stone-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-stone-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
           >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0A8.003 8.003 0 015.418 15m13.001 0H15" />
+            </svg>
             Refresh
           </button>
         </div>

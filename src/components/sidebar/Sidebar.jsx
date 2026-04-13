@@ -953,8 +953,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 </div>
             </div>
             
-            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white px-6 py-7 dark:border-slate-700/80 dark:bg-[#081121]">
-                <div className="mb-4 text-center">
+            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white px-5 py-4 dark:border-slate-700/80 dark:bg-[#081121]">
+                <div className="mb-3 text-center">
                     <Link
                         to="/history/reports"
                         className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700 underline-offset-4 hover:underline dark:text-amber-300"
@@ -962,10 +962,10 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                         History → Analysis Reports
                     </Link>
                 </div>
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-2 rounded-xl border border-stone-200/80 bg-stone-50/80 p-2 dark:border-slate-700/80 dark:bg-slate-900/40">
                     <button
                         onClick={handleCopyRoomId}
-                        className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                        className="group relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                         aria-label="Copy room link"
                         title="Copy room link"
                     >
@@ -978,7 +978,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                     
                     <button
                         onClick={handleGoHome}
-                        className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                        className="group relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                         aria-label="Home"
                         title="Home"
                     >
@@ -991,7 +991,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                     
                     <Link to="/">
                         <button
-                            className="group relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-red-50/90 dark:bg-red-950/90 hover:bg-red-100 dark:hover:bg-red-900 border border-red-200/80 dark:border-red-800/80 hover:border-red-300 dark:hover:border-red-700 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
+                            className="group relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50/90 dark:bg-red-950/90 hover:bg-red-100 dark:hover:bg-red-900 border border-red-200/80 dark:border-red-800/80 hover:border-red-300 dark:hover:border-red-700 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"
                             aria-label="Leave room"
                             title="Leave room"
                         >
