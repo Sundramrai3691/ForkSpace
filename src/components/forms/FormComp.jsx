@@ -5,6 +5,8 @@ import { toast } from 'react-hot-toast';
 import { ThemeContext } from '../../../Context/ThemeContext';
 import { clearAuthToken, getAuthHeaders, getAuthToken, onAuthChange, setAuthToken } from '../../lib/auth';
 import CodeforcesProblemPicker from '../codeforces/CodeforcesProblemPicker';
+import AvatarPicker from '../common/AvatarPicker';
+import { getRandomAvatar } from '../../lib/avatars';
 
 function FormComp() {
     const navigate = useNavigate();
@@ -32,6 +34,7 @@ function FormComp() {
         email: '',
         password: '',
     });
+    const [avatarId, setAvatarId] = useState('clever-fox');
 
     const toastStyle = {
         borderRadius: '10px',
@@ -118,10 +121,26 @@ function FormComp() {
             return;
         }
 
+        let resolvedAvatarId = currentUser?.avatarId || avatarId || 'clever-fox';
+        if (!currentUser && entryMode === 'guest') {
+            const randomAvatar = getRandomAvatar();
+            resolvedAvatarId = randomAvatar.id;
+            toast(`You're ${randomAvatar.name} this session ${randomAvatar.emoji}`, {
+                duration: 2000,
+                position: 'bottom-center',
+                style: {
+                    background: '#111827',
+                    color: '#f59e0b',
+                    borderRadius: '10px',
+                },
+            });
+        }
+
         navigate(`/editor/${roomId}`, {
             state: {
                 username,
                 role,
+                avatarId: resolvedAvatarId,
                 sessionMode: sessionModeRef.current?.value?.trim() || 'peer_practice',
                 problemSource,
                 cfInternalProblemId:
@@ -137,7 +156,7 @@ function FormComp() {
         try {
             const endpoint = authMode === 'signup' ? '/api/auth/register' : '/api/auth/login';
             const payload = authMode === 'signup'
-                ? authForm
+                ? { ...authForm, avatarId }
                 : { email: authForm.email, password: authForm.password };
             const response = await axios.post(`${serverUrl}${endpoint}`, payload);
 
@@ -295,6 +314,9 @@ function FormComp() {
                                                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-gray-100"
                                                     required
                                                 />
+                                                {authMode === 'signup' && (
+                                                    <AvatarPicker selected={avatarId} onChange={setAvatarId} />
+                                                )}
                                                 <button
                                                     type="submit"
                                                     disabled={authLoading}

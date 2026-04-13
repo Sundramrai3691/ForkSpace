@@ -943,6 +943,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                 <User
                                     key={user.socketId}
                                     username={user.username}
+                                    avatarId={user.avatarId}
                                     role={user.role}
                                     isOnline={true}
                                     editorAccess={getEditorAccess(user)}

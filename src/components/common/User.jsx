@@ -1,13 +1,16 @@
-import Avatar from 'react-avatar'
+import { getAvatarById } from '../../lib/avatars';
 
 
 // eslint-disable-next-line react/prop-types
-function User({ username, isOnline, role, pairLabel, editorAccess }) {
+function User({ username, isOnline, role, pairLabel, editorAccess, avatarId }) {
+    const avatar = getAvatarById(avatarId);
     return (
         <div className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm">
             <div className="relative">
                 <div className="ring-2 ring-gray-200 dark:ring-gray-700 rounded-full transition-all group-hover:ring-gray-300 dark:group-hover:ring-gray-600">
-                    <Avatar name={username} size="36" round={true} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg dark:bg-slate-900">
+                        {avatar.emoji}
+                    </div>
                 </div>
                 {isOnline && (
                     <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-900 shadow-sm animate-pulse"></div>

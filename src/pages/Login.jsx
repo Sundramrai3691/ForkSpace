@@ -5,6 +5,8 @@ import { GraduationCap, Sword, X, Zap } from 'lucide-react';
 import FormComp from '../components/forms/FormComp';
 import Navbar from '../components/common/Navbar';
 import { getAuthHeaders, getAuthToken } from '../lib/auth';
+import { getRandomAvatar } from '../lib/avatars';
+import { toast } from 'react-hot-toast';
 
 const useCases = [
     {
@@ -65,10 +67,25 @@ function Login() {
     const handleQuickJoin = (event) => {
         event.preventDefault();
         const resolvedRoomId = quickRoomId.trim() || createRoomId();
+        const randomAvatar = getRandomAvatar();
+        const resolvedAvatarId = currentUser?.avatarId || randomAvatar.id;
+
+        if (!currentUser) {
+            toast(`You're ${randomAvatar.name} this session ${randomAvatar.emoji}`, {
+                duration: 2000,
+                position: 'bottom-center',
+                style: {
+                    background: '#111827',
+                    color: '#f59e0b',
+                    borderRadius: '10px',
+                },
+            });
+        }
 
         navigate(`/editor/${resolvedRoomId}`, {
             state: {
                 username: currentUser?.name || 'Guest',
+                avatarId: resolvedAvatarId,
                 role: 'Peer',
                 sessionMode: 'peer_practice',
             },

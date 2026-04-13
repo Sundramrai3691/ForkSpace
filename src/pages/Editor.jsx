@@ -6,6 +6,7 @@ import Workspace from '../components/Workspace/Workspace';
 import { connectSocket } from '../socket';
 import toast from 'react-hot-toast';
 import { getAuthToken } from '../lib/auth';
+import { getRandomAvatar } from '../lib/avatars';
 
 const SIDEBAR_WIDTH_KEY = 'forkspace.sidebarWidth';
 const SIDEBAR_MIN = 260;
@@ -33,6 +34,7 @@ function Editor() {
   const enteredSessionMode = state?.sessionMode || 'peer_practice';
   const enteredProblemSource = state?.problemSource || 'manual';
   const enteredCfProblemId = state?.cfInternalProblemId || '';
+  const enteredAvatarId = state?.avatarId || getRandomAvatar().id;
   const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
   const [socketConnected, setSocketConnected] = useState(false);
   const [users, setUsers] = useState([]); // Add this to track users
@@ -143,6 +145,7 @@ function Editor() {
             roomId,
             username,
             role: enteredRole,
+            avatarId: enteredAvatarId,
             authToken: getAuthToken(),
             sessionMode: enteredSessionMode,
           });
@@ -217,6 +220,7 @@ function Editor() {
     username,
     enteredProblemSource,
     enteredCfProblemId,
+    enteredAvatarId,
     serverUrl,
   ]);
 

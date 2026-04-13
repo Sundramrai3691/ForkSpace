@@ -18,6 +18,7 @@ import { formatCode } from "./formatCode";
 import { getAuthHeaders, getAuthToken } from "../../lib/auth";
 import SessionIntelligenceReportDashboard from "../sessionIntelligence/SessionIntelligenceReportDashboard.jsx";
 import HiddenTestPanel from "../HiddenTestPanel.jsx";
+import { getAvatarById } from "../../lib/avatars";
 
 function normalizeEditorText(text) {
     return String(text ?? "").replace(/\r\n/g, "\n");
@@ -687,7 +688,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             const labelEl = document.createElement('span');
             labelEl.className = 'remote-cursor-label';
             labelEl.style.backgroundColor = userColor;
-            labelEl.textContent = username || 'Guest';
+            const remoteUser = users.find((u) => u.socketId === socketId);
+            const avatar = getAvatarById(remoteUser?.avatarId);
+            labelEl.textContent = `${avatar.emoji} ${username || 'Guest'}`;
             cursorEl.appendChild(labelEl);
 
             const cursorMarker = editorRef.current.setBookmark(cursorPos, {
@@ -1650,10 +1653,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     <div
                                         key={user.socketId}
                                         style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
-                                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[11px] font-semibold text-black dark:border-[#081121]"
+                                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-sm dark:border-[#081121]"
                                         title={`${user.username || "Guest"} (${user.role || "Peer"})`}
                                     >
-                                        {(user.username || '?').charAt(0).toUpperCase()}
+                                        {getAvatarById(user.avatarId).emoji}
                                     </div>
                                 ))}
                             </div>

@@ -201,7 +201,7 @@ app.get("/", (_req, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
-  const { name = "", email = "", password = "" } = req.body || {};
+  const { name = "", email = "", password = "", avatarId = "clever-fox" } = req.body || {};
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
@@ -212,7 +212,7 @@ app.post("/api/auth/register", async (req, res) => {
         .json({ error: "An account with this email already exists." });
     }
 
-    user = new User({ name, email: normalizedEmail, password });
+    user = new User({ name, email: normalizedEmail, password, avatarId });
     await user.save();
 
     const token = jwt.sign(
@@ -223,7 +223,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
     });
   } catch (err) {
     console.error("Registration error details:", err);
@@ -257,7 +257,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
     });
   } catch (err) {
     console.error("Login error details:", err);
@@ -278,7 +278,7 @@ app.get("/api/auth/me", async (req, res) => {
     if (!user) return res.status(401).json({ error: "Unauthorized" });
 
     res.json({
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
     });
   } catch (err) {
     res.status(401).json({ error: "Unauthorized" });
@@ -2791,6 +2791,7 @@ function getUsersInRoom(roomId) {
         socketId,
         username: userSocketMap[socketId]?.username,
         role: userSocketMap[socketId]?.role || "Peer",
+        avatarId: userSocketMap[socketId]?.avatarId || "clever-fox",
         color: userSocketMap[socketId]?.color || USER_COLORS[0],
         isOnline: true,
       };
@@ -2803,7 +2804,7 @@ io.on("connection", (socket) => {
 
   socket.on(
     "join",
-    async ({ roomId, username, role, authToken, sessionMode }) => {
+    async ({ roomId, username, role, authToken, sessionMode, avatarId }) => {
       let roomState = roomStateMap.get(roomId);
 
       if (!roomState) {
@@ -2841,6 +2842,7 @@ io.on("connection", (socket) => {
       userSocketMap[socket.id] = {
         username: resolvedUsername,
         role: role || "Peer",
+        avatarId: authenticatedUser?.avatarId || avatarId || "clever-fox",
         color: pickColorForRoom(roomId, socket.id),
         userId: authenticatedUser?._id || null,
       };
