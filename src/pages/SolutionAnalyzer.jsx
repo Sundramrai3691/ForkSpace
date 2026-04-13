@@ -31,6 +31,24 @@ function SolutionAnalyzer() {
     const [isLoading, setIsLoading] = useState(false);
     const [isFetchingShared, setIsFetchingShared] = useState(false);
 
+    const normalizedAnalysis = analysis
+        ? {
+            ...analysis,
+            bugs: Array.isArray(analysis.bugs) ? analysis.bugs : [],
+            time_complexity: analysis.time_complexity || 'N/A',
+            space_complexity: analysis.space_complexity || 'N/A',
+            complexity_reasoning: analysis.complexity_reasoning || '',
+            optimization_suggestion:
+                analysis.optimization_suggestion && typeof analysis.optimization_suggestion === 'object'
+                    ? analysis.optimization_suggestion
+                    : { before: '', after: '', benefit: '' },
+            summary:
+                typeof analysis.summary === 'string' && analysis.summary.trim()
+                    ? analysis.summary.trim()
+                    : 'Analysis generated. Review the details below.',
+        }
+        : null;
+
     useEffect(() => {
         if (!analysisId) return;
 
@@ -167,40 +185,40 @@ function SolutionAnalyzer() {
                             <div className="rounded-[2rem] border border-dashed border-stone-300 bg-white/70 p-8 text-sm leading-7 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
                                 Loading shared analysis...
                             </div>
-                        ) : analysis ? (
+                        ) : normalizedAnalysis ? (
                             <>
                                 <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                                    <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{analysis.summary}</p>
-                                    {analysis.complexity_reasoning ? (
-                                        <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-400">{analysis.complexity_reasoning}</p>
+                                    <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{normalizedAnalysis.summary}</p>
+                                    {normalizedAnalysis.complexity_reasoning ? (
+                                        <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-400">{normalizedAnalysis.complexity_reasoning}</p>
                                     ) : null}
                                 </div>
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    <InsightCard label="Time Complexity" value={analysis.time_complexity} tone="blue" />
-                                    <InsightCard label="Space Complexity" value={analysis.space_complexity} tone="emerald" />
+                                    <InsightCard label="Time Complexity" value={normalizedAnalysis.time_complexity} tone="blue" />
+                                    <InsightCard label="Space Complexity" value={normalizedAnalysis.space_complexity} tone="emerald" />
                                 </div>
-                                {analysis.bugs?.length > 0 ? (
+                                {normalizedAnalysis.bugs?.length > 0 ? (
                                     <div className="rounded-[2rem] border border-rose-200 bg-rose-50/80 p-6 shadow-sm dark:border-rose-800/40 dark:bg-rose-950/20">
                                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-700 dark:text-rose-300">Specific missed edge cases</p>
                                         <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-rose-900 dark:text-rose-100">
-                                            {analysis.bugs.slice(0, 3).map((bug, index) => <li key={`${bug}-${index}`}>{bug}</li>)}
+                                            {normalizedAnalysis.bugs.slice(0, 3).map((bug, index) => <li key={`${bug}-${index}`}>{bug}</li>)}
                                         </ul>
                                     </div>
                                 ) : null}
-                                {analysis.optimization_suggestion ? (
+                                {normalizedAnalysis.optimization_suggestion ? (
                                     <div className="rounded-[2rem] border border-amber-200 bg-amber-50/80 p-6 shadow-sm dark:border-amber-800/40 dark:bg-amber-950/20">
                                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">One concrete optimization</p>
                                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                                             <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
                                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
-                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800 dark:text-slate-200">{analysis.optimization_suggestion.before}</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800 dark:text-slate-200">{normalizedAnalysis.optimization_suggestion.before}</p>
                                             </div>
                                             <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
                                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
-                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800 dark:text-slate-200">{analysis.optimization_suggestion.after}</p>
+                                                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800 dark:text-slate-200">{normalizedAnalysis.optimization_suggestion.after}</p>
                                             </div>
                                         </div>
-                                        <p className="mt-4 text-sm leading-7 text-amber-900 dark:text-amber-100">{analysis.optimization_suggestion.benefit}</p>
+                                        <p className="mt-4 text-sm leading-7 text-amber-900 dark:text-amber-100">{normalizedAnalysis.optimization_suggestion.benefit}</p>
                                     </div>
                                 ) : null}
                             </>

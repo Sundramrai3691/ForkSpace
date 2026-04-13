@@ -2054,25 +2054,90 @@ ${code}
       });
     }
 
-    let parsed;
-    try {
-      const jsonStart = review.indexOf("{");
-      const jsonEnd = review.lastIndexOf("}") + 1;
-      parsed =
-        jsonStart !== -1 && jsonEnd !== -1
-          ? JSON.parse(review.substring(jsonStart, jsonEnd))
-          : JSON.parse(review);
-    } catch {
-      parsed = {
-        bugs: [],
-        time_complexity: "N/A",
-        space_complexity: "N/A",
-        complexity_reasoning: "",
-        style_issues: [],
-        optimization_suggestion: null,
-        summary: review,
+    function sanitizeAnalysisPayload(payload, rawText = "") {
+      const obj = payload && typeof payload === "object" ? payload : {};
+      const optimizationObj =
+        obj.optimization_suggestion &&
+        typeof obj.optimization_suggestion === "object"
+          ? obj.optimization_suggestion
+          : {};
+      const toStr = (v) => (v == null ? "" : String(v).trim());
+      return {
+        bugs: Array.isArray(obj.bugs)
+          ? obj.bugs.map((v) => toStr(v)).filter(Boolean).slice(0, 6)
+          : [],
+        time_complexity: toStr(obj.time_complexity) || "N/A",
+        space_complexity: toStr(obj.space_complexity) || "N/A",
+        complexity_reasoning: toStr(obj.complexity_reasoning),
+        style_issues: Array.isArray(obj.style_issues)
+          ? obj.style_issues.map((v) => toStr(v)).filter(Boolean).slice(0, 6)
+          : [],
+        optimization_suggestion: {
+          before: toStr(optimizationObj.before),
+          after: toStr(optimizationObj.after),
+          benefit: toStr(optimizationObj.benefit),
+        },
+        summary:
+          toStr(obj.summary) ||
+          "Analysis generated. Review bugs and optimization suggestions below.",
+        raw_text: toStr(rawText).slice(0, 1200),
       };
     }
+
+    function parseAnalysisReview(rawReview = "") {
+      const text = String(rawReview || "").trim();
+      if (!text) return null;
+      const candidates = [];
+      candidates.push(text);
+      candidates.push(
+        text
+          .replace(/```json/gi, "")
+          .replace(/```/g, "")
+          .replace(/^\s*json\s*/i, "")
+          .trim(),
+      );
+      const firstBrace = text.indexOf("{");
+      const lastBrace = text.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        candidates.push(text.slice(firstBrace, lastBrace + 1).trim());
+      }
+
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        try {
+          const direct = JSON.parse(candidate);
+          if (typeof direct === "string") {
+            try {
+              const nested = JSON.parse(direct);
+              if (nested && typeof nested === "object") return nested;
+            } catch {
+              // keep falling through
+            }
+          }
+          if (direct && typeof direct === "object") return direct;
+        } catch {
+          // try next candidate
+        }
+      }
+      return null;
+    }
+
+    const parsedRaw = parseAnalysisReview(review);
+    const parsed = parsedRaw
+      ? sanitizeAnalysisPayload(parsedRaw, review)
+      : sanitizeAnalysisPayload(
+          {
+            bugs: [],
+            time_complexity: "N/A",
+            space_complexity: "N/A",
+            complexity_reasoning: "",
+            style_issues: [],
+            optimization_suggestion: null,
+            summary:
+              "AI response format was invalid. Please rerun analysis for a structured output.",
+          },
+          review,
+        );
 
     const analysis = await Analysis.create({
       code,

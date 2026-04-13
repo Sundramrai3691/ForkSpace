@@ -23,7 +23,8 @@ export async function connectSocket() {
         reconnectionDelay: 1000,
         reconnectionAttempts: Infinity,
         timeout: 10000,
-        transports: ["websocket", "polling"],
+        transports: ["polling", "websocket"],
+        upgrade: true,
         rememberUpgrade: true,
     };
 
