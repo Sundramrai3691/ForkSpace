@@ -1,4 +1,5 @@
 import { getAvatarById } from '../../lib/avatars';
+import AvatarGlyph from './AvatarGlyph';
 
 
 // eslint-disable-next-line react/prop-types
@@ -8,8 +9,8 @@ function User({ username, isOnline, role, pairLabel, editorAccess, avatarId }) {
         <div className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm">
             <div className="relative">
                 <div className="ring-2 ring-gray-200 dark:ring-gray-700 rounded-full transition-all group-hover:ring-gray-300 dark:group-hover:ring-gray-600">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg dark:bg-slate-900">
-                        {avatar.emoji}
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white text-gray-800 dark:bg-slate-900 dark:text-gray-100">
+                        <AvatarGlyph avatar={avatar} className="h-4 w-4" />
                     </div>
                 </div>
                 {isOnline && (

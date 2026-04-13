@@ -39,6 +39,7 @@ function createRoomId() {
 function Login() {
     const navigate = useNavigate();
     const quickRoomRef = useRef(null);
+    const authEntryRef = useRef(null);
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [currentUser, setCurrentUser] = useState(null);
     const [quickRoomId, setQuickRoomId] = useState('');
@@ -71,8 +72,8 @@ function Login() {
         const resolvedAvatarId = currentUser?.avatarId || randomAvatar.id;
 
         if (!currentUser) {
-            toast(`You're ${randomAvatar.name} this session ${randomAvatar.emoji}`, {
-                duration: 2000,
+            toast(`You're ${randomAvatar.name} this session`, {
+                duration: 3500,
                 position: 'bottom-center',
                 style: {
                     background: '#111827',
@@ -160,7 +161,17 @@ function Login() {
                         {!currentUser && (
                             <button
                                 type="button"
-                                onClick={() => setShowAuthPanel((prev) => !prev)}
+                                onClick={() => {
+                                    setShowAuthPanel((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                            window.setTimeout(() => {
+                                                authEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }, 30);
+                                        }
+                                        return next;
+                                    });
+                                }}
                                 className="mt-5 text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
                             >
                                 {showAuthPanel ? 'Close account access' : 'Sign in to save history'}
@@ -170,7 +181,7 @@ function Login() {
                 </section>
 
                 {(!currentUser && showAuthPanel) && (
-                    <section id="auth-entry" className="scroll-mt-24 border-b border-stone-200 bg-white px-4 py-10 dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:px-8">
+                    <section ref={authEntryRef} id="auth-entry" className="scroll-mt-24 border-b border-stone-200 bg-white px-4 py-10 dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:px-8">
                         <div className="mx-auto max-w-6xl space-y-5">
                             <div className="mx-auto flex w-full max-w-2xl items-start justify-between gap-4">
                                 <div className="space-y-2 text-left">

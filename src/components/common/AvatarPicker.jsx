@@ -1,4 +1,5 @@
 import { AVATARS } from '../../lib/avatars';
+import AvatarGlyph from './AvatarGlyph';
 
 export default function AvatarPicker({ selected, onChange }) {
   return (
@@ -22,7 +23,12 @@ export default function AvatarPicker({ selected, onChange }) {
                 }
               `}
             >
-              <span className="text-2xl">{avatar.emoji}</span>
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-gray-100"
+                style={{ color: avatar.color }}
+              >
+                <AvatarGlyph avatar={avatar} className="h-4 w-4" />
+              </span>
               <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
                 {avatar.name}
               </span>

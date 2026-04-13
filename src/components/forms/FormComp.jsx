@@ -125,8 +125,8 @@ function FormComp() {
         if (!currentUser && entryMode === 'guest') {
             const randomAvatar = getRandomAvatar();
             resolvedAvatarId = randomAvatar.id;
-            toast(`You're ${randomAvatar.name} this session ${randomAvatar.emoji}`, {
-                duration: 2000,
+            toast(`You're ${randomAvatar.name} this session`, {
+                duration: 3500,
                 position: 'bottom-center',
                 style: {
                     background: '#111827',

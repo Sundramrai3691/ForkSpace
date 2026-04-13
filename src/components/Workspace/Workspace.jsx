@@ -19,6 +19,7 @@ import { getAuthHeaders, getAuthToken } from "../../lib/auth";
 import SessionIntelligenceReportDashboard from "../sessionIntelligence/SessionIntelligenceReportDashboard.jsx";
 import HiddenTestPanel from "../HiddenTestPanel.jsx";
 import { getAvatarById } from "../../lib/avatars";
+import AvatarGlyph from "../common/AvatarGlyph.jsx";
 
 function normalizeEditorText(text) {
     return String(text ?? "").replace(/\r\n/g, "\n");
@@ -689,8 +690,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             labelEl.className = 'remote-cursor-label';
             labelEl.style.backgroundColor = userColor;
             const remoteUser = users.find((u) => u.socketId === socketId);
-            const avatar = getAvatarById(remoteUser?.avatarId);
-            labelEl.textContent = `${avatar.emoji} ${username || 'Guest'}`;
+            labelEl.textContent = `${username || 'Guest'}`;
             cursorEl.appendChild(labelEl);
 
             const cursorMarker = editorRef.current.setBookmark(cursorPos, {
@@ -1656,7 +1656,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                         className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-sm dark:border-[#081121]"
                                         title={`${user.username || "Guest"} (${user.role || "Peer"})`}
                                     >
-                                        {getAvatarById(user.avatarId).emoji}
+                                        <AvatarGlyph avatar={getAvatarById(user.avatarId)} className="h-3.5 w-3.5" />
                                     </div>
                                 ))}
                             </div>
