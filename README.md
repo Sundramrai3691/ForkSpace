@@ -48,10 +48,26 @@ The product is currently strongest for Codeforces-style practice and general int
 
 - Shared problem brief in the sidebar
 - Manual sample input and expected output fields for practical DSA sessions
-- Codeforces-first workflow with problem URL / platform / code context
+- Codeforces-first workflow with inline URL metadata load (title, tags, rating)
+- Honest import UX: statement + sample I/O are copied manually from Codeforces
 - Clear output comparison with visible `Passed sample` / `Mismatch` feedback
 - Shared approach notes for discussing brute force, optimized ideas, and edge cases
 - **Edge-case checklist (mentoring / AI panel):** priority-tagged items (for example critical vs high), short hints, and progress so interviews stay concrete instead of checkbox theater
+
+### Workspace UI (latest)
+
+- Action-driven top bar: `Run`, `Submit`, `Analyze`, `Report`, `Generate Tests`
+- Right-side panel tabs: `Output`, `Submissions`, `Tests` (resizable + can be collapsed)
+- `Analyze` and `Report` open as overlays instead of staying as crowded inline tabs
+- Room header shows language/mode/room controls with compact responsive alignment
+- Sidebar-first branding and room utilities for quick navigation
+
+### Hidden Tests (beta)
+
+- `Tests` tab separates **Verified tests** and **Stress tests (no ground truth)**
+- Generate hidden tests from current problem context and run all in one click
+- Clear status labels for pass/fail/timeout/crash/stress-only runs
+- Run summary modal for quick signal scanning
 
 ### Language & starter templates
 
@@ -70,6 +86,7 @@ The product is currently strongest for Codeforces-style practice and general int
 - **Run failures:** clearer feedback when execution or configuration breaks (for example Judge0 / network), instead of only a generic error toast
 - Formatter support for cleaner code before review or reruns
 - Output panel designed for quick debugging during pair sessions
+- Submission output and run output surfaced with clearer status context
 
 ### AI Assistance
 
@@ -231,9 +248,12 @@ Recommended workflow for the current product:
 1. Choose `Continue as Guest` for fast sessions, or sign in if you want saved rooms and runs.
 2. Create or enter a room ID.
 3. Add the problem context and shared sample input / expected output.
-4. Pick the **room language** in workspace settings when you need Python or JavaScript instead of the default (C++). If you already edited beyond the starter template, you will be asked to confirm before the buffer is replaced.
-5. Solve together in the shared editor.
-6. Run once and use the mismatch view to discuss what needs to change.
+4. If using Codeforces, click **Browse Codeforces**, paste the problem URL, and auto-fill title/tags/rating.
+5. Open the Codeforces link, then paste statement + sample I/O manually into Prompt/Input/Expected Output.
+6. Pick the **room language** when needed. If code is beyond starter template, you are asked before replacement.
+7. Solve together in the shared editor.
+8. Use `Run`/`Submit` for output, `Analyze` for review insights, and `Report` for session summary overlays.
+9. Use `Generate Tests` in the top bar or `Tests` tab to probe verified + stress behaviors.
 
 For now, this manual sample-based workflow is more reliable than trying to automate every external problem platform.
 
@@ -290,7 +310,7 @@ It is intentionally narrower: shared coding rooms for problem-solving sessions.
 - [x] Room persistence across restart
 - [ ] Stronger room history UI
 - [ ] More structured mentoring notes
-- [ ] Better problem import workflow
+- [x] Practical Codeforces metadata import (manual statement/sample copy flow)
 - [ ] Deeper run/result history inside each room
 
 ---
