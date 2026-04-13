@@ -10,7 +10,7 @@ import { getAuthToken } from '../lib/auth';
 const SIDEBAR_WIDTH_KEY = 'forkspace.sidebarWidth';
 const SIDEBAR_MIN = 260;
 const SIDEBAR_MAX = 500;
-const SIDEBAR_DEFAULT = 320;
+const SIDEBAR_DEFAULT = 360;
 
 function readInitialSidebarWidth() {
   try {
