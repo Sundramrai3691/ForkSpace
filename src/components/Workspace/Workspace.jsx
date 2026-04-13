@@ -1217,6 +1217,30 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         void fetchAIHints();
     };
 
+    const handleShareSessionCard = async () => {
+        try {
+            const { data } = await axios.post(
+                `${serverUrl}/api/session-card/generate`,
+                { roomId },
+                { headers: getAuthHeaders() },
+            );
+            const shareId = String(data?.shareId || "").trim();
+            if (!shareId) {
+                throw new Error("Could not generate session card");
+            }
+            const cardUrl = `${window.location.origin}/card/${shareId}`;
+            window.open(cardUrl, "_blank", "noopener,noreferrer");
+            await navigator.clipboard.writeText(cardUrl);
+            toast.success("Session card link copied");
+        } catch (error) {
+            const msg =
+                error?.response?.data?.error ||
+                error?.message ||
+                "Could not generate session card";
+            toast.error(msg);
+        }
+    };
+
     const handleFormatCode = () => {
         const currentCode = editorRef.current?.getValue() ?? "";
         const formattedCode = formatCode(selectedLanguageRef.current, currentCode);
@@ -1525,17 +1549,26 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             variant="standalone"
                         />
                         {lastShareId ? (
-                            <button
-                                type="button"
-                                onClick={async () => {
-                                    const url = `${window.location.origin}/report/${lastShareId}`;
-                                    await navigator.clipboard.writeText(url);
-                                    toast.success("Share link copied");
-                                }}
-                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
-                            >
-                                Copy share link
-                            </button>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                <button
+                                    type="button"
+                                    onClick={handleShareSessionCard}
+                                    className="w-full rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-700/70 dark:bg-emerald-900/20 dark:text-emerald-200"
+                                >
+                                    Share Card
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const url = `${window.location.origin}/report/${lastShareId}`;
+                                        await navigator.clipboard.writeText(url);
+                                        toast.success("Share link copied");
+                                    }}
+                                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+                                >
+                                    Copy report link
+                                </button>
+                            </div>
                         ) : null}
                     </div>
                 </OverlayPanel>

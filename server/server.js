@@ -22,6 +22,7 @@ import Room from "./models/Room.js";
 import Analysis from "./models/Analysis.js";
 import MockSummary from "./models/MockSummary.js";
 import HiddenTest from "./models/HiddenTest.js";
+import SessionCard from "./models/SessionCard.js";
 import {
   appendIntelligenceEvent,
   aggregateSessionReport,
@@ -33,7 +34,9 @@ import {
   saveShareableReport,
   getReportByShareId,
   listReportsForUser,
+  getLatestReportForRoom,
 } from "./services/sessionIntelligence.js";
+import { generateSessionCard } from "./services/sessionCard.js";
 import {
   loadCodeforcesCatalog,
   filterProblems,
@@ -348,6 +351,7 @@ const roomStateMap = new Map();
 const dataDirectory = path.join(process.cwd(), "server", "data");
 const roomStateFile = path.join(dataDirectory, "room-state.json");
 const userStateFile = path.join(dataDirectory, "user-state.json");
+const memorySessionCards = new Map();
 let persistTimer = null;
 let userPersistTimer = null;
 let userState = {
@@ -637,6 +641,20 @@ function getOrCreateRoomState(roomId) {
   }
 
   return roomStateMap.get(roomId);
+}
+
+function createRoomId() {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+function createUniqueRoomId() {
+  let attempts = 0;
+  let candidate = createRoomId();
+  while (roomStateMap.has(candidate) && attempts < 10) {
+    candidate = createRoomId();
+    attempts += 1;
+  }
+  return candidate;
 }
 
 function ensureIntelligenceSession(roomState) {
@@ -2746,6 +2764,61 @@ app.get("/api/session-intelligence/my-reports", async (req, res) => {
   });
 });
 
+app.post("/api/session-card/generate", async (req, res) => {
+  const { roomId = "" } = req.body || {};
+  if (!String(roomId).trim()) {
+    return res.status(400).json({ error: "Missing roomId" });
+  }
+
+  const latestReport = await getLatestReportForRoom(
+    isDatabaseConnected,
+    String(roomId).trim(),
+  );
+  if (!latestReport?.report) {
+    return res.status(400).json({
+      error:
+        "No session report available yet for this room. Generate a report first.",
+    });
+  }
+
+  const card = generateSessionCard(latestReport);
+  let shareId = card.shareId;
+
+  if (isDatabaseConnected()) {
+    try {
+      await SessionCard.create(card);
+    } catch {
+      shareId = `${card.shareId}-${Date.now().toString(36).slice(-3)}`;
+      await SessionCard.create({ ...card, shareId });
+    }
+  } else {
+    memorySessionCards.set(shareId, {
+      ...card,
+      shareId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  return res.json({ shareId });
+});
+
+app.get("/api/session-card/:shareId", async (req, res) => {
+  const { shareId = "" } = req.params;
+  if (!shareId.trim()) {
+    return res.status(400).json({ error: "Missing shareId" });
+  }
+
+  if (isDatabaseConnected()) {
+    const doc = await SessionCard.findOne({ shareId: shareId.trim() }).lean();
+    if (doc) return res.json({ card: doc });
+  }
+
+  const mem = memorySessionCards.get(shareId.trim());
+  if (mem) return res.json({ card: mem });
+
+  return res.status(404).json({ error: "Session card not found" });
+});
+
 app.get("/api/codeforces/problems", async (req, res) => {
   try {
     const { problems, source, stale, warning } =
@@ -2792,6 +2865,12 @@ app.get("/api/rooms/:roomId/problem-snapshot", (req, res) => {
     snapshot,
     sessionId: roomState?.session?.intelligenceSessionId || null,
   });
+});
+
+app.get("/api/rooms/new", (req, res) => {
+  const roomId = createUniqueRoomId();
+  getOrCreateRoomState(roomId);
+  return res.json({ roomId });
 });
 
 app.post("/api/rooms/:roomId/problem-selection", async (req, res) => {

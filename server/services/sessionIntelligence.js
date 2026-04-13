@@ -506,3 +506,30 @@ export async function listReportsForUser(isDatabaseConnected, userId, limit = 24
     .slice(0, limit);
 }
 
+export async function getLatestReportForRoom(isDatabaseConnected, roomId) {
+  if (!roomId) return null;
+  if (isDatabaseConnected()) {
+    try {
+      const doc = await SessionIntelligenceReport.findOne({ roomId: String(roomId) })
+        .sort({ createdAt: -1 })
+        .lean();
+      if (doc) return doc;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return Array.from(memoryLogs.entries())
+    .filter(
+      ([k, v]) =>
+        k.startsWith("report:") &&
+        v.type === "report" &&
+        v.roomId === String(roomId),
+    )
+    .map(([, v]) => v)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    )[0] || null;
+}
+
