@@ -266,6 +266,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [testGenerateSignal, setTestGenerateSignal] = useState(0);
     const [editorContentVersion, setEditorContentVersion] = useState(0);
     const [collabHintDismissed, setCollabHintDismissed] = useState(false);
+    const [showLanguageSwitchModal, setShowLanguageSwitchModal] = useState(false);
+    const [pendingLanguage, setPendingLanguage] = useState(null);
+    const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+    const [clearConfirmCountdown, setClearConfirmCountdown] = useState(0);
+    const [canUndoClear, setCanUndoClear] = useState(false);
+    const [showFormattedFlash, setShowFormattedFlash] = useState(false);
+    const lastClearedCodeRef = useRef("");
+    const clearUndoTimeoutRef = useRef(null);
 
     useEffect(() => {
         setCollabHintDismissed(false);
@@ -282,6 +290,30 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         const id = window.setTimeout(() => setIsNewReport(false), 12000);
         return () => window.clearTimeout(id);
     }, [isNewReport]);
+
+    useEffect(() => {
+        if (!showFormattedFlash) return undefined;
+        const id = window.setTimeout(() => setShowFormattedFlash(false), 1000);
+        return () => window.clearTimeout(id);
+    }, [showFormattedFlash]);
+
+    useEffect(() => {
+        if (!showClearConfirmModal) return undefined;
+        setClearConfirmCountdown(2);
+        const startedAt = Date.now();
+        const intervalId = window.setInterval(() => {
+            const elapsedSeconds = (Date.now() - startedAt) / 1000;
+            const remaining = Math.max(0, 2 - elapsedSeconds);
+            setClearConfirmCountdown(Number(remaining.toFixed(1)));
+        }, 100);
+        return () => window.clearInterval(intervalId);
+    }, [showClearConfirmModal]);
+
+    useEffect(() => () => {
+        if (clearUndoTimeoutRef.current) {
+            window.clearTimeout(clearUndoTimeoutRef.current);
+        }
+    }, []);
 
     useEffect(() => {
         localStorage.setItem(
@@ -1040,25 +1072,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         });
     };
 
-    const handleLanguageChange = useCallback((event) => {
-        const next = event.target.value;
+    const applyLanguageSwitch = useCallback((next) => {
         if (!LANGUAGE_OPTIONS[next]) return;
 
         const prevLang = selectedLanguageRef.current;
         if (prevLang === next) return;
-
-        const currentCode = editorRef.current?.getValue() ?? "";
-        const safeReplace = codeIsSafeToReplaceForLanguageSwitch(currentCode);
-
-        if (!safeReplace) {
-            const ok = window.confirm(
-                `Switch to ${LANGUAGE_OPTIONS[next].label}? The editor will be reset to the default template for that language and your current code will be replaced.`,
-            );
-            if (!ok) {
-                event.target.value = prevLang;
-                return;
-            }
-        }
 
         const nextCode = LANGUAGE_OPTIONS[next].starterCode;
 
@@ -1072,11 +1090,64 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         socketRef.current?.emit("language-change", { roomId, language: next });
     }, [roomId]);
 
+    const handleLanguageChange = useCallback((event) => {
+        const next = event.target.value;
+        if (!LANGUAGE_OPTIONS[next]) return;
+
+        const prevLang = selectedLanguageRef.current;
+        if (prevLang === next) return;
+
+        const currentCode = editorRef.current?.getValue() ?? "";
+        const safeReplace = codeIsSafeToReplaceForLanguageSwitch(currentCode);
+        if (!safeReplace) {
+            setPendingLanguage(next);
+            setShowLanguageSwitchModal(true);
+            return;
+        }
+
+        applyLanguageSwitch(next);
+    }, [applyLanguageSwitch]);
+
     const handleResetCode = () => {
         setCollabHintDismissed(false);
         const nextCode = LANGUAGE_OPTIONS[selectedLanguageRef.current].starterCode;
         editorRef.current?.setValue(nextCode);
         syncCodeToRoom(nextCode);
+    };
+
+    const handleOpenClearConfirm = () => {
+        if (!editorUnlocked) return;
+        setShowClearConfirmModal(true);
+    };
+
+    const handleConfirmClear = () => {
+        if (clearConfirmCountdown > 0) return;
+        const currentCode = editorRef.current?.getValue() ?? "";
+        lastClearedCodeRef.current = currentCode;
+        if (clearUndoTimeoutRef.current) {
+            window.clearTimeout(clearUndoTimeoutRef.current);
+        }
+        setCanUndoClear(true);
+        clearUndoTimeoutRef.current = window.setTimeout(() => {
+            setCanUndoClear(false);
+            lastClearedCodeRef.current = "";
+            clearUndoTimeoutRef.current = null;
+        }, 30000);
+        handleResetCode();
+        setShowClearConfirmModal(false);
+    };
+
+    const handleUndoClear = () => {
+        if (!canUndoClear || !lastClearedCodeRef.current) return;
+        const previousCode = lastClearedCodeRef.current;
+        editorRef.current?.setValue(previousCode);
+        syncCodeToRoom(previousCode);
+        setCanUndoClear(false);
+        lastClearedCodeRef.current = "";
+        if (clearUndoTimeoutRef.current) {
+            window.clearTimeout(clearUndoTimeoutRef.current);
+            clearUndoTimeoutRef.current = null;
+        }
     };
 
     const handleFormatCode = () => {
@@ -1097,7 +1168,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             toast.error("Only the Driver can run code in mock mode.");
             return;
         }
-        const rawCode = editorRef.current.getValue();
+        const currentCode = editorRef.current.getValue();
+        const autoFormattedCode = formatCode(selectedLanguageRef.current, currentCode);
+        const rawCode = autoFormattedCode !== currentCode ? autoFormattedCode : currentCode;
+        if (rawCode !== currentCode) {
+            editorRef.current.setValue(rawCode);
+            syncCodeToRoom(rawCode);
+            setShowFormattedFlash(true);
+        }
         const languageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
         const fallbackSampleInput = sampleInput.trim();
         const effectiveStdin = sampleInput;
@@ -1500,6 +1578,88 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </div>
                 </OverlayPanel>
             ) : null}
+            {showLanguageSwitchModal && pendingLanguage ? (
+                <OverlayPanel
+                    title="Switch Language?"
+                    subtitle="Template Replacement Preview"
+                    onClose={() => {
+                        setShowLanguageSwitchModal(false);
+                        setPendingLanguage(null);
+                    }}
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                            Your current code will be replaced with the starter template for {LANGUAGE_OPTIONS[pendingLanguage]?.label || pendingLanguage}.
+                        </p>
+                        <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="rounded-xl border border-red-200/70 bg-red-50/60 p-3 dark:border-red-800/40 dark:bg-red-950/20">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">Your current code (will be replaced)</p>
+                                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-lg bg-white/90 p-3 font-mono text-xs leading-6 text-slate-800 dark:bg-slate-900/70 dark:text-slate-100">{editorRef.current?.getValue() ?? ""}</pre>
+                            </div>
+                            <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">New starter template</p>
+                                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-lg bg-white/90 p-3 font-mono text-xs leading-6 text-slate-800 dark:bg-slate-900/70 dark:text-slate-100">{LANGUAGE_OPTIONS[pendingLanguage]?.starterCode ?? ""}</pre>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowLanguageSwitchModal(false);
+                                    setPendingLanguage(null);
+                                }}
+                                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    applyLanguageSwitch(pendingLanguage);
+                                    setShowLanguageSwitchModal(false);
+                                    setPendingLanguage(null);
+                                }}
+                                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400"
+                            >
+                                Switch Language
+                            </button>
+                        </div>
+                    </div>
+                </OverlayPanel>
+            ) : null}
+            {showClearConfirmModal ? (
+                <OverlayPanel
+                    title="Clear Editor For Everyone?"
+                    subtitle="Destructive Action"
+                    onClose={() => setShowClearConfirmModal(false)}
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                            Clear the editor for everyone in this room? This can&apos;t be undone.
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Confirm unlocks after 2 seconds to prevent accidental data loss.
+                        </p>
+                        <div className="flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowClearConfirmModal(false)}
+                                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmClear}
+                                disabled={clearConfirmCountdown > 0}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {clearConfirmCountdown > 0 ? `Confirm in ${clearConfirmCountdown.toFixed(1)}s` : "Confirm Clear"}
+                            </button>
+                        </div>
+                    </div>
+                </OverlayPanel>
+            ) : null}
 
             <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121]">
                     <button
@@ -1515,6 +1675,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         )}
                         {isRunBusy ? "Running..." : "Run"}
                     </button>
+                    {showFormattedFlash ? (
+                        <span className="inline-flex h-8 items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-950/30 dark:text-emerald-200">
+                            Formatted
+                        </span>
+                    ) : null}
                     <button
                         className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-500/70 px-4 text-[15px] text-amber-400 transition-colors hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
                         onClick={submitSamples}
@@ -1585,7 +1750,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </button>
                     <button
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 text-gray-300 transition-colors hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-50"
-                        onClick={handleResetCode}
+                        onClick={handleOpenClearConfirm}
                         disabled={!editorUnlocked}
                         title={editorUnlocked ? 'Clear editor' : 'Only the active editor owner can clear code right now'}
                     >
@@ -1597,6 +1762,16 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             <line x1="14" x2="14" y1="11" y2="17" />
                         </svg>
                     </button>
+                    {canUndoClear ? (
+                        <button
+                            type="button"
+                            onClick={handleUndoClear}
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300/70 bg-amber-50/80 px-3 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                            title="Undo clear (available for 30 seconds)"
+                        >
+                            Undo Clear
+                        </button>
+                    ) : null}
                     <div className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <label htmlFor="language-select" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
