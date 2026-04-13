@@ -26,6 +26,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
     const [offset, setOffset] = useState(0);
     const [loading, setLoading] = useState(false);
     const [warning, setWarning] = useState('');
+    const [showFilters, setShowFilters] = useState(true);
     const limit = 40;
 
     const fetchWithFilters = useCallback(
@@ -84,27 +85,22 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
     };
 
     return (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-md sm:p-5">
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-md sm:p-4">
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="cf-picker-title"
-                className="flex h-[80vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_28px_100px_-28px_rgba(15,23,42,0.55)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_36px_120px_-36px_rgba(0,0,0,0.9)] dark:ring-white/5"
+                className="flex h-[78vh] w-full max-w-[1040px] flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_28px_100px_-28px_rgba(15,23,42,0.55)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_36px_120px_-36px_rgba(0,0,0,0.9)] dark:ring-white/5"
             >
-                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-stone-200/90 px-6 py-5 sm:px-8 dark:border-slate-700/80">
+                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-stone-200/90 px-5 py-3.5 sm:px-6 dark:border-slate-700/80">
                     <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
                             Codeforces catalog
                         </p>
-                        <h3
-                            id="cf-picker-title"
-                            className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white"
-                        >
+                        <h3 id="cf-picker-title" className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                             Pick a problem
                         </h3>
-                        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                            Filters stay visible while you scroll. Select a card to apply.
-                        </p>
+                        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600 dark:text-slate-400">Select a row to apply to the room.</p>
                     </div>
                     <button
                         type="button"
@@ -125,14 +121,28 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                         </div>
                     )}
 
-                    <div className="sticky top-0 z-20 border-b border-stone-200/90 bg-white/95 px-6 py-5 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-700/80 dark:bg-[#060d18]/95 sm:px-8">
-                        <form onSubmit={handleSearch} className="space-y-6">
+                    <div className="sticky top-0 z-20 border-b border-stone-200/90 bg-white/95 px-5 py-3 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-700/80 dark:bg-[#060d18]/95 sm:px-6">
+                        <form onSubmit={handleSearch} className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Filters</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowFilters((v) => !v)}
+                                    className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                                >
+                                    {showFilters ? "Collapse" : "Expand"}
+                                </button>
+                            </div>
+                            {showFilters ? (
+                                <>
                             <div className="rounded-2xl border border-stone-200/90 bg-stone-50/90 p-5 dark:border-slate-700/80 dark:bg-slate-900/40">
                                 <p className={`${labelClass} mb-4 text-stone-700 dark:text-slate-300`}>Search & tags</p>
                                 <div className="space-y-4">
                                     <label className="block space-y-2">
                                         <span className={labelClass}>Tags (comma-separated, AND)</span>
                                         <input
+                                            id="cf-tags"
+                                            name="tags"
                                             value={filters.tags}
                                             onChange={(e) => setFilters((f) => ({ ...f, tags: e.target.value }))}
                                             placeholder="e.g. dp, greedy"
@@ -142,6 +152,8 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                                     <label className="block space-y-2">
                                         <span className={labelClass}>Search by title or problem id</span>
                                         <input
+                                            id="cf-search"
+                                            name="search"
                                             value={filters.search}
                                             onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                                             placeholder="e.g. 1885 or xor"
@@ -158,6 +170,8 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                                         <span className={labelClass}>Minimum rating</span>
                                         <input
                                             type="number"
+                                            id="cf-min-rating"
+                                            name="minRating"
                                             value={filters.minRating}
                                             onChange={(e) => setFilters((f) => ({ ...f, minRating: e.target.value }))}
                                             placeholder="800"
@@ -168,6 +182,8 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                                         <span className={labelClass}>Maximum rating</span>
                                         <input
                                             type="number"
+                                            id="cf-max-rating"
+                                            name="maxRating"
                                             value={filters.maxRating}
                                             onChange={(e) => setFilters((f) => ({ ...f, maxRating: e.target.value }))}
                                             placeholder="2000"
@@ -184,6 +200,8 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                                         <span className={labelClass}>Minimum solves</span>
                                         <input
                                             type="number"
+                                            id="cf-min-solved"
+                                            name="minSolved"
                                             value={filters.minSolved}
                                             onChange={(e) => setFilters((f) => ({ ...f, minSolved: e.target.value }))}
                                             placeholder="0"
@@ -194,6 +212,8 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                                         <span className={labelClass}>Maximum solves</span>
                                         <input
                                             type="number"
+                                            id="cf-max-solved"
+                                            name="maxSolved"
                                             value={filters.maxSolved}
                                             onChange={(e) => setFilters((f) => ({ ...f, maxSolved: e.target.value }))}
                                             placeholder="Optional cap"
@@ -222,10 +242,12 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                                     Reset
                                 </button>
                             </div>
+                                </>
+                            ) : null}
                         </form>
                     </div>
 
-                    <div className="px-6 py-6 sm:px-8 sm:py-8">
+                    <div className="px-5 py-5 sm:px-6 sm:py-6">
                         <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-stone-200/80 pb-4 dark:border-slate-700/60">
                             <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
                                 <span className="tabular-nums text-lg text-slate-900 dark:text-white">{rows.length}</span>
@@ -238,7 +260,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                             </p>
                         </div>
 
-                        <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                             {rows.map((row) => (
                                 <li key={row.internalProblemId}>
                                     <button

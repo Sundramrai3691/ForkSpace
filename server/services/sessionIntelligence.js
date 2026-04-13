@@ -108,7 +108,7 @@ async function upsertLogMongo(sessionId, roomId, mutator) {
   await SessionIntelligenceLog.findOneAndUpdate(
     { sessionId },
     { $set: next },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 }
 

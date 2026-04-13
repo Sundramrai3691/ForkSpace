@@ -17,6 +17,7 @@ import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "./languages";
 import { formatCode } from "./formatCode";
 import { getAuthHeaders, getAuthToken } from "../../lib/auth";
 import SessionIntelligenceReportDashboard from "../sessionIntelligence/SessionIntelligenceReportDashboard.jsx";
+import HiddenTestPanel from "../HiddenTestPanel.jsx";
 
 function normalizeEditorText(text) {
     return String(text ?? "").replace(/\r\n/g, "\n");
@@ -242,6 +243,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [reportLoading, setReportLoading] = useState(false);
     const [lastReportPayload, setLastReportPayload] = useState(null);
     const [lastShareId, setLastShareId] = useState('');
+    const [showReportModal, setShowReportModal] = useState(false);
     const [editorContentVersion, setEditorContentVersion] = useState(0);
     const [collabHintDismissed, setCollabHintDismissed] = useState(false);
 
@@ -888,6 +890,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         setIsOutputCollapsed(false);
                         setIsNewReport(true);
                         setActiveRightTab("report");
+                        setShowReportModal(true);
                         toast.success("Session intelligence report saved.");
                     }
                 } catch {
@@ -1132,6 +1135,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             setIsOutputCollapsed(false);
             setIsNewReport(true);
             setActiveRightTab("report");
+            setShowReportModal(true);
             toast.success("Session intelligence report is ready.");
         } catch (error) {
             const msg =
@@ -1274,6 +1278,34 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </div>
                 </OverlayPanel>
             )}
+            {showReportModal && lastReportPayload ? (
+                <OverlayPanel
+                    title="Session Report"
+                    subtitle="Session Intelligence"
+                    onClose={() => setShowReportModal(false)}
+                >
+                    <div className="space-y-4">
+                        <SessionIntelligenceReportDashboard
+                            report={lastReportPayload}
+                            title={roomState?.problem?.title || "Practice session"}
+                            variant="standalone"
+                        />
+                        {lastShareId ? (
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const url = `${window.location.origin}/report/${lastShareId}`;
+                                    await navigator.clipboard.writeText(url);
+                                    toast.success("Share link copied");
+                                }}
+                                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+                            >
+                                Copy share link
+                            </button>
+                        ) : null}
+                    </div>
+                </OverlayPanel>
+            ) : null}
 
             <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-2.5 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -1531,6 +1563,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     { key: "output", label: "Output" },
                                     { key: "history", label: "History" },
                                     { key: "ai", label: "Intelligence" },
+                                    { key: "tests", label: "Tests" },
                                     { key: "report", label: "Report" },
                                 ].map((tab) => {
                                     const isActive = activeRightTab === tab.key;
@@ -1760,6 +1793,16 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
                                     {renderReviewContent()}
                                 </div>
+                            )}
+
+                            {activeRightTab === "tests" && (
+                                <HiddenTestPanel
+                                    serverUrl={serverUrl}
+                                    roomId={roomId}
+                                    language={selectedLanguageRef.current}
+                                    code={editorRef.current?.getValue?.() || ""}
+                                    problem={roomState?.problem || {}}
+                                />
                             )}
 
                             {activeRightTab === "report" && (

@@ -21,6 +21,7 @@ import User from "./models/User.js";
 import Room from "./models/Room.js";
 import Analysis from "./models/Analysis.js";
 import MockSummary from "./models/MockSummary.js";
+import HiddenTest from "./models/HiddenTest.js";
 import {
   appendIntelligenceEvent,
   aggregateSessionReport,
@@ -40,6 +41,7 @@ import {
   buildRoomProblemPayloadFromCf,
   parseInternalProblemId,
 } from "./services/codeforcesCatalog.js";
+import createHiddenTestRouter from "./hidden-tests/hiddenTestRoutes.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
 mongoose.set("bufferCommands", false);
@@ -161,6 +163,15 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(
+  "/api/hidden-tests",
+  createHiddenTestRouter({
+    isDatabaseConnected,
+    getRoomState: getOrCreateRoomState,
+  }),
+);
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -2529,6 +2540,52 @@ app.post("/api/run-sample-suite", async (req, res) => {
   }
 });
 
+async function enrichReportWithHiddenTestSignals({ roomId, sessionId, report }) {
+  if (!isDatabaseConnected() || !report) return report;
+  try {
+    const rows = await HiddenTest.find({
+      roomId,
+      sessionId,
+      bugClass: { $in: ["off-by-one", "overflow", "empty case", "wrong loop bounds"] },
+      $or: [
+        { passed: false },
+        { timedOut: true },
+        { runtimeError: true },
+        { suspiciousOutput: true },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(48)
+      .lean();
+    if (!rows.length) return report;
+
+    const counts = {};
+    for (const row of rows) {
+      const key = row.bugClass || "unknown";
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    const repeated = Object.entries(counts)
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1]);
+    if (!repeated.length) return report;
+
+    const [topBug, topCount] = repeated[0];
+    const hiddenSignal = `Hidden tests indicate repeated ${topBug} issues (${topCount} occurrences).`;
+    return {
+      ...report,
+      biggestGaps: [...new Set([...(report.biggestGaps || []), hiddenSignal])].slice(0, 5),
+      nextSteps: [
+        ...new Set([
+          ...(report.nextSteps || []),
+          `Target ${topBug} by adding one dedicated boundary case before each submit.`,
+        ]),
+      ].slice(0, 5),
+    };
+  } catch {
+    return report;
+  }
+}
+
 app.post("/api/session-intelligence/report", async (req, res) => {
   const user = await getUserFromAuthHeader(req);
   const {
@@ -2562,7 +2619,8 @@ app.post("/api/session-intelligence/report", async (req, res) => {
     ? { userId: String(user._id), username: user.name }
     : {};
 
-  const report = aggregateSessionReport(logDoc, filter);
+  let report = aggregateSessionReport(logDoc, filter);
+  report = await enrichReportWithHiddenTestSignals({ roomId, sessionId, report });
   let shareId = null;
   if (saveShare !== false && saveShare !== "false") {
     shareId = await saveShareableReport(isDatabaseConnected, {
