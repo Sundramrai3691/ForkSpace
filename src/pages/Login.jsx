@@ -10,24 +10,24 @@ const useCases = [
     {
         icon: Sword,
         title: 'Mock Interview',
-        description: 'Run a candidate-interviewer session in one room with shared code, role switching, and quick output checks.',
+        description: 'Candidate and interviewer in one room. Shared editor, live output, Driver/Navigator roles. No screen share needed.',
     },
     {
         icon: GraduationCap,
         title: 'DSA Mentoring',
-        description: 'Explain patterns, compare approaches, and guide learners live without handing screens back and forth.',
+        description: 'Load a Codeforces problem, walk through the approach together, run and debug in the same editor. No back-and-forth screen passing.',
     },
     {
         icon: Zap,
         title: 'Peer Practice',
-        description: 'Open a room fast, solve one problem together, and validate the answer in the same flow.',
+        description: 'Pick a problem, write a solution, stress-test it with generated hidden tests. Two people, one attempt, immediate feedback.',
     },
 ];
 
 const quickStartSteps = [
-    'Create a room instantly or paste an existing Room ID to jump straight into a shared session.',
-    'Pick the right mode for the session, then assign Driver and Navigator so both people know the flow.',
-    'Code, run, compare output, and use the AI review panel only when you actually need extra guidance.',
+    'Create a room or paste a Room ID. Jump in as guest — no account needed to start.',
+    'Pick a session mode: Mock Interview, DSA Mentoring, or Peer Practice. Assign Driver and Navigator roles so both sides know the structure.',
+    'Write code together, run it, compare output against sample cases. Use Analyze for complexity and bug review, Report for a session summary — when you actually need it.',
 ];
 
 function createRoomId() {
@@ -87,15 +87,15 @@ function Login() {
                 <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 pb-20 pt-20 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
                     <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
                         <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                            Realtime rooms for interview practice, DSA mentoring, and revision
+                            Built for Codeforces practice, mock interviews, and DSA mentoring
                         </div>
 
                         <div className="mt-8 space-y-5">
                             <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">
-                                Practice interviews and teach DSA live in one shared coding room.
+                                One room. One solution. No screen sharing.
                             </h1>
                             <p className="mx-auto max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                                ForkSpace helps mentors, interviewers, and learners open a room quickly, solve problems together, and run code without screen sharing or extra setup.
+                                Open a room, load a Codeforces problem, write and run code together — without switching tabs or sharing screens. Built for pair DSA practice, mock rounds, and mentor sessions.
                             </p>
                         </div>
 
@@ -125,7 +125,7 @@ function Login() {
                                 type="text"
                                 value={quickRoomId}
                                 onChange={(event) => setQuickRoomId(event.target.value.toUpperCase())}
-                                placeholder="Enter Room ID or leave blank to create one instantly"
+                                placeholder="Paste a Room ID, or leave blank to create one"
                                 className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                             />
                             <button
@@ -137,7 +137,7 @@ function Login() {
                         </form>
 
                         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                            {currentUser ? `Jump in as ${currentUser.name}.` : 'Jump in as a guest now, or sign in below to save rooms and history.'}
+                            {currentUser ? `Jump in as ${currentUser.name}.` : 'No signup needed. Sign in only to save room and run history.'}
                         </p>
 
                         {!currentUser && (
@@ -146,7 +146,7 @@ function Login() {
                                 onClick={() => setShowAuthPanel((prev) => !prev)}
                                 className="mt-5 text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
                             >
-                                {showAuthPanel ? 'Close account access' : 'Need saved history? Sign in'}
+                                {showAuthPanel ? 'Close account access' : 'Sign in to save history'}
                             </button>
                         )}
                     </div>
@@ -180,9 +180,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">How It Works</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Three steps to start a mock round or mentoring session.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">From zero to coding together in under a minute.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                ForkSpace stays focused on one practical loop: enter a room, align on roles, and solve together in the same space.
+                                No configuration. No plugins. Just open a room, load the problem, and start.
                             </p>
                         </div>
 
@@ -203,9 +203,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Use Cases</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Built for the sessions people actually search for.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">Narrow by design. Strong where it counts.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                Instead of trying to be everything, ForkSpace is strongest when it supports focused interview prep, guided DSA learning, and fast pair practice.
+                                ForkSpace doesn&apos;t try to be a full IDE. It&apos;s built for one workflow: two people, one problem, solved together in real time.
                             </p>
                         </div>
 
@@ -235,7 +235,7 @@ function Login() {
                             rel="noopener noreferrer"
                             className="transition hover:text-slate-900 dark:hover:text-white"
                         >
-                            GitHub | 0 stars
+                            GitHub
                         </a>
                         <a
                             href="/LICENSE"
