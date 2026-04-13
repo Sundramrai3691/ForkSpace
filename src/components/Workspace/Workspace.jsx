@@ -1200,6 +1200,40 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         }
     };
 
+    const handleUseHiddenTestAsSample = (test) => {
+        if (!socketRef?.current || !test) return;
+        const input = String(test.input || "").trim();
+        const output = String(test.actualOutput || "").trim();
+        if (!input || !output) {
+            toast.error("Run the test first so input/output is available.");
+            return;
+        }
+
+        const baseProblem = roomState?.problem || {};
+        const existingSamples = Array.isArray(baseProblem.samples) ? baseProblem.samples : [];
+        const nextSamples = [
+            ...existingSamples,
+            {
+                id: `sample-${existingSamples.length + 1}`,
+                input,
+                output,
+            },
+        ];
+        const appendBlock = (prev, next) => (String(prev || "").trim() ? `${String(prev).trim()}\n\n${next}` : next);
+        const nextProblem = {
+            ...baseProblem,
+            sampleInput: appendBlock(baseProblem.sampleInput, input),
+            sampleOutput: appendBlock(baseProblem.sampleOutput, output),
+            samples: nextSamples,
+        };
+
+        socketRef.current.emit("problem-update", {
+            roomId,
+            problem: nextProblem,
+        });
+        toast.success("Added hidden test as sample case");
+    };
+
     const submitSamples = async () => {
         if (!canRunInCurrentMode) {
             toast.error("Only the Driver can run code in mock mode.");
@@ -1503,7 +1537,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 void reviewSolution();
                             }
                         }}
-                        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[15px] text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                        className="inline-flex h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-[15px] text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
                     >
                         {isReviewLoading ? <ButtonSpinner /> : (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1522,7 +1556,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             void generateSessionReport({ endSession: false });
                         }}
                         disabled={reportLoading}
-                        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[15px] text-gray-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60"
+                        className="inline-flex h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-[15px] text-gray-200 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-60"
                     >
                         {reportLoading ? <ButtonSpinner /> : (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1538,7 +1572,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             setTestGenerateSignal((v) => v + 1);
                             setIsOutputCollapsed(false);
                         }}
-                        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[15px] text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                        className="inline-flex h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-[15px] text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
                         title="Generate hidden tests"
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1658,9 +1692,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             </div>
                         </div>
                     )}
-                        {isMockMode && (
-                            <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+                    {isMockMode && (
+                            <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50/70 px-3 py-1.5 shadow-sm dark:border-amber-800/40 dark:bg-amber-900/20">
+                                <span className="min-w-[4.2rem] rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-bold tracking-[0.12em] text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/40 dark:text-amber-100">
                                     {formatTimerLabel(timeRemaining)}
                                 </span>
                                 <select
@@ -1982,6 +2016,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     code={editorRef.current?.getValue?.() || ""}
                                     problem={roomState?.problem || {}}
                                     externalGenerateSignal={testGenerateSignal}
+                                    onUseAsSampleTest={handleUseHiddenTestAsSample}
                                 />
                             )}
 

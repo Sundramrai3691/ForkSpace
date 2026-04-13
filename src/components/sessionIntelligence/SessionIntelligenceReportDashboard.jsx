@@ -54,13 +54,25 @@ export default function SessionIntelligenceReportDashboard({
     return (
         <div className={`${shell} ${pad} space-y-1`}>
             <div className="rounded-2xl border border-gray-200/80 bg-white/90 px-5 py-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/65 sm:px-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                    Session intelligence
-                </p>
-                <h2 className="mt-2 text-xl font-bold leading-tight tracking-tight text-gray-900 dark:text-white sm:text-2xl">
-                    {title}
-                </h2>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{subtitle}</p>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                            Session intelligence
+                        </p>
+                        <h2 className="mt-2 text-xl font-bold leading-tight tracking-tight text-gray-900 dark:text-white sm:text-2xl">
+                            {title}
+                        </h2>
+                        <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{subtitle}</p>
+                    </div>
+                    <div className="min-w-[7.5rem] rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white px-4 py-3 text-right shadow-sm dark:border-amber-900/45 dark:from-amber-950/30 dark:to-slate-900/70">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                            Session score
+                        </p>
+                        <p className="mt-1 text-3xl font-extrabold leading-none text-amber-900 dark:text-amber-100">
+                            {report.sessionScore}
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Insight — blue */}
@@ -182,7 +194,7 @@ export default function SessionIntelligenceReportDashboard({
             </div>
 
             <div className="rounded-xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs text-gray-600 dark:border-gray-700/70 dark:bg-slate-900/60 dark:text-gray-400">
-                <span className="font-semibold">Session score (beta signal):</span> {report.sessionScore}
+                <span className="font-semibold">Score note:</span> The score blends runtime reliability, sample outcomes, and iteration quality for this session.
             </div>
         </div>
     );

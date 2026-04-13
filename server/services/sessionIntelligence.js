@@ -296,15 +296,38 @@ export function aggregateSessionReport(logDoc, filter = {}) {
 
   const totalAttempts = runs.length + submits.length;
   const failSignals =
-    compileErrors + runtimeErrors + sampleMismatch + (submits.length - samplePass);
-  let sessionScore = 50;
-  if (totalAttempts > 0) {
-    sessionScore = Math.round(
-      100 * (1 - failSignals / (totalAttempts + failSignals * 0.5)),
-    );
+    compileErrors + runtimeErrors + sampleMismatch + Math.max(0, submits.length - samplePass);
+  let sessionScore = 56;
+  if (totalAttempts === 0) {
+    sessionScore = 42;
+  } else {
+    const reliabilityBonus = Math.min(18, runPass * 2 + samplePass * 6);
+    const reviewBonus = Math.min(10, reviews.length * 3);
+    const activityBonus = Math.min(8, Math.max(0, totalAttempts - 1) * 2);
+    const compilePenalty = compileErrors * 7;
+    const runtimePenalty = runtimeErrors * 8;
+    const mismatchPenalty = sampleMismatch * 6;
+    const failSubmitPenalty = Math.max(0, submits.length - samplePass) * 5;
+    const frictionPenalty = failSignals >= totalAttempts ? 8 : 0;
+
+    sessionScore =
+      56 +
+      reliabilityBonus +
+      reviewBonus +
+      activityBonus -
+      compilePenalty -
+      runtimePenalty -
+      mismatchPenalty -
+      failSubmitPenalty -
+      frictionPenalty;
+
+    if (totalAttempts < 2) {
+      sessionScore = Math.min(sessionScore, 74);
+    } else if (totalAttempts < 4) {
+      sessionScore = Math.min(sessionScore, 88);
+    }
   }
-  if (samplePass > 0) sessionScore = Math.min(100, sessionScore + 10);
-  sessionScore = Math.max(0, Math.min(100, sessionScore));
+  sessionScore = Math.max(12, Math.min(99, Math.round(sessionScore)));
 
   const slowSubmit =
     firstSubmitMs != null && firstRunMs != null && firstSubmitMs > firstRunMs + 5 * 60 * 1000;

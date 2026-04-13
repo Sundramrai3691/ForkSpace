@@ -4,8 +4,9 @@ import axios from 'axios';
 import { BrainCircuit, FlaskConical, GraduationCap, Radar, ShieldCheck, Sparkles, Sword, Users2, Workflow, X, Zap } from 'lucide-react';
 import FormComp from '../components/forms/FormComp';
 import Navbar from '../components/common/Navbar';
+import AvatarGlyph from '../components/common/AvatarGlyph';
 import { getAuthHeaders, getAuthToken } from '../lib/auth';
-import { getRandomAvatar } from '../lib/avatars';
+import { getAvatarById, getRandomAvatar } from '../lib/avatars';
 import { toast } from 'react-hot-toast';
 
 const useCases = [
@@ -105,7 +106,14 @@ function Login() {
         const resolvedAvatarId = currentUser?.avatarId || randomAvatar.id;
 
         if (!currentUser) {
-            toast(`You're ${randomAvatar.name} this session`, {
+            toast(
+                <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-400/50 bg-amber-500/15">
+                        <AvatarGlyph avatar={getAvatarById(randomAvatar.id)} className="h-3.5 w-3.5" />
+                    </span>
+                    {`You're ${randomAvatar.name} this session`}
+                </span>,
+                {
                 duration: 3500,
                 position: 'bottom-center',
                 style: {

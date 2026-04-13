@@ -22,7 +22,7 @@ function statusPill(test) {
   return { label: "stress-only", cls: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/30 dark:text-sky-100" };
 }
 
-function TestCard({ test, onDelete, canDelete = true }) {
+function TestCard({ test, onDelete, canDelete = true, onUseAsSample }) {
   const [expanded, setExpanded] = useState(false);
   const status = statusPill(test);
   return (
@@ -56,6 +56,15 @@ function TestCard({ test, onDelete, canDelete = true }) {
         {test.description || "Generated test"}
       </p>
       <div className="mt-3 space-y-2">
+        {typeof onUseAsSample === "function" ? (
+          <button
+            type="button"
+            onClick={() => onUseAsSample(test)}
+            className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700/60 dark:bg-emerald-900/25 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+          >
+            Use as sample test
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -93,6 +102,7 @@ export default function HiddenTestPanel({
   language,
   problem,
   externalGenerateSignal = 0,
+  onUseAsSampleTest,
 }) {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -167,7 +177,7 @@ export default function HiddenTestPanel({
     setRunning(true);
     try {
       const collected = [];
-      await Promise.all(
+      const settled = await Promise.allSettled(
         tests.map(async (test) => {
           const { data } = await axios.post(`${serverUrl}/api/hidden-tests/run`, {
             roomId,
@@ -183,9 +193,14 @@ export default function HiddenTestPanel({
           );
         }),
       );
+      const failedRuns = settled.filter((row) => row.status === "rejected").length;
       setLastRunResults(collected);
       setShowResultsModal(true);
-      toast.success("Hidden tests executed");
+      if (failedRuns > 0) {
+        toast.success(`Hidden tests executed (${collected.length} updated, ${failedRuns} failed)`);
+      } else {
+        toast.success("Hidden tests executed");
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to run hidden tests");
     } finally {
@@ -206,10 +221,10 @@ export default function HiddenTestPanel({
     <div className="space-y-4">
       {showResultsModal ? (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-[#081121]">
+          <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-gray-700 dark:bg-[#081121] dark:text-gray-100">
             <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Hidden tests</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-600 dark:text-gray-300">Hidden tests</p>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Run summary</h3>
               </div>
               <button
@@ -223,25 +238,25 @@ export default function HiddenTestPanel({
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm dark:border-emerald-800/50 dark:bg-emerald-950/30">
-                  <p className="text-[10px] uppercase tracking-wide">Pass</p>
-                  <p className="text-lg font-bold">{lastRunResults.filter((r) => r.passed === true).length}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Pass</p>
+                  <p className="text-lg font-bold text-emerald-900 dark:text-emerald-100">{lastRunResults.filter((r) => r.passed === true).length}</p>
                 </div>
                 <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm dark:border-rose-800/50 dark:bg-rose-950/30">
-                  <p className="text-[10px] uppercase tracking-wide">Fail</p>
-                  <p className="text-lg font-bold">{lastRunResults.filter((r) => r.passed === false).length}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-200">Fail</p>
+                  <p className="text-lg font-bold text-rose-900 dark:text-rose-100">{lastRunResults.filter((r) => r.passed === false).length}</p>
                 </div>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-800/50 dark:bg-amber-950/30">
-                  <p className="text-[10px] uppercase tracking-wide">Timeout</p>
-                  <p className="text-lg font-bold">{lastRunResults.filter((r) => r.timedOut).length}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">Timeout</p>
+                  <p className="text-lg font-bold text-amber-900 dark:text-amber-100">{lastRunResults.filter((r) => r.timedOut).length}</p>
                 </div>
                 <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm dark:border-sky-800/50 dark:bg-sky-950/30">
-                  <p className="text-[10px] uppercase tracking-wide">Stress-only</p>
-                  <p className="text-lg font-bold">{lastRunResults.filter((r) => !r.isVerified).length}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-200">Stress-only</p>
+                  <p className="text-lg font-bold text-sky-900 dark:text-sky-100">{lastRunResults.filter((r) => !r.isVerified).length}</p>
                 </div>
               </div>
               <div className="space-y-3">
                 {lastRunResults.map((test) => (
-                  <TestCard key={test.id} test={test} onDelete={() => {}} canDelete={false} />
+                  <TestCard key={test.id} test={test} onDelete={() => {}} canDelete={false} onUseAsSample={onUseAsSampleTest} />
                 ))}
               </div>
             </div>
@@ -310,7 +325,7 @@ export default function HiddenTestPanel({
         {verified.length ? (
           <div className="space-y-3">
             {verified.map((test) => (
-              <TestCard key={test.id} test={test} onDelete={removeTest} />
+              <TestCard key={test.id} test={test} onDelete={removeTest} onUseAsSample={onUseAsSampleTest} />
             ))}
           </div>
         ) : (
@@ -327,7 +342,7 @@ export default function HiddenTestPanel({
         {stress.length ? (
           <div className="space-y-3">
             {stress.map((test) => (
-              <TestCard key={test.id} test={test} onDelete={removeTest} />
+              <TestCard key={test.id} test={test} onDelete={removeTest} onUseAsSample={onUseAsSampleTest} />
             ))}
           </div>
         ) : (

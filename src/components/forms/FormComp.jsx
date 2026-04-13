@@ -6,7 +6,8 @@ import { ThemeContext } from '../../../Context/ThemeContext';
 import { clearAuthToken, getAuthHeaders, getAuthToken, onAuthChange, setAuthToken } from '../../lib/auth';
 import CodeforcesProblemPicker from '../codeforces/CodeforcesProblemPicker';
 import AvatarPicker from '../common/AvatarPicker';
-import { getRandomAvatar } from '../../lib/avatars';
+import AvatarGlyph from '../common/AvatarGlyph';
+import { getAvatarById, getRandomAvatar } from '../../lib/avatars';
 
 function FormComp() {
     const navigate = useNavigate();
@@ -125,7 +126,14 @@ function FormComp() {
         if (!currentUser && entryMode === 'guest') {
             const randomAvatar = getRandomAvatar();
             resolvedAvatarId = randomAvatar.id;
-            toast(`You're ${randomAvatar.name} this session`, {
+            toast(
+                <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-400/50 bg-amber-500/15">
+                        <AvatarGlyph avatar={getAvatarById(randomAvatar.id)} className="h-3.5 w-3.5" />
+                    </span>
+                    {`You're ${randomAvatar.name} this session`}
+                </span>,
+                {
                 duration: 3500,
                 position: 'bottom-center',
                 style: {

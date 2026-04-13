@@ -3,7 +3,7 @@ import axios from 'axios';
 import User from '../common/User';
 import { Link, useLocation, Navigate, useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const PLATFORM_OPTIONS = [
     { value: 'codeforces', label: 'Codeforces' },
@@ -197,6 +197,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         problemSource: 'manual',
         problemSnapshot: null,
     });
+    const lastLocalProblemEditAtRef = useRef(0);
+
+    const updateProblemDraft = (updater) => {
+        lastLocalProblemEditAtRef.current = Date.now();
+        setProblemDraft(updater);
+    };
 
     const hasJoinState = Boolean(location.state);
     const session = roomState?.session || { mode: 'peer_practice', driverSocketId: '', navigatorSocketId: '' };
@@ -241,6 +247,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     };
 
     useEffect(() => {
+        const recentlyEditedLocally = Date.now() - lastLocalProblemEditAtRef.current < 1200;
+        if (recentlyEditedLocally) return;
         const tagList = roomState?.problem?.tags;
         const tags = Array.isArray(tagList)
             ? tagList
@@ -348,7 +356,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 sourceUrl: problemDraft.sourceUrl,
             });
 
-            setProblemDraft((prev) => ({
+            updateProblemDraft((prev) => ({
                 ...prev,
                 ...response.data.problem,
             }));
@@ -411,7 +419,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         setImportNotice('');
         try {
             const result = await loadFromCodeforcesUrl(problemDraft.problemUrl.trim());
-            setProblemDraft((prev) => ({
+            updateProblemDraft((prev) => ({
                 ...prev,
                 title: result.title,
                 tags: result.tags
@@ -447,7 +455,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
                 problemDraft={problemDraft}
-                setProblemDraft={setProblemDraft}
+                setProblemDraft={updateProblemDraft}
                 isImporting={isImporting}
                 importNotice={importNotice}
                 onImportProblem={handleImportProblem}
@@ -560,7 +568,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                         <input
                                             type="url"
                                             value={problemDraft.problemUrl}
-                                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
+                                            onChange={(event) => updateProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
                                             placeholder="https://codeforces.com/problemset/problem/1/A"
                                             className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                         />
@@ -613,7 +621,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                             <input
                                                 type="text"
                                                 value={problemDraft.title}
-                                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
+                                                onChange={(event) => updateProblemDraft((prev) => ({ ...prev, title: event.target.value }))}
                                                 placeholder="Problem title"
                                                 className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                             />
@@ -624,7 +632,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                             </p>
                                             <textarea
                                                 value={problemDraft.constraints}
-                                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, constraints: event.target.value }))}
+                                                onChange={(event) => updateProblemDraft((prev) => ({ ...prev, constraints: event.target.value }))}
                                                 placeholder="1 <= n <= 2e5, values can be negative, sum fits in 64-bit..."
                                                 className="mt-1.5 h-20 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                             />
@@ -638,7 +646,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     type="text"
                                                     value={Array.isArray(problemDraft.tags) ? problemDraft.tags.join(', ') : ''}
                                                     onChange={(event) =>
-                                                        setProblemDraft((prev) => ({
+                                                        updateProblemDraft((prev) => ({
                                                             ...prev,
                                                             tags: event.target.value
                                                                 .split(',')
@@ -658,7 +666,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     type="text"
                                                     value={problemDraft.rating || ''}
                                                     onChange={(event) =>
-                                                        setProblemDraft((prev) => ({
+                                                        updateProblemDraft((prev) => ({
                                                             ...prev,
                                                             rating: event.target.value,
                                                             difficulty: event.target.value,
@@ -713,7 +721,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     </span>
                                                     <textarea
                                                         value={problemDraft.prompt}
-                                                        onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                                                        onChange={(event) => updateProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
                                                         placeholder="Paste the statement or the specific prompt you want to discuss."
                                                         className="h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                                     />
@@ -725,7 +733,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     </span>
                                                     <textarea
                                                         value={problemDraft.sampleInput}
-                                                        onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
+                                                        onChange={(event) => updateProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
                                                         placeholder="Paste the sample input here"
                                                         className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                                     />
@@ -736,7 +744,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     </span>
                                                     <textarea
                                                         value={problemDraft.sampleOutput}
-                                                        onChange={(event) => setProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
+                                                        onChange={(event) => updateProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
                                                         placeholder="Paste the expected output here"
                                                         className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                                     />

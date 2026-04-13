@@ -4,15 +4,14 @@
 
 # ForkSpace
 
-### Shared coding rooms for interview practice and DSA mentoring.
+### Shared coding rooms for interview practice, DSA sessions, and mentoring.
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)](https://react.dev/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-white?logo=socket.io&logoColor=black)](https://socket.io/)
-[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
 
-**[Quick Start](#quick-start)** | **[Features](#features)** | **[Architecture](#architecture)** | **[License](#license)**
+**[Quick Start](#quick-start)** | **[Latest Updates](#latest-updates)** | **[Features](#features)** | **[Architecture](#architecture)** | **[License](#license)**
 
 </div>
 
@@ -20,110 +19,77 @@
 
 ## What is ForkSpace?
 
-ForkSpace is a realtime shared coding room built for:
+ForkSpace is a realtime collaborative coding workspace for:
 
-- mock interviews
 - peer DSA practice
+- mock interviews
 - mentor-led problem solving
 
-Instead of screen sharing, switching tabs, and testing code in separate places, two people can stay in one room, edit the same solution, run it, and compare output together.
+Instead of juggling a call, a notes doc, an editor, and a compiler, both participants stay in one room with shared code, shared runs, shared problem context, and post-session feedback.
 
-The product is currently strongest for Codeforces-style practice and general interview-prep sessions.
+The product is focused on interview-style algorithm sessions rather than being a full online IDE.
+
+---
+
+## Latest Updates
+
+Recent product and workflow improvements reflected in this repo:
+
+- Added richer collaboration cues with remote cursors, colored participant presence, and shared run visibility
+- Added room-level language sync for C++, Python, and JavaScript with safer starter-template replacement behavior
+- Added Codeforces catalog browsing with filters for rating, tags, solves, and title/problem search
+- Added hidden test generation plus verified-vs-stress test runs inside the workspace
+- Added session intelligence reports with shareable links and signed-in report history
+- Moved analysis/report flows into cleaner overlays and improved the right-side workspace panel
+- Improved sample output comparison, execution feedback, and room persistence across refresh/restart
 
 ---
 
 ## Features
 
-### Shared Practice Room
+### Realtime collaboration
 
-- Realtime code sync with Socket.IO
-- Room-based collaboration with a shareable room ID
-- Live participant list and room presence
+- Shared room-based coding with Socket.IO
+- Live participant list and presence
+- Driver / Navigator role support
 - Session modes: `Peer Practice`, `Mock Interview`, `Mentoring`
-- Driver / Navigator role assignment for structured pair coding
-- **Live collaboration cues:** remote cursors with username labels, per-user colors, and shared selection highlights so everyone sees who is working where
-- **Shared runs:** when someone executes code, run status and output can surface for the whole room (pair debugging without re-running blindly)
+- Remote cursor positions, usernames, colors, and selection highlights
+- Shared run results so both users can debug the same execution outcome
 
-### Problem-Solving Workflow
+### Interview workflow
 
-- Shared problem brief in the sidebar
-- Manual sample input and expected output fields for practical DSA sessions
-- Codeforces-first workflow with inline URL metadata load (title, tags, rating)
-- Honest import UX: statement + sample I/O are copied manually from Codeforces
-- Clear output comparison with visible `Passed sample` / `Mismatch` feedback
-- Shared approach notes for discussing brute force, optimized ideas, and edge cases
-- **Edge-case checklist (mentoring / AI panel):** priority-tagged items (for example critical vs high), short hints, and progress so interviews stay concrete instead of checkbox theater
+- Shared problem brief, prompt, constraints, notes, and sample I/O
+- Codeforces-first workflow with browsable catalog and room problem selection
+- Manual statement/sample copy flow for reliable external problem setup
+- Edge-case checklist for interview-style validation
+- Recent run history stored in the room session
+- Timer support for timed practice blocks
 
-### Workspace UI (latest)
+### Execution and testing
 
-- Action-driven top bar: `Run`, `Submit`, `Analyze`, `Report`, `Generate Tests`
-- Right-side panel tabs: `Output`, `Submissions`, `Tests` (resizable + can be collapsed)
-- `Analyze` and `Report` open as overlays instead of staying as crowded inline tabs
-- Room header shows language/mode/room controls with compact responsive alignment
-- Sidebar-first branding and room utilities for quick navigation
+- Run C++, Python, and JavaScript solutions
+- Judge0-backed code execution for normal runs/submissions
+- Hidden test generation from the current problem statement
+- Verified tests and stress tests shown separately
+- Output diffing for expected vs actual sample output
+- Clear labels for pass, fail, timeout, crash, and stress-only results
 
-### Hidden Tests (beta)
+### Analysis and reports
 
-- `Tests` tab separates **Verified tests** and **Stress tests (no ground truth)**
-- Generate hidden tests from current problem context and run all in one click
-- Clear status labels for pass/fail/timeout/crash/stress-only runs
-- Run summary modal for quick signal scanning
+- AI hints in the editor
+- AI solution review with complexity, bug-risk, style, and optimization feedback
+- Standalone analysis page with shareable analysis links
+- Session intelligence reports with strengths, gaps, next steps, and session score
+- Shareable report pages and a signed-in report history screen
 
-### Language & starter templates
+### Auth and persistence
 
-- Per-room **language** is part of shared state: **C++**, **Python**, or **JavaScript**, chosen from the workspace settings
-- Language changes **propagate over Socket.IO** and stay aligned with the server (client room state merges `language-change` so the UI does not snap back to a stale default)
-- Switching language loads that language’s **default starter snippet** in the editor and syncs it as a normal `code-change` for the room
-- If your buffer is **not** still empty or a stock starter template, you get a **confirmation** before replacing code so accidental wipes are harder
-
-### Code Execution
-
-- Run code in:
-  - C++
-  - Python
-  - JavaScript
-- Execution status with visible time and memory
-- **Run failures:** clearer feedback when execution or configuration breaks (for example Judge0 / network), instead of only a generic error toast
-- Formatter support for cleaner code before review or reruns
-- Output panel designed for quick debugging during pair sessions
-- Submission output and run output surfaced with clearer status context
-
-### AI Assistance
-
-- AI code hints inside the editor
-- `Review Solution` flow for bug risks, complexity, and style feedback
-- Provider fallback support across:
-  - Groq
-  - Gemini
-  - Mistral Codestral
-- Graceful fallback when AI providers fail
-
-### Auth And Persistence
-
-- Continue as guest for fast room entry
-- Sign in / create account flow
-- Signed-in users can keep room and run history
-- Room state persistence survives refresh and backend restart
-
----
-
-## Current Product Direction
-
-ForkSpace is not trying to be a full IDE or another generic online compiler.
-
-It is focused on one narrower workflow:
-
-1. Enter as guest or sign in
-2. Join a shared room
-3. Discuss the problem in one place
-4. Edit one solution together
-5. Run and compare output immediately
-
-That makes it especially useful for:
-
-- pair programming during DSA prep
-- mentor / learner sessions
-- mock interviewer / candidate sessions
+- Continue as guest for fast entry
+- Sign up / sign in with JWT auth
+- Avatar selection and profile persistence
+- Saved room and run history for authenticated users
+- JSON-file persistence for room state and fallback intelligence logs
+- MongoDB-backed persistence when configured
 
 ---
 
@@ -136,26 +102,30 @@ Client (React + CodeMirror)
         v
 Express + Socket Server
         |
-        |-- Room state persistence
-        |   (room-state.json)
+        |-- Room/session persistence
+        |   (JSON files + MongoDB when available)
         |
-        |-- Auth / history
+        |-- Auth/history
         |   (JWT + MongoDB)
         |
-        |-- AI providers
+        |-- AI analysis/hints
         |   (Groq / Gemini / Mistral)
         |
+        |-- Codeforces catalog
+        |
+        |-- Hidden tests
+        |   (LLM-assisted planning + Piston execution)
+        |
         `-- Judge0 API
-            (sandboxed code execution)
+            (standard code execution)
 ```
 
 ### Notes
 
-- Socket.IO powers realtime room sync (code, language, cursors, selections, and run notifications)
-- Judge0 handles code execution
-- Room state is persisted locally in `server/data/room-state.json`
-- Auth and saved history currently use JWT plus MongoDB-backed user storage
-- Redis pub/sub support exists in the backend for horizontal scaling when configured
+- `server/server.js` is the main backend for auth, sockets, execution, analysis, reports, Codeforces, and hidden tests
+- Room state is persisted locally under `server/data/`
+- Redis pub/sub is supported for horizontal Socket.IO scaling when `REDIS_URL` is set
+- MongoDB is optional for local boot, but needed for full auth/history/report persistence
 
 ---
 
@@ -163,13 +133,13 @@ Express + Socket Server
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React 18, Tailwind CSS, Vite |
+| Frontend | React 18, Vite, Tailwind CSS |
 | Editor | CodeMirror |
 | Realtime | Socket.IO |
 | Backend | Node.js, Express |
 | Auth | JWT, bcryptjs, MongoDB / Mongoose |
 | AI | Groq, Gemini, Mistral |
-| Execution | Judge0 |
+| Execution | Judge0, Piston |
 | Optional scaling | Redis adapter for Socket.IO |
 
 ---
@@ -180,9 +150,9 @@ Express + Socket Server
 
 - Node.js 18+
 - npm
-- MongoDB if you want sign-in and saved history
-- A Judge0 RapidAPI key for code execution
-- At least one AI provider key if you want AI hints / review
+- MongoDB if you want authentication, report history, and saved user data
+- A Judge0 API key for standard code execution
+- At least one AI provider key if you want AI hints/review/report assistance
 
 ### 1. Install dependencies
 
@@ -192,13 +162,13 @@ npm install
 
 ### 2. Configure environment
 
-Root `.env`:
+Root `.env`
 
 ```env
 VITE_SERVER_URL=http://localhost:5000
 ```
 
-`server/.env`:
+`server/.env`
 
 ```env
 PORT=5000
@@ -239,23 +209,26 @@ npm run dev:client
 http://localhost:5173
 ```
 
+### Optional production start
+
+```bash
+npm run build
+npm run start
+```
+
 ---
 
-## How To Use It Well
+## How To Use It
 
-Recommended workflow for the current product:
-
-1. Choose `Continue as Guest` for fast sessions, or sign in if you want saved rooms and runs.
-2. Create or enter a room ID.
-3. Add the problem context and shared sample input / expected output.
-4. If using Codeforces, click **Browse Codeforces**, paste the problem URL, and auto-fill title/tags/rating.
-5. Open the Codeforces link, then paste statement + sample I/O manually into Prompt/Input/Expected Output.
-6. Pick the **room language** when needed. If code is beyond starter template, you are asked before replacement.
-7. Solve together in the shared editor.
-8. Use `Run`/`Submit` for output, `Analyze` for review insights, and `Report` for session summary overlays.
-9. Use `Generate Tests` in the top bar or `Tests` tab to probe verified + stress behaviors.
-
-For now, this manual sample-based workflow is more reliable than trying to automate every external problem platform.
+1. Open the home page and continue as guest or sign in.
+2. Create a room or join an existing room ID.
+3. Add the problem manually or choose one from the Codeforces picker.
+4. Pick the room language when needed.
+5. Solve together in the shared editor.
+6. Use `Run` and `Submit` to compare output against samples.
+7. Use `Generate Tests` to create verified and stress-style hidden tests.
+8. Use `Analyze` for AI review and `Report` for the session intelligence summary.
+9. Copy the share link if you want to send an analysis/report page to someone else.
 
 ---
 
@@ -266,61 +239,55 @@ ForkSpace/
 |-- src/
 |   |-- components/
 |   |   |-- Workspace/
+|   |   |-- codeforces/
 |   |   |-- common/
-|   |   |-- forms/
+|   |   |-- sessionIntelligence/
 |   |   `-- sidebar/
 |   |-- lib/
 |   |-- pages/
 |   `-- socket.js
 |-- server/
 |   |-- data/
+|   |-- hidden-tests/
 |   |-- models/
+|   |-- services/
 |   |-- ai-server.js
 |   `-- server.js
 |-- public/
-|-- nodemon.json
 `-- README.md
 ```
 
 ---
 
-## Known Product Boundaries
+## Known Boundaries
 
-ForkSpace currently does not try to be:
+ForkSpace is intentionally not:
 
-- a full multi-file IDE
-- a LeetCode-native execution environment
+- a multi-file IDE
+- a LeetCode-native platform clone
 - a video-call platform
-- a generic "online compiler clone"
+- a generic compiler playground
 
-It is intentionally narrower: shared coding rooms for problem-solving sessions.
+It is optimized for collaborative problem-solving sessions around one solution at a time.
 
 ---
 
-## Roadmap
+## Roadmap Snapshot
 
 - [x] Realtime shared rooms
-- [x] Driver / Navigator session roles
-- [x] Multi-language execution for C++, Python, and JavaScript
-- [x] Reliable **room language sync** and **starter-template** behavior when switching languages
-- [x] **Live cursors**, **selection highlights**, and **shared run** visibility for collaboration
-- [x] Sample output comparison
-- [x] AI hints and review flow
-- [x] Guest entry plus sign-in flow
+- [x] Multi-language collaboration and execution
+- [x] Live cursors and shared run awareness
+- [x] Codeforces catalog workflow
+- [x] Hidden tests and stress runs
+- [x] AI hints and solution review
+- [x] Session intelligence reports and share links
+- [x] Signed-in report history
 - [x] Room persistence across restart
-- [ ] Stronger room history UI
-- [ ] More structured mentoring notes
-- [x] Practical Codeforces metadata import (manual statement/sample copy flow)
-- [ ] Deeper run/result history inside each room
+- [ ] Deeper room history UX
+- [ ] More structured mentoring/session note flows
 
 ---
 
 ## License
 
-MIT - see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-  <strong>ForkSpace is being shaped around practical interview practice and DSA mentoring workflows.</strong>
-</div>
+MIT - see [LICENSE](LICENSE).
