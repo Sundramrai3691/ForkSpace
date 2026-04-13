@@ -292,11 +292,10 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
 
     const handleCopyRoomId = async () => {
         try {
-            const inviteUrl = `${window.location.origin}/editor/${roomId}`;
-            await navigator.clipboard.writeText(inviteUrl);
-            toast.success('Room link copied');
+            await navigator.clipboard.writeText(roomId);
+            toast.success('Room ID copied');
         } catch {
-            toast.error('Failed to copy link');
+            toast.error('Failed to copy room ID');
         }
     };
 
@@ -455,9 +454,29 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
             />
             <div className="flex-1 min-h-0 overflow-y-auto scroll-smooth">
                 <div className="flex flex-col space-y-4 p-4 sm:p-5">
-                    <Link to="/" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 transition hover:bg-white/10">
-                        <img src="/logo.png" alt="ForkSpace logo" className="h-4 w-4 brightness-0 invert" />
-                    </Link>
+                    <div className="flex w-full items-center gap-1.5">
+                        <Link to="/" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 transition hover:bg-white/10">
+                            <img src="/logo.png" alt="ForkSpace logo" className="h-6 w-6 brightness-0 invert" />
+                        </Link>
+                        <div className="flex h-10 min-w-0 flex-1 items-center justify-between gap-1.5 rounded-full border border-white/15 bg-white/5 px-2 dark:bg-white/[0.04]">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Room</span>
+                            <code className="min-w-0 truncate rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[11px] text-gray-100">
+                                {roomId}
+                            </code>
+                            <button
+                                type="button"
+                                onClick={handleCopyRoomId}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/20 bg-white/10 text-gray-200 transition hover:bg-white/20"
+                                title="Copy room ID"
+                                aria-label="Copy room ID"
+                            >
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                     <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-5 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
                         <div className="mb-4 flex items-center justify-between">
                             <div>

@@ -1467,10 +1467,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 </OverlayPanel>
             ) : null}
 
-            <div className="flex flex-col gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121] lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121] lg:flex-row lg:items-center">
+                <div className="flex flex-wrap items-center gap-2 lg:flex-1">
                     <button
-                        className="inline-flex h-9 items-center gap-2 rounded-md bg-teal-500 px-4 text-sm font-semibold text-white shadow-sm shadow-teal-900/40 transition-colors hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50"
+                        className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-500 px-4 text-[15px] font-semibold text-white shadow-sm shadow-teal-900/40 transition-colors hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50"
                         onClick={runCode}
                         disabled={!canRunInCurrentMode || isRunBusy}
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
@@ -1483,7 +1483,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         {isRunBusy ? "Running..." : "Run"}
                     </button>
                     <button
-                        className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-500/70 px-4 text-sm text-amber-400 transition-colors hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
+                        className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-500/70 px-4 text-[15px] text-amber-400 transition-colors hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
                         onClick={submitSamples}
                         disabled={!canRunInCurrentMode || isSubmitBusy}
                         title={canRunInCurrentMode ? "Run all parsed sample tests (Judge0)" : "Only the Driver can submit in mock mode"}
@@ -1504,7 +1504,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 void reviewSolution();
                             }
                         }}
-                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[15px] text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
                     >
                         {isReviewLoading ? <ButtonSpinner /> : (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1523,7 +1523,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             void generateSessionReport({ endSession: false });
                         }}
                         disabled={reportLoading}
-                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60"
+                        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[15px] text-gray-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60"
                     >
                         {reportLoading ? <ButtonSpinner /> : (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1539,7 +1539,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             setTestGenerateSignal((v) => v + 1);
                             setIsOutputCollapsed(false);
                         }}
-                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[15px] text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
                         title="Generate hidden tests"
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1563,9 +1563,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <div className="inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                        <label htmlFor="language-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+                <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+                    <div className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                        <label htmlFor="language-select" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
                         </label>
                         <select
@@ -1574,7 +1574,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             onChange={handleLanguageChange}
                             disabled={!editorUnlocked}
                             title={LANGUAGE_OPTIONS[selectedLanguage]?.label || "Language"}
-                            className="h-8 min-w-[128px] rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-[#111d33] dark:text-white"
+                            className="h-8 min-w-[138px] rounded-full border border-gray-200 bg-white px-3 text-[15px] font-medium text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-[#111d33] dark:text-white"
                         >
                             {Object.entries(LANGUAGE_OPTIONS).map(([languageKey, config]) => (
                                 <option key={languageKey} value={languageKey}>
@@ -1583,10 +1583,50 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             ))}
                         </select>
                     </div>
-                    <div className="flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                    <div className="flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
-                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
+                        <span className="text-[15px] font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
+                    {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
+                        <button
+                            onClick={handleSwapRoles}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            title="Swap Roles"
+                        >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                        </button>
+                    )}
+                    {users.length > 0 && (
+                        <div className="flex h-9 items-center rounded-full border border-gray-200 bg-white/92 px-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                            {users.slice(0, 5).map((user, index) => (
+                                <div
+                                    key={user.socketId}
+                                    style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-sm dark:border-[#081121]"
+                                    title={`${user.username || "Guest"} (${user.role || "Peer"})`}
+                                >
+                                    <AvatarGlyph avatar={getAvatarById(user.avatarId)} className="h-3.5 w-3.5" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setIsOutputCollapsed((current) => !current)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                        title={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
+                        aria-label={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
+                            {isOutputCollapsed ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16m0-12v12" />
+                            ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16M18 6v12" />
+                            )}
+                        </svg>
+                    </button>
                     {problemToolbarMeta && (
                         <div className="hidden min-w-0 max-w-[min(360px,42vw)] flex-col justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-left xl:flex">
                             <span className="truncate text-xs font-semibold text-gray-100">
@@ -1619,64 +1659,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             </div>
                         </div>
                     )}
-                    <div className="flex h-9 flex-nowrap items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Room</span>
-                        <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
-                            {roomId}
-                        </code>
-                        <button
-                            type="button"
-                            onClick={handleCopyRoomId}
-                            className="inline-flex h-7 items-center justify-center rounded-full border border-gray-200 bg-white px-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
-                            title="Copy room ID"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                            </svg>
-                            {copyingRoomLink ? "Copied!" : ""}
-                        </button>
-                        {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
-                            <button
-                                onClick={handleSwapRoles}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#111d33] dark:text-gray-400 dark:hover:bg-gray-700"
-                                title="Swap Roles"
-                            >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                            </button>
-                        )}
-                        {users.length > 0 && (
-                            <div className="flex items-center pl-1">
-                                {users.slice(0, 5).map((user, index) => (
-                                    <div
-                                        key={user.socketId}
-                                        style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
-                                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-sm dark:border-[#081121]"
-                                        title={`${user.username || "Guest"} (${user.role || "Peer"})`}
-                                    >
-                                        <AvatarGlyph avatar={getAvatarById(user.avatarId)} className="h-3.5 w-3.5" />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setIsOutputCollapsed((current) => !current)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                            title={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
-                            aria-label={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-                                {isOutputCollapsed ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16m0-12v12" />
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16M18 6v12" />
-                                )}
-                            </svg>
-                        </button>
-                        {isMockMode && (
+                    {isMockMode && (
                             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                                 <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
                                     {formatTimerLabel(timeRemaining)}
@@ -1708,7 +1691,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 </button>
                             </div>
                         )}
-                    </div>
                 </div>
             </div>
 
