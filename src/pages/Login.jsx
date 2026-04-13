@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import axios from 'axios';
-import { GraduationCap, Sword, X, Zap } from 'lucide-react';
+import { BrainCircuit, FlaskConical, GraduationCap, Radar, ShieldCheck, Sparkles, Sword, Users2, Workflow, X, Zap } from 'lucide-react';
 import FormComp from '../components/forms/FormComp';
 import Navbar from '../components/common/Navbar';
 import { getAuthHeaders, getAuthToken } from '../lib/auth';
@@ -30,6 +30,39 @@ const quickStartSteps = [
     'Create a room or paste a Room ID. Jump in as guest — no account needed to start.',
     'Pick a session mode: Mock Interview, DSA Mentoring, or Peer Practice. Assign Driver and Navigator roles so both sides know the structure.',
     'Write code together, run it, compare output against sample cases. Use Analyze for complexity and bug review, Report for a session summary — when you actually need it.',
+];
+
+const featureHighlights = [
+    {
+        icon: Workflow,
+        title: 'Realtime Shared Workspace',
+        description: 'Socket-based code sync, live cursors, shared language switching, and role-aware collaboration in one room.',
+    },
+    {
+        icon: Radar,
+        title: 'Codeforces-Ready Problem Flow',
+        description: 'Load metadata from Codeforces URL (title, tags, rating) and continue with an honest manual brief workflow.',
+    },
+    {
+        icon: FlaskConical,
+        title: 'Hidden Tests (Beta)',
+        description: 'Generate verified + stress test sets, run all tests quickly, and review timeout/crash/pass signals clearly.',
+    },
+    {
+        icon: BrainCircuit,
+        title: 'Session Intelligence',
+        description: 'Analyze and report overlays summarize thinking patterns, strengths, gaps, and next practice priorities.',
+    },
+    {
+        icon: Users2,
+        title: 'Interview Modes',
+        description: 'Peer Practice, Mock Interview, and Mentoring modes keep sessions structured without extra setup.',
+    },
+    {
+        icon: ShieldCheck,
+        title: 'Stable, Practical Workflow',
+        description: 'Run/submit with shared outputs, preserved room state, and optional account history when you need it.',
+    },
 ];
 
 function createRoomId() {
@@ -102,18 +135,21 @@ function Login() {
             <Navbar />
 
             <main>
-                <section className="border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 pb-20 pt-20 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
+                <section className="relative overflow-hidden border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 pb-20 pt-20 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
+                    <div className="pointer-events-none absolute -left-20 top-20 h-56 w-56 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-500/10" />
+                    <div className="pointer-events-none absolute -right-20 top-12 h-64 w-64 rounded-full bg-sky-300/20 blur-3xl dark:bg-sky-500/10" />
                     <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
                         <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                            Built for Codeforces practice, mock interviews, and DSA mentoring
+                            <Sparkles size={14} />
+                            Realtime interview practice platform for serious DSA sessions
                         </div>
 
                         <div className="mt-8 space-y-5">
                             <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">
-                                One room. One solution. No screen sharing.
+                                Practice interviews and DSA in one polished collaborative room.
                             </h1>
                             <p className="mx-auto max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                                Open a room, load a Codeforces problem, write and run code together — without switching tabs or sharing screens. Built for pair DSA practice, mock rounds, and mentor sessions.
+                                ForkSpace combines shared coding, Codeforces-ready problem setup, run/submit output, hidden tests, and AI-assisted session intelligence into one focused workspace.
                             </p>
                         </div>
 
@@ -157,6 +193,20 @@ function Login() {
                         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
                             {currentUser ? `Jump in as ${currentUser.name}.` : 'No signup needed. Sign in only to save room and run history.'}
                         </p>
+                        <div className="mt-6 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3">
+                            <div className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Realtime</p>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Shared editor, cursors, and role sync over Socket.IO.</p>
+                            </div>
+                            <div className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Execution + Tests</p>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Run, submit, and hidden-test your code with quick feedback loops.</p>
+                            </div>
+                            <div className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Session Intelligence</p>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Analyze and report overlays for better interview-quality reviews.</p>
+                            </div>
+                        </div>
 
                         {!currentUser && (
                             <button
@@ -204,6 +254,32 @@ function Login() {
                     </section>
                 )}
 
+                <section id="features" className="scroll-mt-24 border-b border-stone-200 bg-white px-4 py-14 dark:border-slate-800 dark:bg-slate-950 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-7xl space-y-8">
+                        <div className="max-w-3xl space-y-3">
+                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Core Features</p>
+                            <h2 className="text-3xl font-bold tracking-tight">Everything needed for modern collaborative coding practice.</h2>
+                            <p className="text-slate-600 dark:text-slate-400">
+                                ForkSpace is purpose-built for pair problem solving with practical tools that help you move faster and review better.
+                            </p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {featureHighlights.map((feature) => (
+                                <article
+                                    key={feature.title}
+                                    className="group rounded-3xl border border-stone-200 bg-stone-50/75 p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-amber-300/60 hover:shadow-[0_16px_42px_-24px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-amber-500/40"
+                                >
+                                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 transition group-hover:scale-105 dark:bg-amber-500/10 dark:text-amber-300">
+                                        <feature.icon size={18} strokeWidth={2} />
+                                    </div>
+                                    <h3 className="text-lg font-semibold">{feature.title}</h3>
+                                    <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">{feature.description}</p>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
                 <section id="how-it-works" className="scroll-mt-24 bg-white px-4 py-14 dark:bg-slate-950 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
@@ -214,15 +290,37 @@ function Login() {
                             </p>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-3">
-                            {quickStartSteps.map((step, index) => (
-                                <div key={step} className="rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                                    <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
-                                        Step {index + 1}
-                                    </p>
-                                    <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{step}</p>
-                                </div>
-                            ))}
+                        <div className="relative mx-auto max-w-4xl">
+                            <div className="absolute bottom-6 left-6 top-6 w-px bg-gradient-to-b from-amber-300/70 via-amber-400/60 to-amber-300/40 dark:from-amber-500/50 dark:via-amber-400/40 dark:to-amber-600/20 md:left-1/2" />
+                            <div className="space-y-5">
+                                {quickStartSteps.map((step, index) => {
+                                    const isRight = index % 2 === 1;
+                                    return (
+                                        <div
+                                            key={step}
+                                            className={`relative flex items-start gap-4 md:gap-6 ${isRight ? 'md:flex-row-reverse' : ''}`}
+                                        >
+                                            <div className="relative z-10 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 font-semibold text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300">
+                                                {index + 1}
+                                            </div>
+                                            <div className="absolute left-6 top-6 hidden h-px w-8 bg-amber-300/60 dark:bg-amber-500/40 md:block md:w-10" />
+                                            <div
+                                                className={`absolute top-6 hidden h-8 w-8 border-t border-amber-300/60 dark:border-amber-500/40 md:block ${
+                                                    isRight
+                                                        ? 'left-[calc(50%+2.5rem)] rounded-tr-full border-r'
+                                                        : 'left-[calc(50%-2rem)] rounded-tl-full border-l'
+                                                }`}
+                                            />
+                                            <div className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 md:max-w-[42%]">
+                                                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
+                                                    Step {index + 1}
+                                                </p>
+                                                <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{step}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -239,7 +337,7 @@ function Login() {
 
                         <div className="grid gap-6 md:grid-cols-3">
                             {useCases.map((item) => (
-                                <article key={item.title} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                <article key={item.title} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
                                     <div className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
                                         <item.icon size={18} strokeWidth={2} />
                                     </div>

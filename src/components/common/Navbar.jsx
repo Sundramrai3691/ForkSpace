@@ -3,10 +3,13 @@ import axios from 'axios';
 import { ThemeContext } from '../../../Context/ThemeContext';
 import { Monitor, Sun, Moon } from 'lucide-react';
 import { clearAuthToken, getAuthHeaders, getAuthToken, onAuthChange } from '../../lib/auth';
+import AvatarGlyph from './AvatarGlyph';
+import { AVATARS, getAvatarById } from '../../lib/avatars';
 
 function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const { theme, setTheme } = useContext(ThemeContext);
     const profileRef = useRef(null);
@@ -78,7 +81,23 @@ function Navbar() {
     const handleSignOut = () => {
         clearAuthToken();
         setIsProfileOpen(false);
+        setIsAvatarPickerOpen(false);
         closeMenu();
+    };
+
+    const handleAvatarUpdate = async (avatarId) => {
+        if (!currentUser) return;
+        try {
+            const response = await axios.patch(
+                `${serverUrl}/api/auth/avatar`,
+                { avatarId },
+                { headers: getAuthHeaders() },
+            );
+            setCurrentUser(response.data.user);
+            setIsAvatarPickerOpen(false);
+        } catch {
+            // Keep menu stable even if update fails.
+        }
     };
 
     const themeOptions = [
@@ -132,11 +151,14 @@ function Navbar() {
                         <div className="relative" ref={profileRef}>
                             <button
                                 type="button"
-                                onClick={() => setIsProfileOpen((current) => !current)}
+                                onClick={() => {
+                                    setIsProfileOpen((current) => !current);
+                                    setIsAvatarPickerOpen(false);
+                                }}
                                 className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                 aria-label="Open profile and theme menu"
                             >
-                                {currentUser?.name?.charAt(0)?.toUpperCase() || 'F'}
+                                <AvatarGlyph avatar={getAvatarById(currentUser?.avatarId)} className="h-4 w-4" />
                             </button>
 
                             {isProfileOpen && (
@@ -179,6 +201,13 @@ function Navbar() {
                                             <>
                                                 <button
                                                     type="button"
+                                                    onClick={() => setIsAvatarPickerOpen((prev) => !prev)}
+                                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                >
+                                                    Update avatar
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={handleScrollToJoin}
                                                     className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                                 >
@@ -202,6 +231,33 @@ function Navbar() {
                                             </button>
                                         )}
                                     </div>
+                                    {currentUser && isAvatarPickerOpen && (
+                                        <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                            <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                Choose avatar
+                                            </p>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {AVATARS.map((avatar) => {
+                                                    const isActive = currentUser.avatarId === avatar.id;
+                                                    return (
+                                                        <button
+                                                            key={avatar.id}
+                                                            type="button"
+                                                            onClick={() => handleAvatarUpdate(avatar.id)}
+                                                            className={`flex h-10 items-center justify-center rounded-xl border transition ${
+                                                                isActive
+                                                                    ? 'border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
+                                                                    : 'border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700'
+                                                            }`}
+                                                            title={avatar.name}
+                                                        >
+                                                            <AvatarGlyph avatar={avatar} className="h-4 w-4" />
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

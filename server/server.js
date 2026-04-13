@@ -298,6 +298,25 @@ app.get("/api/auth/history", async (req, res) => {
   });
 });
 
+app.patch("/api/auth/avatar", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  if (!user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const nextAvatarId = String(req.body?.avatarId || "").trim();
+  if (!nextAvatarId) {
+    return res.status(400).json({ error: "avatarId is required" });
+  }
+
+  user.avatarId = nextAvatarId;
+  await user.save();
+
+  return res.json({
+    user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
+  });
+});
+
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
