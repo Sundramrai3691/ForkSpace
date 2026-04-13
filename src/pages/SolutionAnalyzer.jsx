@@ -1,9 +1,10 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams } from 'react-router';
 import toast from 'react-hot-toast';
 import { LANGUAGE_OPTIONS, DEFAULT_LANGUAGE } from '../components/Workspace/languages';
+import { getAnalysisApiBases } from '../lib/analysisApi';
 
 function InsightCard({ label, value, tone = 'default' }) {
     const toneClasses = {
@@ -20,8 +21,21 @@ function InsightCard({ label, value, tone = 'default' }) {
     );
 }
 
+async function requestFromAnalysisApis(apiBases, requestFactory) {
+    let lastError = null;
+
+    for (const baseUrl of apiBases) {
+        try {
+            return await requestFactory(baseUrl);
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError || new Error('Analysis API is unavailable');
+}
+
 function SolutionAnalyzer() {
-    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const { analysisId } = useParams();
     const navigate = useNavigate();
     const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
@@ -30,6 +44,7 @@ function SolutionAnalyzer() {
     const [analysis, setAnalysis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetchingShared, setIsFetchingShared] = useState(false);
+    const analysisApiBases = useMemo(() => getAnalysisApiBases(), []);
 
     const normalizedAnalysis = analysis
         ? {
@@ -42,6 +57,7 @@ function SolutionAnalyzer() {
                 analysis.optimization_suggestion && typeof analysis.optimization_suggestion === 'object'
                     ? analysis.optimization_suggestion
                     : { before: '', after: '', benefit: '' },
+            raw_text: typeof analysis.raw_text === 'string' ? analysis.raw_text.trim() : '',
             summary:
                 typeof analysis.summary === 'string' && analysis.summary.trim()
                     ? analysis.summary.trim()
@@ -49,13 +65,19 @@ function SolutionAnalyzer() {
         }
         : null;
 
+    const hasOptimizationSuggestion = Boolean(
+        normalizedAnalysis?.optimization_suggestion?.before
+        || normalizedAnalysis?.optimization_suggestion?.after
+        || normalizedAnalysis?.optimization_suggestion?.benefit,
+    );
+
     useEffect(() => {
         if (!analysisId) return;
 
         const loadSharedAnalysis = async () => {
             setIsFetchingShared(true);
             try {
-                const response = await axios.get(`${serverUrl}/api/analysis/${analysisId}`);
+                const response = await requestFromAnalysisApis(analysisApiBases, (baseUrl) => axios.get(`${baseUrl}/api/analysis/${analysisId}`));
                 const sharedAnalysis = response.data.analysis;
                 setLanguage(sharedAnalysis.language || DEFAULT_LANGUAGE);
                 setCode(sharedAnalysis.code || '');
@@ -69,7 +91,7 @@ function SolutionAnalyzer() {
         };
 
         loadSharedAnalysis();
-    }, [analysisId, serverUrl]);
+    }, [analysisApiBases, analysisId]);
 
     const handleAnalyse = async () => {
         if (!code.trim()) {
@@ -79,11 +101,11 @@ function SolutionAnalyzer() {
 
         setIsLoading(true);
         try {
-            const response = await axios.post(`${serverUrl}/api/analysis`, {
+            const response = await requestFromAnalysisApis(analysisApiBases, (baseUrl) => axios.post(`${baseUrl}/api/analysis`, {
                 code,
                 language,
                 prompt,
-            });
+            }));
 
             setAnalysis(response.data.analysis);
             navigate(`/analysis/${response.data.analysisId}`);
@@ -205,7 +227,7 @@ function SolutionAnalyzer() {
                                         </ul>
                                     </div>
                                 ) : null}
-                                {normalizedAnalysis.optimization_suggestion ? (
+                                {hasOptimizationSuggestion ? (
                                     <div className="rounded-[2rem] border border-amber-200 bg-amber-50/80 p-6 shadow-sm dark:border-amber-800/40 dark:bg-amber-950/20">
                                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">One concrete optimization</p>
                                         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -219,6 +241,12 @@ function SolutionAnalyzer() {
                                             </div>
                                         </div>
                                         <p className="mt-4 text-sm leading-7 text-amber-900 dark:text-amber-100">{normalizedAnalysis.optimization_suggestion.benefit}</p>
+                                    </div>
+                                ) : null}
+                                {normalizedAnalysis.raw_text ? (
+                                    <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Raw AI output</p>
+                                        <pre className="mt-4 whitespace-pre-wrap break-words rounded-2xl bg-stone-50 p-4 text-sm leading-7 text-slate-700 dark:bg-slate-950 dark:text-slate-300">{normalizedAnalysis.raw_text}</pre>
                                     </div>
                                 ) : null}
                             </>

@@ -17,6 +17,7 @@ const analysisSchema = new mongoose.Schema(
         benefit: { type: String, default: "" },
       },
       summary: { type: String, default: "" },
+      raw_text: { type: String, default: "" },
     },
   },
   { timestamps: true },
