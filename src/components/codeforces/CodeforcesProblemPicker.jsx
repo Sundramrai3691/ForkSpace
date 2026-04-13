@@ -90,7 +90,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="cf-picker-title"
-                className="flex h-[68vh] w-full max-w-[980px] flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_28px_100px_-28px_rgba(15,23,42,0.55)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_36px_120px_-36px_rgba(0,0,0,0.9)] dark:ring-white/5"
+                className="flex h-[74vh] w-full max-w-[1040px] flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_28px_100px_-28px_rgba(15,23,42,0.55)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_36px_120px_-36px_rgba(0,0,0,0.9)] dark:ring-white/5"
             >
                 <div className="flex shrink-0 items-start justify-between gap-4 border-b border-stone-200/90 px-5 py-2.5 sm:px-6 dark:border-slate-700/80">
                     <div className="min-w-0">

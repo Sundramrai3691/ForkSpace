@@ -4,12 +4,6 @@
  * Presentational only — same fields as API report object.
  */
 
-function clampScore(value) {
-    const n = Number(value);
-    if (Number.isNaN(n)) return 0;
-    return Math.max(0, Math.min(100, Math.round(n)));
-}
-
 /** Remove duplicate lines while preserving order (backend can repeat filler lines). */
 function dedupeStrings(list) {
     if (!Array.isArray(list)) return [];
@@ -22,48 +16,6 @@ function dedupeStrings(list) {
         out.push(s);
     }
     return out;
-}
-
-function ScoreRing({ score, className = '' }) {
-    const n = clampScore(score);
-    const r = 44;
-    const c = 2 * Math.PI * r;
-    const offset = c - (n / 100) * c;
-
-    return (
-        <div className={`relative flex shrink-0 items-center justify-center ${className}`}>
-            <svg viewBox="0 0 112 112" className="h-28 w-28 sm:h-32 sm:w-32" aria-hidden>
-                <circle
-                    cx="56"
-                    cy="56"
-                    r={r}
-                    fill="none"
-                    className="stroke-gray-200/90 dark:stroke-slate-700"
-                    strokeWidth="10"
-                />
-                <circle
-                    cx="56"
-                    cy="56"
-                    r={r}
-                    fill="none"
-                    className="stroke-amber-500 drop-shadow-[0_0_12px_rgba(245,158,11,0.45)]"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeDasharray={c}
-                    strokeDashoffset={offset}
-                    transform="rotate(-90 56 56)"
-                />
-            </svg>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold tabular-nums tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-                    {n}
-                </span>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
-                    score
-                </span>
-            </div>
-        </div>
-    );
 }
 
 function SectionDivider({ label }) {
@@ -101,22 +53,14 @@ export default function SessionIntelligenceReportDashboard({
 
     return (
         <div className={`${shell} ${pad} space-y-1`}>
-            {/* Score hero */}
-            <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/95 via-white to-orange-50/50 px-5 py-7 shadow-sm dark:border-amber-900/45 dark:from-amber-950/55 dark:via-slate-900/85 dark:to-slate-950/90 sm:px-7 sm:py-8">
-                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-3xl dark:bg-amber-500/10" />
-                <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl dark:bg-orange-500/5" />
-                <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0 flex-1 space-y-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-800/90 dark:text-amber-300/90">
-                            Session score
-                        </p>
-                        <h2 className="text-xl font-bold leading-tight tracking-tight text-gray-900 dark:text-white sm:text-2xl">
-                            {title}
-                        </h2>
-                        <p className="max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{subtitle}</p>
-                    </div>
-                    <ScoreRing score={report.sessionScore} />
-                </div>
+            <div className="rounded-2xl border border-gray-200/80 bg-white/90 px-5 py-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/65 sm:px-6">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                    Session intelligence
+                </p>
+                <h2 className="mt-2 text-xl font-bold leading-tight tracking-tight text-gray-900 dark:text-white sm:text-2xl">
+                    {title}
+                </h2>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{subtitle}</p>
             </div>
 
             {/* Insight — blue */}
@@ -235,6 +179,10 @@ export default function SessionIntelligenceReportDashboard({
                         <p className="text-xs text-gray-500 dark:text-gray-400">No targets listed.</p>
                     )}
                 </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs text-gray-600 dark:border-gray-700/70 dark:bg-slate-900/60 dark:text-gray-400">
+                <span className="font-semibold">Session score:</span> {report.sessionScore}
             </div>
         </div>
     );

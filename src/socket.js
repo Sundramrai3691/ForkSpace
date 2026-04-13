@@ -16,7 +16,9 @@ export async function connectSocket() {
         reconnectionDelay: 1000,
         reconnectionAttempts: Infinity,
         timeout: 10000,
-        transports: ['polling', 'websocket'],
+        // Prefer websocket to avoid noisy polling/XHR refused errors in dev.
+        transports: ['websocket'],
+        rememberUpgrade: true,
     };
 
     const primary = io(serverUrl, socketOptions);
@@ -37,7 +39,10 @@ export async function connectSocket() {
             });
             fallback.on("connect_error", () => {
                 // Keep primary retries alive as final fallback.
-                if (!settled) resolve(primary);
+                if (!settled) {
+                    settled = true;
+                    resolve(primary);
+                }
             });
         }, 1000);
 

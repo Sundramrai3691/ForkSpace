@@ -203,6 +203,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     const [showImportModal, setShowImportModal] = useState(false);
     const [showCfPicker, setShowCfPicker] = useState(false);
     const [activeTab, setActiveTab] = useState('problem');
+    const [showPromptSection, setShowPromptSection] = useState(true);
+    const [showExampleSection, setShowExampleSection] = useState(true);
     const [problemDraft, setProblemDraft] = useState({
         platform: 'codeforces',
         problemCode: '',
@@ -290,6 +292,13 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
             problemSnapshot: roomState?.problem?.problemSnapshot || null,
         });
     }, [roomState?.problem]);
+
+    useEffect(() => {
+        const hasPrompt = Boolean((problemDraft.prompt || '').trim());
+        const hasExample = Boolean((problemDraft.sampleInput || '').trim() || (problemDraft.sampleOutput || '').trim());
+        setShowPromptSection(hasPrompt);
+        setShowExampleSection(hasExample);
+    }, [problemDraft.prompt, problemDraft.sampleInput, problemDraft.sampleOutput]);
 
     useEffect(() => {
         if (!socketRef?.current || !roomState) return;
@@ -592,16 +601,25 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                 className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                             />
                                         </div>
-                                        <div>
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                                Prompt
-                                            </p>
-                                            <textarea
-                                                value={problemDraft.prompt}
-                                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
-                                                placeholder="Paste the statement or the specific prompt you want to discuss."
-                                                className="mt-1.5 h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                            />
+                                        <div className="rounded-xl border border-stone-200/80 bg-white/80 p-3 dark:border-slate-700/80 dark:bg-slate-900/40">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPromptSection((v) => !v)}
+                                                className="flex w-full items-center justify-between text-left"
+                                            >
+                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Prompt
+                                                </p>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{showPromptSection ? 'Hide' : 'Show'}</span>
+                                            </button>
+                                            {showPromptSection ? (
+                                                <textarea
+                                                    value={problemDraft.prompt}
+                                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                                                    placeholder="Paste the statement or the specific prompt you want to discuss."
+                                                    className="mt-2 h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                />
+                                            ) : null}
                                         </div>
                                         <div>
                                             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
@@ -658,13 +676,21 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                     <div className="grid gap-3">
                                         <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
                                             <div className="mb-3 flex items-center justify-between">
-                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                                    Example
-                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowExampleSection((v) => !v)}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                        Example
+                                                    </p>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{showExampleSection ? 'Hide' : 'Show'}</span>
+                                                </button>
                                                 <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                                                     Shared
                                                 </span>
                                             </div>
+                                            {showExampleSection ? (
                                             <div className="space-y-3">
                                                 <label className="space-y-1.5">
                                                     <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
@@ -689,6 +715,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     />
                                                 </label>
                                             </div>
+                                            ) : null}
                                         </div>
                                     </div>
                                     {problemDraft.samples?.length > 0 && (

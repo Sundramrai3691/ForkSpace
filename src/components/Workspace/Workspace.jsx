@@ -227,6 +227,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     );
     const [output, setOutput] = useState("");
     const [showSettings, setShowSettings] = useState(false);
+    const [copyingRoomLink, setCopyingRoomLink] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
     const [lastRunMeta, setLastRunMeta] = useState(null);
     const [timerDuration, setTimerDuration] = useState(45 * 60);
@@ -956,12 +957,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
     const handleCopyRoomId = async () => {
         try {
+            setCopyingRoomLink(true);
             const inviteUrl = `${window.location.origin}/editor/${roomId}`;
             await navigator.clipboard.writeText(inviteUrl);
             toast.success("Room link copied");
             setShowSettings(false);
         } catch {
             toast.error("Failed to copy link");
+        } finally {
+            setTimeout(() => setCopyingRoomLink(false), 900);
         }
     };
 
@@ -1561,6 +1565,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {roomId}
                         </code>
+                        <button
+                            type="button"
+                            onClick={handleCopyRoomId}
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-gray-200 bg-white px-2.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
+                            title="Copy room link"
+                        >
+                            {copyingRoomLink ? "Copied" : "Copy"}
+                        </button>
                         {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
                             <button
                                 onClick={handleSwapRoles}
