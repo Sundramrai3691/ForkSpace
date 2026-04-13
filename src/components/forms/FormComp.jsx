@@ -13,7 +13,11 @@ function FormComp() {
     const roleRef = useRef(null);
     const sessionModeRef = useRef(null);
     const { theme } = useContext(ThemeContext);
-    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const rawServerUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const serverUrl =
+        rawServerUrl.includes(':5173') && !import.meta.env.VITE_SERVER_URL
+            ? rawServerUrl.replace(':5173', ':5000')
+            : rawServerUrl;
     const [authMode, setAuthMode] = useState('login');
     const [entryMode, setEntryMode] = useState('guest');
     const [authLoading, setAuthLoading] = useState(false);

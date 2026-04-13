@@ -68,7 +68,7 @@ function TestCard({ test, onDelete, canDelete = true }) {
             ) : null}
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Actual output</p>
-              <pre className="mt-1 max-h-24 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{test.actualOutput || "(not run yet)"}</pre>
+              <pre className="mt-1 max-h-24 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{test.actualOutput || (test.runtimeError ? "(runtime error)" : test.timedOut ? "(timeout)" : "(not run yet)")}</pre>
             </div>
           </div>
         ) : null}
@@ -83,6 +83,7 @@ export default function HiddenTestPanel({
   code,
   language,
   problem,
+  externalGenerateSignal = 0,
 }) {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -119,6 +120,13 @@ export default function HiddenTestPanel({
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!externalGenerateSignal) return;
+    if (!canGenerate) return;
+    void generateTests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalGenerateSignal]);
 
   const generateTests = async () => {
     if (!canGenerate) {

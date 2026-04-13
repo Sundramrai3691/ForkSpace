@@ -26,7 +26,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
     const [offset, setOffset] = useState(0);
     const [loading, setLoading] = useState(false);
     const [warning, setWarning] = useState('');
-    const [showFilters, setShowFilters] = useState(true);
+    const [showFilters, setShowFilters] = useState(false);
     const limit = 40;
 
     const fetchWithFilters = useCallback(
@@ -90,9 +90,9 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="cf-picker-title"
-                className="flex h-[78vh] w-full max-w-[1040px] flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_28px_100px_-28px_rgba(15,23,42,0.55)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_36px_120px_-36px_rgba(0,0,0,0.9)] dark:ring-white/5"
+                className="flex h-[68vh] w-full max-w-[980px] flex-col overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_28px_100px_-28px_rgba(15,23,42,0.55)] ring-1 ring-black/5 dark:border-slate-700/90 dark:bg-[#060d18] dark:shadow-[0_36px_120px_-36px_rgba(0,0,0,0.9)] dark:ring-white/5"
             >
-                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-stone-200/90 px-5 py-3.5 sm:px-6 dark:border-slate-700/80">
+                <div className="flex shrink-0 items-start justify-between gap-4 border-b border-stone-200/90 px-5 py-2.5 sm:px-6 dark:border-slate-700/80">
                     <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
                             Codeforces catalog
@@ -100,7 +100,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                         <h3 id="cf-picker-title" className="mt-0.5 text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                             Pick a problem
                         </h3>
-                        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600 dark:text-slate-400">Select a row to apply to the room.</p>
+                        <p className="mt-0.5 max-w-2xl text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">Select a row to apply to the room.</p>
                     </div>
                     <button
                         type="button"
@@ -121,7 +121,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                         </div>
                     )}
 
-                    <div className="sticky top-0 z-20 border-b border-stone-200/90 bg-white/95 px-5 py-3 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-700/80 dark:bg-[#060d18]/95 sm:px-6">
+                    <div className="sticky top-0 z-20 border-b border-stone-200/90 bg-white/95 px-5 py-2 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.25)] backdrop-blur-md dark:border-slate-700/80 dark:bg-[#060d18]/95 sm:px-6">
                         <form onSubmit={handleSearch} className="space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Filters</p>
@@ -247,7 +247,7 @@ function CodeforcesProblemPicker({ isOpen, onClose, onSelect, serverUrl }) {
                         </form>
                     </div>
 
-                    <div className="px-5 py-5 sm:px-6 sm:py-6">
+                    <div className="px-5 py-4 sm:px-6 sm:py-5">
                         <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-stone-200/80 pb-4 dark:border-slate-700/60">
                             <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
                                 <span className="tabular-nums text-lg text-slate-900 dark:text-white">{rows.length}</span>

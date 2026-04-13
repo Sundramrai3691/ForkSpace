@@ -244,6 +244,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [lastReportPayload, setLastReportPayload] = useState(null);
     const [lastShareId, setLastShareId] = useState('');
     const [showReportModal, setShowReportModal] = useState(false);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    const [rightPanelWidthPct, setRightPanelWidthPct] = useState(() => {
+        const raw = Number(localStorage.getItem("forkspace.rightPanelWidthPct"));
+        if (Number.isFinite(raw) && raw >= 25 && raw <= 50) return raw;
+        return 35;
+    });
+    const [testGenerateSignal, setTestGenerateSignal] = useState(0);
     const [editorContentVersion, setEditorContentVersion] = useState(0);
     const [collabHintDismissed, setCollabHintDismissed] = useState(false);
 
@@ -262,6 +269,31 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         const id = window.setTimeout(() => setIsNewReport(false), 12000);
         return () => window.clearTimeout(id);
     }, [isNewReport]);
+
+    useEffect(() => {
+        localStorage.setItem(
+            "forkspace.rightPanelWidthPct",
+            String(rightPanelWidthPct),
+        );
+    }, [rightPanelWidthPct]);
+
+    const startPanelResize = useCallback((event) => {
+        event.preventDefault();
+        const startX = event.clientX;
+        const startPct = rightPanelWidthPct;
+        const onMove = (ev) => {
+            const deltaPx = ev.clientX - startX;
+            const deltaPct = (deltaPx / window.innerWidth) * 100;
+            const next = Math.max(25, Math.min(50, startPct - deltaPct));
+            setRightPanelWidthPct(next);
+        };
+        const onUp = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+    }, [rightPanelWidthPct]);
 
     const renderReviewContent = () => {
         if (isReviewLoading) {
@@ -440,6 +472,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             : isNavigator
                 ? 'Navigator'
                 : 'Observer';
+    const isDesktopLayout =
+        typeof window !== "undefined" ? window.innerWidth >= 1280 : false;
 
     const handleSwapRoles = () => {
         socketRef.current?.emit('swap-roles', { roomId });
@@ -472,7 +506,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
     const reviewSolution = async () => {
         setIsReviewLoading(true);
-        setActiveRightTab("ai");
+        setShowAnalysisModal(true);
         try {
             const code = editorRef.current?.getValue() || "";
             setReviewContent(null);
@@ -889,7 +923,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         setLastReportPayload(intelRes.data.report);
                         setIsOutputCollapsed(false);
                         setIsNewReport(true);
-                        setActiveRightTab("report");
                         setShowReportModal(true);
                         toast.success("Session intelligence report saved.");
                     }
@@ -1051,7 +1084,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         const effectiveStdin = sampleInput;
         const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
         const normalizedExpectedOutput = normalizeOutput(expectedOutput);
-        setActiveRightTab("output");
+        setActiveRightTab("submissions");
 
         setLastRunMeta({
             languageLabel: languageConfig.label,
@@ -1134,7 +1167,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             setLastShareId(res.data.shareId || "");
             setIsOutputCollapsed(false);
             setIsNewReport(true);
-            setActiveRightTab("report");
             setShowReportModal(true);
             toast.success("Session intelligence report is ready.");
         } catch (error) {
@@ -1306,6 +1338,97 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </div>
                 </OverlayPanel>
             ) : null}
+            {showAnalysisModal ? (
+                <OverlayPanel
+                    title="Solution Analysis"
+                    subtitle="Session Intelligence"
+                    onClose={() => setShowAnalysisModal(false)}
+                >
+                    <div className="space-y-5">
+                        <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Edge Case Checklist</h3>
+                                <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-gray-600 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-300">
+                                        {checklistCompleted}/{checklistTotal}
+                                    </span>
+                                    {criticalOpenCount > 0 && (
+                                        <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-red-700 dark:border-red-800/50 dark:bg-red-950/20 dark:text-red-300">
+                                            {criticalOpenCount} critical open
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {session.edgeCaseChecklist.map((item) => (
+                                    <label key={item.id} className="group flex cursor-pointer items-start gap-3 rounded-lg border border-transparent px-2 py-1.5 hover:border-gray-200 dark:hover:border-gray-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.checked}
+                                            onChange={() => toggleEdgeCase(item.id)}
+                                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                                        />
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                    {item.label}
+                                                </span>
+                                            </div>
+                                            {item.hint ? (
+                                                <p className="mt-0.5 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                                    {item.hint}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={reviewSolution}
+                                className="inline-flex flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                            >
+                                Re-run analysis
+                            </button>
+                            <button
+                                type="button"
+                                onClick={fetchAIHints}
+                                className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-stone-50 hover:text-gray-900 dark:border-gray-700 dark:bg-[#111d33] dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-[#16243d] dark:hover:text-white"
+                            >
+                                Refresh AI Hints
+                            </button>
+                        </div>
+
+                        <div className="rounded-[1.4rem] border border-gray-200/80 bg-white p-4 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                            <div className="mb-3 flex items-center justify-between">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">AI Hints</h3>
+                                {isLoading ? <span className="text-[10px] text-amber-500">Loading...</span> : null}
+                            </div>
+                            {aiHints.length > 0 ? (
+                                <div className="space-y-2">
+                                    {aiHints.map((hint, index) => (
+                                        <button
+                                            key={index}
+                                            type="button"
+                                            onClick={() => applyHint(hint)}
+                                            className="w-full rounded-xl border border-gray-200 bg-white/80 p-3 text-left text-sm text-gray-700 transition hover:border-amber-200 hover:bg-amber-50/70 dark:border-gray-700 dark:bg-slate-900/50 dark:text-gray-200 dark:hover:border-amber-800/40 dark:hover:bg-amber-900/10"
+                                        >
+                                            {hint}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">No suggestions available right now.</p>
+                            )}
+                        </div>
+
+                        {renderReviewContent()}
+                    </div>
+                </OverlayPanel>
+            ) : null}
 
             <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-2.5 dark:border-gray-700/80 dark:bg-[#081121]">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -1327,6 +1450,42 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         title={canRunInCurrentMode ? "Run all parsed sample tests (Judge0)" : "Only the Driver can submit in mock mode"}
                     >
                         Submit
+                    </button>
+                    <span className="mx-1 h-7 w-px bg-gray-300/80 dark:bg-gray-700" />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowAnalysisModal(true);
+                            if (!reviewContent) {
+                                void reviewSolution();
+                            }
+                        }}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/90 px-4 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-blue-200"
+                    >
+                        Analyze
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (lastReportPayload) {
+                                setShowReportModal(true);
+                                return;
+                            }
+                            void generateSessionReport({ endSession: false });
+                        }}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200"
+                    >
+                        Report
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setActiveRightTab("tests");
+                            setTestGenerateSignal((v) => v + 1);
+                        }}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50/90 px-4 text-sm font-semibold text-violet-800 transition hover:bg-violet-100 dark:border-violet-800/40 dark:bg-violet-900/20 dark:text-violet-200"
+                    >
+                        Generate Tests
                     </button>
                     <button
                         className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-gray-100 px-2.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -1525,7 +1684,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 </div>
             </div>
 
-            <div className={`grid min-h-0 flex-1 grid-cols-1 ${isOutputCollapsed ? 'xl:grid-cols-[minmax(0,1fr)]' : 'xl:grid-cols-[minmax(0,1fr)_24rem]'}`}>
+            <div
+                className="grid min-h-0 flex-1 grid-cols-1"
+                style={
+                    isOutputCollapsed || !isDesktopLayout
+                        ? undefined
+                        : { gridTemplateColumns: `minmax(0,1fr) 8px ${rightPanelWidthPct}%` }
+                }
+            >
                 <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${editorUnlocked
                     ? 'border-emerald-200/80 dark:border-emerald-800/40'
                     : 'border-rose-200/80 dark:border-rose-800/40'
@@ -1547,7 +1713,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     ) : null}
                 </div>
 
-                <aside className={`${isOutputCollapsed ? 'hidden xl:hidden' : 'block'} overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:min-w-[360px] xl:max-w-[520px] xl:flex-none xl:border-l xl:border-t-0 xl:panel-resize xl:panel-resize-left`}>
+                <div
+                    onMouseDown={startPanelResize}
+                    className={`${isOutputCollapsed ? 'hidden' : 'hidden xl:block'} cursor-col-resize border-t border-gray-200/80 bg-gray-100/70 hover:bg-amber-200/80 dark:border-gray-700/80 dark:bg-slate-800/80 dark:hover:bg-amber-700/40`}
+                    title="Resize panel"
+                />
+
+                <aside className={`${isOutputCollapsed ? 'hidden xl:hidden' : 'block'} overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:flex-none xl:border-l xl:border-t-0`}>
                     <div className="flex h-full flex-col min-h-0">
                         <div className="flex flex-none items-center gap-2 border-b border-gray-200/80 bg-white px-4 py-2.5 dark:border-gray-700/80 dark:bg-[#0b1528]">
                             <div className="flex gap-1.5">
@@ -1561,24 +1733,18 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             <div className="flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1.5 shadow-sm dark:border-gray-700/80 dark:bg-slate-950/40">
                                 {[
                                     { key: "output", label: "Output" },
-                                    { key: "history", label: "History" },
-                                    { key: "ai", label: "Intelligence" },
+                                    { key: "submissions", label: "Submissions" },
                                     { key: "tests", label: "Tests" },
-                                    { key: "report", label: "Report" },
                                 ].map((tab) => {
                                     const isActive = activeRightTab === tab.key;
-                                    const isReport = tab.key === "report";
-                                    const reportFresh = isReport && isNewReport && isActive;
                                     return (
                                         <button
                                             key={tab.key}
                                             type="button"
                                             onClick={() => setActiveRightTab(tab.key)}
                                             className={`rounded-[0.95rem] border-b-2 px-3.5 py-2.5 text-sm font-semibold transition ${isActive
-                                                ? isReport
-                                                    ? `border-amber-500 bg-white text-gray-900 shadow-md dark:border-amber-400 dark:bg-slate-900 dark:text-white ${reportFresh ? "ring-2 ring-amber-400/70 ring-offset-2 ring-offset-stone-50 dark:ring-offset-[#0d172b]" : ""}`
-                                                    : "border-amber-500 bg-white text-gray-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white"
-                                                : `border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white ${isReport && isNewReport && !isActive ? "ring-2 ring-amber-400/55 animate-pulse bg-amber-50/90 dark:bg-amber-950/30" : ""}`
+                                                ? "border-amber-500 bg-white text-gray-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white"
+                                                : "border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                                                 }`}
                                         >
                                             {tab.label}
@@ -1653,7 +1819,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 </div>
                             )}
 
-                            {activeRightTab === "history" && (
+                            {activeRightTab === "submissions" && (
                                 session.runHistory.length > 0 ? (
                                     <div className="space-y-3">
                                         {session.runHistory.map((run) => (
@@ -1802,6 +1968,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     language={selectedLanguageRef.current}
                                     code={editorRef.current?.getValue?.() || ""}
                                     problem={roomState?.problem || {}}
+                                    externalGenerateSignal={testGenerateSignal}
                                 />
                             )}
 

@@ -193,7 +193,11 @@ function ImportProblemModal({
 function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, currentRole = 'Peer' }) {
     const location = useLocation();
     const navigate = useNavigate();
-    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const rawServerUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+    const serverUrl =
+        rawServerUrl.includes(':5173') && !import.meta.env.VITE_SERVER_URL
+            ? rawServerUrl.replace(':5173', ':5000')
+            : rawServerUrl;
     const [isImporting, setIsImporting] = useState(false);
     const [importNotice, setImportNotice] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
