@@ -103,13 +103,13 @@ function Login() {
                             <button
                                 type="button"
                                 onClick={focusQuickEntry}
-                                className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                                className="inline-flex items-center justify-center rounded-md bg-white px-5 py-2.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
                             >
                                 Start a Room
                             </button>
                             <Link
                                 to="/analyse"
-                                className="inline-flex items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
+                                className="inline-flex items-center justify-center rounded-md border border-amber-500 px-5 py-2.5 text-sm text-amber-400 transition hover:bg-amber-500/10"
                             >
                                 Solution Analyser
                             </Link>

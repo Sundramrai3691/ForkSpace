@@ -245,7 +245,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [showOutputModal, setShowOutputModal] = useState(false);
     const [reviewContent, setReviewContent] = useState(null);
     const [isReviewLoading, setIsReviewLoading] = useState(false);
-    const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+    const [isOutputCollapsed, setIsOutputCollapsed] = useState(true);
     const [activeRightTab, setActiveRightTab] = useState("output");
     /** Brief highlight after a new report is generated (Output-like priority). */
     const [isNewReport, setIsNewReport] = useState(false);
@@ -339,18 +339,18 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-[1.35rem] border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Time Complexity</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Time Complexity</p>
                         <p className="mt-2 text-lg font-semibold text-blue-950 dark:text-blue-100">{reviewContent?.time_complexity || 'N/A'}</p>
                     </div>
                     <div className="rounded-[1.35rem] border border-purple-200 bg-purple-50/80 p-4 dark:border-purple-800/40 dark:bg-purple-950/20">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-700 dark:text-purple-300">Space Complexity</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Space Complexity</p>
                         <p className="mt-2 text-lg font-semibold text-purple-950 dark:text-purple-100">{reviewContent?.space_complexity || 'N/A'}</p>
                     </div>
                 </div>
 
                 {reviewContent?.bugs?.length > 0 && (
                     <div className="rounded-[1.4rem] border border-red-200 bg-red-50/80 p-5 dark:border-red-800/40 dark:bg-red-950/20">
-                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700 dark:text-red-300">Potential Bugs</h3>
+                        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Potential Bugs</h3>
                         <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-red-900 dark:text-red-200">
                             {reviewContent.bugs.map((bug, index) => <li key={index}>{bug}</li>)}
                         </ul>
@@ -359,7 +359,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
                 {reviewContent?.style_issues?.length > 0 && (
                     <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-800/40 dark:bg-amber-950/20">
-                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">Style And Readability</h3>
+                        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Style And Readability</h3>
                         <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-amber-900 dark:text-amber-200">
                             {reviewContent.style_issues.map((issue, index) => <li key={index}>{issue}</li>)}
                         </ul>
@@ -368,15 +368,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
                 {reviewContent?.optimization_suggestion && (
                     <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50/80 p-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-                        <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Optimization Suggestion</h3>
+                        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Optimization Suggestion</h3>
                         <div className="mt-4 grid gap-4 md:grid-cols-2">
-                            <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
+                            <div className="rounded-2xl border-l-2 border-red-500/30 bg-white/80 p-4 pl-3 dark:bg-slate-900/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
-                                <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.before}</p>
+                                <p className="mt-2 text-sm leading-7 text-gray-400">{reviewContent.optimization_suggestion.before}</p>
                             </div>
-                            <div className="rounded-2xl bg-white/80 p-4 dark:bg-slate-900/50">
+                            <div className="rounded-2xl border-l-2 border-green-500/40 bg-white/80 p-4 pl-3 dark:bg-slate-900/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
-                                <p className="mt-2 text-sm leading-7 text-slate-800 dark:text-slate-200">{reviewContent.optimization_suggestion.after}</p>
+                                <p className="mt-2 text-sm font-medium leading-7 text-gray-200">{reviewContent.optimization_suggestion.after}</p>
                             </div>
                         </div>
                         <p className="mt-4 text-sm leading-7 text-emerald-900 dark:text-emerald-100">{reviewContent.optimization_suggestion.benefit}</p>
@@ -971,14 +971,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const handleCopyRoomId = async () => {
         try {
             setCopyingRoomLink(true);
-            const inviteUrl = `${window.location.origin}/editor/${roomId}`;
-            await navigator.clipboard.writeText(inviteUrl);
-            toast.success("Room link copied");
+            await navigator.clipboard.writeText(roomId);
+            toast.success("Room ID copied");
             setShowSettings(false);
         } catch {
-            toast.error("Failed to copy link");
+            toast.error("Failed to copy room ID");
         } finally {
-            setTimeout(() => setCopyingRoomLink(false), 900);
+            setTimeout(() => setCopyingRoomLink(false), 1500);
         }
     };
 
@@ -1465,10 +1464,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 </OverlayPanel>
             ) : null}
 
-            <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b border-gray-200/80 bg-white px-5 py-2.5 dark:border-gray-700/80 dark:bg-[#081121]">
-                <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-col gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121] lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                     <button
-                        className="inline-flex h-11 min-h-[2.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-teal-600 px-6 text-base font-semibold text-white shadow-md shadow-teal-600/25 ring-2 ring-amber-400/55 ring-offset-2 ring-offset-white transition-all hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-[#081121] dark:hover:bg-teal-500"
+                        className="inline-flex h-9 items-center gap-2 rounded-md bg-teal-500 px-4 text-sm font-semibold text-white shadow-sm shadow-teal-900/40 transition-colors hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50"
                         onClick={runCode}
                         disabled={!canRunInCurrentMode || isRunBusy}
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
@@ -1481,7 +1480,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         {isRunBusy ? "Running..." : "Run"}
                     </button>
                     <button
-                        className="inline-flex h-11 min-h-[2.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-teal-500/80 bg-white px-5 text-base font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-teal-600 dark:bg-[#0a1324] dark:text-teal-100 dark:hover:bg-teal-950/40 dark:ring-offset-[#081121]"
+                        className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-500/70 px-4 text-sm text-amber-400 transition-colors hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
                         onClick={submitSamples}
                         disabled={!canRunInCurrentMode || isSubmitBusy}
                         title={canRunInCurrentMode ? "Run all parsed sample tests (Judge0)" : "Only the Driver can submit in mock mode"}
@@ -1493,7 +1492,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         )}
                         {isSubmitBusy ? "Submitting..." : "Submit"}
                     </button>
-                    <span className="mx-1 h-7 w-px bg-gray-300/80 dark:bg-gray-700" />
+                    <span className="mx-1 h-5 w-px bg-white/15" />
                     <button
                         type="button"
                         onClick={() => {
@@ -1502,7 +1501,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 void reviewSolution();
                             }
                         }}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50/90 px-4 text-sm font-semibold text-blue-800 transition hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-blue-200"
+                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
                     >
                         {isReviewLoading ? <ButtonSpinner /> : (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1521,7 +1520,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             void generateSessionReport({ endSession: false });
                         }}
                         disabled={reportLoading}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800/40 dark:bg-amber-900/25 dark:text-amber-200"
+                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60"
                     >
                         {reportLoading ? <ButtonSpinner /> : (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1535,22 +1534,21 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         onClick={() => {
                             setActiveRightTab("tests");
                             setTestGenerateSignal((v) => v + 1);
+                            setIsOutputCollapsed(false);
                         }}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50/90 px-4 text-sm font-semibold text-violet-800 transition hover:bg-violet-100 dark:border-violet-800/40 dark:bg-violet-900/20 dark:text-violet-200"
+                        className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                        title="Generate hidden tests"
                     >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
                         </svg>
                         Generate Tests
-                        <span className="rounded-full border border-violet-300/80 bg-white/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-violet-700 dark:border-violet-700/60 dark:bg-violet-950/30 dark:text-violet-200">
-                            Beta
-                        </span>
                     </button>
                     <button
-                        className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-gray-100 px-2.5 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 text-gray-300 transition-colors hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-50"
                         onClick={handleResetCode}
                         disabled={!editorUnlocked}
-                        title={editorUnlocked ? 'Reset the shared editor' : 'Only the active editor owner can clear code right now'}
+                        title={editorUnlocked ? 'Clear editor' : 'Only the active editor owner can clear code right now'}
                     >
                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h18" />
@@ -1559,21 +1557,11 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             <line x1="10" x2="10" y1="11" y2="17" />
                             <line x1="14" x2="14" y1="11" y2="17" />
                         </svg>
-                        Clear
                     </button>
                 </div>
 
-                <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/')}
-                        className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm transition hover:bg-white dark:border-gray-700 dark:bg-gray-800/92"
-                        title="Go to home"
-                    >
-                        <img src="/logo.png" alt="ForkSpace logo" className="h-5 w-5 rounded" />
-                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">ForkSpace</span>
-                    </button>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <div className="inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <label htmlFor="language-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
                         </label>
@@ -1592,66 +1580,51 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                    <div className="flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
                     {problemToolbarMeta && (
-                        <div className="hidden min-w-0 max-w-[min(380px,42vw)] flex-col gap-1 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-left shadow-sm dark:border-amber-900/50 dark:bg-amber-950/25 md:flex md:flex-col">
-                            <span className="truncate text-xs font-semibold text-gray-900 dark:text-white">
+                        <div className="hidden min-w-0 max-w-[min(360px,42vw)] flex-col justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-left xl:flex">
+                            <span className="truncate text-xs font-semibold text-gray-100">
                                 {problemToolbarMeta.title || "Practice problem"}
                             </span>
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-400">
                                 {problemToolbarMeta.tags?.slice(0, 5).map((t) => (
                                     <span
                                         key={t}
-                                        className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium text-gray-700 ring-1 ring-amber-200/80 dark:bg-slate-900/80 dark:text-gray-200 dark:ring-amber-900/40"
+                                        className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-gray-300"
                                     >
                                         {t}
                                     </span>
                                 ))}
                                 {problemToolbarMeta.rating != null && problemToolbarMeta.rating !== "" ? (
-                                    <span className="whitespace-nowrap">Rating {String(problemToolbarMeta.rating)}</span>
+                                    <span className="whitespace-nowrap rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px]">
+                                        Rating {String(problemToolbarMeta.rating)}
+                                    </span>
                                 ) : null}
                                 {problemToolbarMeta.diff ? (
-                                    <span className="whitespace-nowrap">{String(problemToolbarMeta.diff)}</span>
+                                    <span className="whitespace-nowrap rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px]">
+                                        {String(problemToolbarMeta.diff)}
+                                    </span>
                                 ) : null}
                                 {problemToolbarMeta.solved != null ? (
-                                    <span className="whitespace-nowrap">
+                                    <span className="whitespace-nowrap rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px]">
                                         {problemToolbarMeta.solved.toLocaleString()} solves
                                     </span>
                                 ) : null}
                             </div>
                         </div>
                     )}
-                    <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
+                    <div className="flex h-9 flex-nowrap items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Room</span>
                         <code className="relative rounded-full bg-gray-100 dark:bg-[#111d33] px-3 py-1 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {roomId}
                         </code>
-                        <button
-                            type="button"
-                            onClick={handleCopyRoomId}
-                            className="inline-flex h-8 items-center justify-center rounded-full border border-gray-200 bg-white px-2.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200"
-                            title="Copy room link"
-                        >
-                            {copyingRoomLink ? "Copied" : "Copy"}
-                        </button>
-                        {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
-                            <button
-                                onClick={handleSwapRoles}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#111d33] dark:text-gray-400 dark:hover:bg-gray-700"
-                                title="Swap Roles"
-                            >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                            </button>
-                        )}
                         <div className="relative" ref={settingsRef}>
                             <button
                                 onClick={() => setShowSettings((current) => !current)}
-                                className="group relative inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 dark:bg-[#111d33] hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="group relative inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-gray-100 transition-all duration-200 hover:bg-gray-200 hover:border-gray-300 dark:border-gray-700 dark:bg-[#111d33] dark:hover:bg-gray-700 dark:hover:border-gray-600"
                                 aria-label="Practice room settings"
                                 title="Practice room settings"
                             >
@@ -1695,6 +1668,17 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 </div>
                             )}
                         </div>
+                        {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
+                            <button
+                                onClick={handleSwapRoles}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#111d33] dark:text-gray-400 dark:hover:bg-gray-700"
+                                title="Swap Roles"
+                            >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </button>
+                        )}
                         {users.length > 0 && (
                             <div className="flex items-center pl-1">
                                 {users.slice(0, 5).map((user, index) => (
@@ -1712,7 +1696,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         <button
                             type="button"
                             onClick={() => setIsOutputCollapsed((current) => !current)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                             title={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
                             aria-label={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
                         >
@@ -1795,7 +1779,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     title="Resize panel"
                 />
 
-                <aside className={`${isOutputCollapsed ? 'hidden xl:hidden' : 'block'} overflow-hidden border-t border-gray-200/80 bg-white dark:border-gray-700/80 dark:bg-[#081121] xl:h-full xl:flex-none xl:border-l xl:border-t-0`}>
+                <aside className={`${isOutputCollapsed ? 'hidden xl:hidden' : 'block'} overflow-hidden border-t border-white/10 bg-white/[0.015] dark:bg-[#081121] xl:h-full xl:flex-none xl:border-l xl:border-t-0 xl:border-white/10`}>
                     <div className="flex h-full flex-col min-h-0">
                         <div className="flex flex-none items-center gap-2 border-b border-gray-200/80 bg-white px-4 py-2.5 dark:border-gray-700/80 dark:bg-[#0b1528]">
                             <div className="flex gap-1.5">
@@ -1805,7 +1789,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             </div>
                         </div>
 
-                        <div className="flex-none border-b border-gray-200/80 bg-stone-50 px-4 py-3.5 dark:border-gray-700/80 dark:bg-[#0d172b]">
+                        <div className="flex-none border-b border-white/10 bg-stone-50 px-4 py-3.5 dark:bg-[#0d172b]">
                             <div className="flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1.5 shadow-sm dark:border-gray-700/80 dark:bg-slate-950/40">
                                 {[
                                     { key: "output", label: "Output" },
@@ -1818,9 +1802,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                             key={tab.key}
                                             type="button"
                                             onClick={() => setActiveRightTab(tab.key)}
-                                            className={`rounded-[0.95rem] border-b-2 px-3.5 py-2.5 text-sm font-semibold transition ${isActive
-                                                ? "border-amber-500 bg-white text-gray-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white"
-                                                : "border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                                            className={`rounded-[0.95rem] border-b-2 px-3.5 py-2.5 text-sm transition ${isActive
+                                                ? "border-amber-400 text-white font-medium"
+                                                : "border-transparent text-gray-500 hover:text-gray-300"
                                                 }`}
                                         >
                                             {tab.label}

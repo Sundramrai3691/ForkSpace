@@ -223,7 +223,7 @@ function Editor() {
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.08),_transparent_22%),linear-gradient(180deg,#020617_0%,#0f172a_52%,#020617_100%)] lg:h-screen lg:overflow-hidden lg:flex-row">
       <aside
-        className="relative w-full border-b border-gray-200/80 bg-white/75 backdrop-blur-xl dark:border-gray-700/80 dark:bg-slate-950/55 lg:h-screen lg:shrink-0 lg:border-b-0 lg:border-r"
+        className="relative w-full border-b border-white/10 bg-white/75 backdrop-blur-xl dark:bg-slate-950/55 lg:h-screen lg:shrink-0 lg:border-b-0 lg:border-r lg:border-white/10"
         style={
           isLg
             ? { width: sidebarWidth, minWidth: SIDEBAR_MIN, maxWidth: SIDEBAR_MAX }

@@ -1,7 +1,6 @@
 /* eslint-disable react/prop-types */
 import axios from 'axios';
 import User from '../common/User';
-import CodeforcesProblemPicker from '../codeforces/CodeforcesProblemPicker';
 import { Link, useLocation, Navigate, useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
 import { useEffect, useState } from 'react';
@@ -58,7 +57,6 @@ function ImportProblemModal({
     isImporting,
     importNotice,
     onImportProblem,
-    onImportProblemUrl,
 }) {
     if (!isOpen) return null;
 
@@ -91,29 +89,6 @@ function ImportProblemModal({
                             {importNotice}
                         </div>
                     )}
-
-                    <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
-                        <div className="space-y-1.5">
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                Problem URL
-                            </span>
-                            <input
-                                type="url"
-                                value={problemDraft.problemUrl}
-                                onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
-                                placeholder="https://codeforces.com/problemset/problem/1/A"
-                                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            onClick={onImportProblemUrl}
-                            disabled={isImporting || !problemDraft.problemUrl.trim()}
-                            className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                        >
-                            {isImporting ? 'Importing...' : 'Import from Link'}
-                        </button>
-                    </div>
 
                     <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
                         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
@@ -201,10 +176,9 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     const [isImporting, setIsImporting] = useState(false);
     const [importNotice, setImportNotice] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
-    const [showCfPicker, setShowCfPicker] = useState(false);
+    const [showCfInlineForm, setShowCfInlineForm] = useState(false);
     const [activeTab, setActiveTab] = useState('problem');
-    const [showPromptSection, setShowPromptSection] = useState(true);
-    const [showExampleSection, setShowExampleSection] = useState(true);
+    const [showPromptExample, setShowPromptExample] = useState(true);
     const [problemDraft, setProblemDraft] = useState({
         platform: 'codeforces',
         problemCode: '',
@@ -295,10 +269,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
 
     useEffect(() => {
         const hasPrompt = Boolean((problemDraft.prompt || '').trim());
-        const hasExample = Boolean((problemDraft.sampleInput || '').trim() || (problemDraft.sampleOutput || '').trim());
-        setShowPromptSection(hasPrompt);
-        setShowExampleSection(hasExample);
-    }, [problemDraft.prompt, problemDraft.sampleInput, problemDraft.sampleOutput]);
+        setShowPromptExample(hasPrompt);
+    }, [problemDraft.prompt]);
 
     useEffect(() => {
         if (!socketRef?.current || !roomState) return;
@@ -392,19 +364,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         }
     };
 
-    const handleCfCatalogSelect = async (internalProblemId) => {
-        setShowCfPicker(false);
-        try {
-            await axios.post(`${serverUrl}/api/rooms/${encodeURIComponent(roomId)}/problem-selection`, {
-                problemSource: 'codeforces',
-                internalProblemId,
-            });
-            toast.success(`Applied Codeforces problem ${internalProblemId}`);
-        } catch (error) {
-            toast.error(error.response?.data?.error || 'Could not apply Codeforces problem');
-        }
-    };
-
     const handleSwitchToManualBrief = async () => {
         try {
             await axios.post(`${serverUrl}/api/rooms/${encodeURIComponent(roomId)}/problem-selection`, {
@@ -416,38 +375,59 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         }
     };
 
-    const handleImportProblemUrl = async () => {
+    async function loadFromCodeforcesUrl(url) {
+        const match = url.match(
+            /codeforces\.com\/(?:(?:problemset\/problem\/(\d+)\/([A-Z]\d*))|(?:contest\/(\d+)\/problem\/([A-Z]\d*)))/i
+        );
+        if (!match) throw new Error('Invalid Codeforces URL');
+
+        const contestId = match[1] || match[3];
+        const index = (match[2] || match[4] || '').toUpperCase();
+
+        const res = await fetch('https://codeforces.com/api/problemset.problems');
+        const data = await res.json();
+        const problems = data?.result?.problems || [];
+
+        const problem = problems.find(
+            (p) => String(p.contestId) === String(contestId) && String(p.index).toUpperCase() === index
+        );
+
+        if (!problem) throw new Error('Problem not found');
+
+        return {
+            title: problem.name,
+            tags: (problem.tags || []).join(', '),
+            rating: problem.rating || 'Unrated',
+            cfUrl: url,
+        };
+    }
+
+    const handleLoadCfUrl = async () => {
         if (!problemDraft.problemUrl.trim()) {
-            toast.error('Add a problem URL first.');
+            toast.error('Paste a Codeforces URL first.');
             return;
         }
 
         setIsImporting(true);
         setImportNotice('');
-
         try {
-            const response = await axios.post(`${serverUrl}/api/problem-import-url`, {
-                problemUrl: problemDraft.problemUrl,
-            });
-
+            const result = await loadFromCodeforcesUrl(problemDraft.problemUrl.trim());
             setProblemDraft((prev) => ({
                 ...prev,
-                ...response.data.problem,
+                title: result.title,
+                tags: result.tags
+                    .split(',')
+                    .map((t) => t.trim())
+                    .filter(Boolean),
+                rating: String(result.rating),
+                difficulty: String(result.rating),
+                sourceUrl: result.cfUrl,
+                platform: 'codeforces',
+                problemSource: 'codeforces',
             }));
-
-            if (response.data.warning) {
-                const nextNotice = 'Automatic import was limited for this problem. Keep the URL and title for context, then paste the sample input and expected output manually below.';
-                setImportNotice(nextNotice);
-                toast(nextNotice, {
-                    icon: '!',
-                });
-            } else {
-                setImportNotice('Problem details imported from the URL.');
-                toast.success('Problem imported from URL');
-                setShowImportModal(false);
-            }
+            toast.success('Codeforces metadata loaded');
         } catch (error) {
-            toast.error(error.response?.data?.error || 'Failed to import from URL');
+            toast.error(error.message || 'Could not parse Codeforces URL');
         } finally {
             setIsImporting(false);
         }
@@ -463,13 +443,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         snap?.difficultyLabel || problemDraft.difficultyLabel || problemDraft.difficulty || '';
 
     return (
-        <div className="flex h-full w-full flex-col border-r border-stone-200/80 bg-transparent dark:border-slate-700/80 dark:bg-transparent">
-            <CodeforcesProblemPicker
-                isOpen={showCfPicker}
-                onClose={() => setShowCfPicker(false)}
-                serverUrl={serverUrl}
-                onSelect={handleCfCatalogSelect}
-            />
+        <div className="flex h-full w-full flex-col border-r border-white/10 bg-transparent dark:bg-transparent">
             <ImportProblemModal
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
@@ -478,10 +452,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 isImporting={isImporting}
                 importNotice={importNotice}
                 onImportProblem={handleImportProblem}
-                onImportProblemUrl={handleImportProblemUrl}
             />
             <div className="flex-1 min-h-0 overflow-y-auto scroll-smooth">
-                <div className="flex flex-col space-y-6 p-6 sm:p-7">
+                <div className="flex flex-col space-y-4 p-4 sm:p-5">
+                    <Link to="/" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 transition hover:bg-white/10">
+                        <img src="/logo.png" alt="ForkSpace logo" className="h-4 w-4 brightness-0 invert" />
+                    </Link>
                     <div className="rounded-[1.6rem] border border-stone-200/80 bg-white p-5 shadow-[0_16px_42px_-28px_rgba(15,23,42,0.22)] dark:border-slate-700/80 dark:bg-[#081121]">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
@@ -545,7 +521,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             <div className="mt-3 flex flex-wrap gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => setShowCfPicker(true)}
+                                    onClick={() => setShowCfInlineForm((v) => !v)}
                                     className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 transition hover:border-amber-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                                 >
                                     Browse Codeforces
@@ -558,16 +534,38 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                     Use manual brief
                                 </button>
                             </div>
+                            {showCfInlineForm ? (
+                                <div className="mt-3 rounded-xl border border-stone-200/80 bg-stone-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+                                    <p className="text-[11px] font-medium text-gray-500">Paste Codeforces URL</p>
+                                    <div className="mt-2 flex gap-2">
+                                        <input
+                                            type="url"
+                                            value={problemDraft.problemUrl}
+                                            onChange={(event) => setProblemDraft((prev) => ({ ...prev, problemUrl: event.target.value }))}
+                                            placeholder="https://codeforces.com/problemset/problem/1/A"
+                                            className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleLoadCfUrl}
+                                            disabled={isImporting}
+                                            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200"
+                                        >
+                                            {isImporting ? 'Loading...' : 'Load'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
 
                         <div className="mb-4 grid grid-cols-2 gap-2 rounded-[1.2rem] border border-stone-200/80 bg-stone-50 p-1 dark:border-slate-700/80 dark:bg-[#0d172b]">
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('problem')}
-                                className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm font-medium transition ${
+                                className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm transition ${
                                     activeTab === 'problem'
-                                        ? 'border-amber-500 bg-white text-stone-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white'
-                                        : 'border-transparent text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
+                                        ? 'border-amber-400 text-white font-medium'
+                                        : 'border-transparent text-gray-500 hover:text-gray-300'
                                 }`}
                             >
                                 Problem
@@ -575,10 +573,10 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('session')}
-                                className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm font-medium transition ${
+                                className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm transition ${
                                     activeTab === 'session'
-                                        ? 'border-amber-500 bg-white text-stone-900 shadow-sm dark:border-amber-400 dark:bg-slate-900 dark:text-white'
-                                        : 'border-transparent text-stone-600 hover:text-stone-900 dark:text-slate-300 dark:hover:text-white'
+                                        ? 'border-amber-400 text-white font-medium'
+                                        : 'border-transparent text-gray-500 hover:text-gray-300'
                                 }`}
                             >
                                 Session
@@ -600,26 +598,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                 placeholder="Problem title"
                                                 className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                             />
-                                        </div>
-                                        <div className="rounded-xl border border-stone-200/80 bg-white/80 p-3 dark:border-slate-700/80 dark:bg-slate-900/40">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPromptSection((v) => !v)}
-                                                className="flex w-full items-center justify-between text-left"
-                                            >
-                                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                                    Prompt
-                                                </p>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{showPromptSection ? 'Hide' : 'Show'}</span>
-                                            </button>
-                                            {showPromptSection ? (
-                                                <textarea
-                                                    value={problemDraft.prompt}
-                                                    onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
-                                                    placeholder="Paste the statement or the specific prompt you want to discuss."
-                                                    className="mt-2 h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                                />
-                                            ) : null}
                                         </div>
                                         <div>
                                             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
@@ -672,26 +650,56 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                 />
                                             </div>
                                         </div>
+                                        {problemDraft.sourceUrl ? (
+                                            <div className="mt-2 rounded-md border border-white/10 bg-white/5 p-2">
+                                                <p className="mb-1 text-[11px] text-gray-400">
+                                                    Statement and test cases aren&apos;t available via API.
+                                                </p>
+                                                <a
+                                                    href={problemDraft.sourceUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[11px] text-amber-400 underline hover:text-amber-300"
+                                                >
+                                                    Open problem on Codeforces →
+                                                </a>
+                                                <p className="mt-1 text-[11px] text-gray-500">
+                                                    Copy the statement into Prompt, paste sample I/O into the fields below.
+                                                </p>
+                                            </div>
+                                        ) : null}
                                     </div>
                                     <div className="grid gap-3">
                                         <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
-                                            <div className="mb-3 flex items-center justify-between">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowExampleSection((v) => !v)}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                                        Example
-                                                    </p>
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400">{showExampleSection ? 'Hide' : 'Show'}</span>
-                                                </button>
-                                                <span className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                                                    Shared
-                                                </span>
-                                            </div>
-                                            {showExampleSection ? (
-                                            <div className="space-y-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPromptExample((v) => !v)}
+                                                className="mb-3 flex w-full items-center justify-between"
+                                            >
+                                                <p className="text-[10px] uppercase tracking-wide text-gray-500">Prompt & example</p>
+                                                {showPromptExample ? (
+                                                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 15l-7-7-7 7" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                            <div className={`overflow-hidden transition-all duration-200 ${showPromptExample ? 'max-h-[600px]' : 'max-h-0'}`}>
+                                                <label className="space-y-1.5">
+                                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                        Prompt
+                                                    </span>
+                                                    <textarea
+                                                        value={problemDraft.prompt}
+                                                        onChange={(event) => setProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                                                        placeholder="Paste the statement or the specific prompt you want to discuss."
+                                                        className="h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                    />
+                                                </label>
+                                                <div className="mt-3 space-y-3">
                                                 <label className="space-y-1.5">
                                                     <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                                         Input
@@ -715,7 +723,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     />
                                                 </label>
                                             </div>
-                                            ) : null}
+                                            </div>
                                         </div>
                                     </div>
                                     {problemDraft.samples?.length > 0 && (
@@ -953,7 +961,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 </div>
             </div>
             
-            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white px-5 py-4 dark:border-slate-700/80 dark:bg-[#081121]">
+            <div className="flex-shrink-0 border-t border-stone-200/80 bg-white px-4 py-3 dark:border-slate-700/80 dark:bg-[#081121]">
                 <div className="mb-3 text-center">
                     <Link
                         to="/history/reports"
@@ -962,7 +970,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                         History → Analysis Reports
                     </Link>
                 </div>
-                <div className="flex justify-center gap-2 rounded-xl border border-stone-200/80 bg-stone-50/80 p-2 dark:border-slate-700/80 dark:bg-slate-900/40">
+                <div className="mx-auto flex w-fit items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
                     <button
                         onClick={handleCopyRoomId}
                         className="group relative inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-700 border border-gray-200/80 dark:border-gray-600/80 hover:border-gray-300 dark:hover:border-gray-500 transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-sm"

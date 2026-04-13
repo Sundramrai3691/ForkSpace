@@ -2174,39 +2174,6 @@ app.post("/api/problem-import", async (req, res) => {
   }
 });
 
-app.post("/api/problem-import-url", async (req, res) => {
-  try {
-    const { problemUrl = "" } = req.body || {};
-
-    if (!problemUrl.trim()) {
-      return res
-        .status(400)
-        .json({ error: "Add a problem URL before importing." });
-    }
-
-    const problem = attachNormalizedSamples(
-      await importProblemFromUrl(problemUrl),
-    );
-    return res.json({ problem });
-  } catch (error) {
-    try {
-      const metadata = attachNormalizedSamples(
-        deriveProblemMetadataFromUrl(req.body?.problemUrl || ""),
-      );
-      const warning = error.message || "Automatic import failed for this URL.";
-
-      return res.json({
-        problem: metadata,
-        warning: `${warning} We saved the platform and problem code. Paste the statement below and use "Parse pasted statement" to extract the examples.`,
-      });
-    } catch {
-      return res.status(400).json({
-        error: error.message || "Failed to import the problem from URL.",
-      });
-    }
-  }
-});
-
 app.post("/api/problem-import-text", async (req, res) => {
   try {
     const { statement = "" } = req.body || {};

@@ -65,7 +65,7 @@ export default function SessionIntelligenceReportDashboard({
 
             {/* Insight — blue */}
             <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/95 to-white p-5 shadow-sm dark:border-sky-900/45 dark:from-sky-950/40 dark:to-slate-900/70">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-800 dark:text-sky-300">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                     How you think
                 </p>
                 <p className="mt-3 line-clamp-4 text-sm font-medium leading-relaxed text-sky-950 dark:text-sky-50">
@@ -78,7 +78,7 @@ export default function SessionIntelligenceReportDashboard({
             <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
                 {/* Strengths — green */}
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800 dark:text-emerald-300">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                         Strongest signals
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -109,7 +109,7 @@ export default function SessionIntelligenceReportDashboard({
 
                 {/* Gaps — amber / orange */}
                 <div className="rounded-2xl border border-amber-200/90 bg-amber-50/50 p-5 shadow-sm dark:border-amber-900/45 dark:bg-amber-950/25">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-900 dark:text-amber-300">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                         Biggest gaps
                     </p>
                     <div className="mt-4 space-y-2.5">
@@ -138,7 +138,7 @@ export default function SessionIntelligenceReportDashboard({
 
             {/* Next steps — blue action */}
             <div className="rounded-2xl border border-blue-200/75 bg-blue-50/45 p-5 shadow-sm dark:border-blue-900/40 dark:bg-blue-950/25">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-900 dark:text-blue-300">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                     Next steps
                 </p>
                 <ol className="mt-4 space-y-2.5">
@@ -162,7 +162,7 @@ export default function SessionIntelligenceReportDashboard({
 
             {/* Practice targets */}
             <div className="rounded-2xl border border-violet-200/70 bg-violet-50/40 p-5 shadow-sm dark:border-violet-900/40 dark:bg-violet-950/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-900 dark:text-violet-300">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
                     Next practice targets
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
