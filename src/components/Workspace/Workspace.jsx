@@ -1467,8 +1467,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 </OverlayPanel>
             ) : null}
 
-            <div className="flex flex-col gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121] lg:flex-row lg:items-center">
-                <div className="flex flex-wrap items-center gap-2 lg:flex-1">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121]">
                     <button
                         className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-500 px-4 text-[15px] font-semibold text-white shadow-sm shadow-teal-900/40 transition-colors hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50"
                         onClick={runCode}
@@ -1546,6 +1545,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
                         </svg>
                         Generate Tests
+                        <span className="rounded-full border border-amber-300/70 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-300">
+                            Beta
+                        </span>
                     </button>
                     <button
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 text-gray-300 transition-colors hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-50"
@@ -1561,9 +1563,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             <line x1="14" x2="14" y1="11" y2="17" />
                         </svg>
                     </button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
                     <div className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                         <label htmlFor="language-select" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                             Language
@@ -1587,7 +1586,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>
                         <span className="text-[15px] font-medium text-gray-600 dark:text-gray-400">{SESSION_MODE_LABELS[session.mode] || 'Peer Practice'}</span>
                     </div>
-                    {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
+                        {(participationLabel === 'Driver' || participationLabel === 'Navigator') && (
                         <button
                             onClick={handleSwapRoles}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
@@ -1598,7 +1597,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             </svg>
                         </button>
                     )}
-                    {users.length > 0 && (
+                        {users.length > 0 && (
                         <div className="flex h-9 items-center rounded-full border border-gray-200 bg-white/92 px-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                             {users.slice(0, 5).map((user, index) => (
                                 <div
@@ -1612,7 +1611,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             ))}
                         </div>
                     )}
-                    <button
+                        <button
                         type="button"
                         onClick={() => setIsOutputCollapsed((current) => !current)}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
@@ -1627,7 +1626,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             )}
                         </svg>
                     </button>
-                    {problemToolbarMeta && (
+                        {problemToolbarMeta && (
                         <div className="hidden min-w-0 max-w-[min(360px,42vw)] flex-col justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-left xl:flex">
                             <span className="truncate text-xs font-semibold text-gray-100">
                                 {problemToolbarMeta.title || "Practice problem"}
@@ -1659,7 +1658,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             </div>
                         </div>
                     )}
-                    {isMockMode && (
+                        {isMockMode && (
                             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
                                 <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
                                     {formatTimerLabel(timeRemaining)}
@@ -1691,7 +1690,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 </button>
                             </div>
                         )}
-                </div>
             </div>
 
             <div
