@@ -20,6 +20,7 @@ import SessionIntelligenceReportDashboard from "../sessionIntelligence/SessionIn
 import HiddenTestPanel from "../HiddenTestPanel.jsx";
 import { getAvatarById } from "../../lib/avatars";
 import AvatarGlyph from "../common/AvatarGlyph.jsx";
+import RunResultOverlay from "./RunResultOverlay.jsx";
 
 function normalizeEditorText(text) {
     return String(text ?? "").replace(/\r\n/g, "\n");
@@ -258,6 +259,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [showReportModal, setShowReportModal] = useState(false);
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
     const [showChecklist, setShowChecklist] = useState(false);
+    const [celebrationResult, setCelebrationResult] = useState(null);
+    const [showCelebration, setShowCelebration] = useState(false);
     const [rightPanelWidthPct, setRightPanelWidthPct] = useState(() => {
         const raw = Number(localStorage.getItem("forkspace.rightPanelWidthPct"));
         if (Number.isFinite(raw) && raw >= 25 && raw <= 50) return raw;
@@ -274,6 +277,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [showFormattedFlash, setShowFormattedFlash] = useState(false);
     const lastClearedCodeRef = useRef("");
     const clearUndoTimeoutRef = useRef(null);
+    const runCountRef = useRef(0);
+    const waCountRef = useRef(0);
+    const sessionStartedAtRef = useRef(Date.now());
+    const celebrationTimeoutRef = useRef(null);
 
     useEffect(() => {
         setCollabHintDismissed(false);
@@ -312,6 +319,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     useEffect(() => () => {
         if (clearUndoTimeoutRef.current) {
             window.clearTimeout(clearUndoTimeoutRef.current);
+        }
+        if (celebrationTimeoutRef.current) {
+            window.clearTimeout(celebrationTimeoutRef.current);
         }
     }, []);
 
@@ -749,10 +759,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         socket.on("run-result", ({ result, runBy: resultRunBy }) => {
             const languageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
             const { stdout, stderr, compile_output, message, time, memory } = result || {};
+            const statusDescription = String(result?.status?.description || result?.status?.status || "");
             const normalizedStdout = normalizeOutput(stdout || "");
             const normalizedExpectedOutput = normalizeOutput(expectedOutput);
             const hasCompileError = Boolean(compile_output);
-            const hasRuntimeError = Boolean(stderr);
+            const isTleSignal = /time limit exceeded|timeout/i.test(`${statusDescription} ${stderr || ""} ${message || ""}`);
+            const hasRuntimeError = Boolean(stderr) && !isTleSignal;
             const sampleMatched =
                 normalizedExpectedOutput &&
                 !hasCompileError &&
@@ -775,6 +787,46 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
                 updatedAt: Date.now(),
             });
+
+            const status =
+                hasCompileError
+                    ? "CE"
+                    : isTleSignal
+                        ? "TLE"
+                        : hasRuntimeError
+                            ? "RE"
+                            : normalizedExpectedOutput && !sampleMatched
+                                ? "WA"
+                                : /accepted/i.test(statusDescription)
+                                    ? "AC"
+                                    : "AC";
+            const currentRunCount = runCountRef.current + 1;
+            const waBeforeThisRun = waCountRef.current;
+            if (status === "WA") {
+                waCountRef.current = waCountRef.current + 1;
+            }
+            runCountRef.current = currentRunCount;
+            if (celebrationTimeoutRef.current) {
+                window.clearTimeout(celebrationTimeoutRef.current);
+            }
+            celebrationTimeoutRef.current = window.setTimeout(() => {
+                setCelebrationResult({
+                    status,
+                    stdout: stdout || "",
+                    stderr: `${compile_output || ""}${compile_output && stderr ? "\n" : ""}${stderr || ""}`,
+                    time: time ? `${time}s` : "N/A",
+                    memory: memory ? `${memory} KB` : "N/A",
+                    runBy: resultRunBy || "Guest",
+                    runCount: currentRunCount,
+                    waCount: waBeforeThisRun,
+                    sessionDuration: Math.floor((Date.now() - sessionStartedAtRef.current) / 1000),
+                    expectedOutput: normalizedExpectedOutput,
+                    actualOutput: normalizedStdout,
+                    problemTitle: roomState?.problem?.title || "Practice Problem",
+                    language: languageConfig.label,
+                });
+                setShowCelebration(true);
+            }, 400);
 
             const nextOutput = (
                 <div className="space-y-4 text-sm">
@@ -828,7 +880,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             });
             remoteCursorMarkersRef.current = {};
         };
-    }, [socketRef, roomId, currentSocketId, expectedOutput, sampleInput]);
+    }, [socketRef, roomId, currentSocketId, expectedOutput, sampleInput, roomState?.problem?.title]);
 
     // AI Hint Keymap
     useEffect(() => {
@@ -1148,6 +1200,21 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             window.clearTimeout(clearUndoTimeoutRef.current);
             clearUndoTimeoutRef.current = null;
         }
+    };
+
+    const handleShareRunCard = async () => {
+        if (lastShareId) {
+            const url = `${window.location.origin}/report/${lastShareId}`;
+            await navigator.clipboard.writeText(url);
+            toast.success("Share link copied");
+            return;
+        }
+        await generateSessionReport({ endSession: false });
+    };
+
+    const handleRunOverlayHint = () => {
+        setShowAnalysisModal(true);
+        void fetchAIHints();
     };
 
     const handleFormatCode = () => {
@@ -1659,6 +1726,24 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </div>
                     </div>
                 </OverlayPanel>
+            ) : null}
+            {showCelebration && celebrationResult ? (
+                <RunResultOverlay
+                    result={celebrationResult}
+                    users={users.map((user) => ({
+                        username: user.username || "Guest",
+                        avatarId: user.avatarId || "clever-fox",
+                    }))}
+                    aiInsight={reviewContent?.summary || reviewContent?.complexity_reasoning || null}
+                    edgeCases={session.edgeCaseChecklist || []}
+                    approachBoard={{ brute: session.mentorNotes || "", optimized: session.approachNotes || "" }}
+                    onClose={() => setShowCelebration(false)}
+                    onShareCard={() => {
+                        void handleShareRunCard();
+                    }}
+                    onGetHint={handleRunOverlayHint}
+                    currentUsername={currentUsername}
+                />
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121]">

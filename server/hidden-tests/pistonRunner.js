@@ -4,7 +4,7 @@ const PISTON_URL = "https://emkc.org/api/v2/piston/execute";
 const TIMEOUT_MS = 5000;
 
 const PISTON_LANG = {
-  cpp: { language: "cpp", version: "17.0.0" },
+  cpp: { language: "cpp", version: "10.2.0" },
   javascript: { language: "javascript", version: "18.15.0" },
   python: { language: "python", version: "3.10.0" },
 };

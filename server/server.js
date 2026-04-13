@@ -1140,19 +1140,28 @@ function attachNormalizedSamples(problem = {}) {
     ...createDefaultProblemState(),
     ...problem,
   };
+  const normalizedJoinedInput = normalizeWhitespace(normalizedProblem.sampleInput);
+  const normalizedJoinedOutput = normalizeWhitespace(normalizedProblem.sampleOutput);
+  const normalizedIncomingSamples = Array.isArray(problem?.samples)
+    ? problem.samples
+        .map((sample, index) => ({
+          id: sample.id || `sample-${index + 1}`,
+          input: normalizeWhitespace(sample.input || ""),
+          output: normalizeWhitespace(sample.output || ""),
+        }))
+        .filter((sample) => sample.input || sample.output)
+    : [];
+  const joinedFromIncomingSamples = {
+    input: normalizedIncomingSamples.map((sample) => sample.input).filter(Boolean).join("\n\n"),
+    output: normalizedIncomingSamples.map((sample) => sample.output).filter(Boolean).join("\n\n"),
+  };
+  const joinedTextLooksEdited =
+    normalizedJoinedInput !== normalizeWhitespace(joinedFromIncomingSamples.input) ||
+    normalizedJoinedOutput !== normalizeWhitespace(joinedFromIncomingSamples.output);
   const samples =
-    Array.isArray(problem?.samples) && problem.samples.length > 0
-      ? problem.samples
-          .map((sample, index) => ({
-            id: sample.id || `sample-${index + 1}`,
-            input: normalizeWhitespace(sample.input || ""),
-            output: normalizeWhitespace(sample.output || ""),
-          }))
-          .filter((sample) => sample.input || sample.output)
-      : buildSamplesFromJoinedText(
-          normalizedProblem.sampleInput,
-          normalizedProblem.sampleOutput,
-        );
+    normalizedIncomingSamples.length > 0 && !joinedTextLooksEdited
+      ? normalizedIncomingSamples
+      : buildSamplesFromJoinedText(normalizedJoinedInput, normalizedJoinedOutput);
 
   const tagsRaw = normalizedProblem.tags;
   const tags = Array.isArray(tagsRaw)
@@ -1170,8 +1179,8 @@ function attachNormalizedSamples(problem = {}) {
       normalizedProblem.problemUrl || normalizedProblem.sourceUrl || "",
     constraints: normalizeWhitespace(normalizedProblem.constraints || ""),
     pastedStatement: normalizedProblem.pastedStatement || "",
-    sampleInput: normalizeWhitespace(normalizedProblem.sampleInput),
-    sampleOutput: normalizeWhitespace(normalizedProblem.sampleOutput),
+    sampleInput: normalizedJoinedInput,
+    sampleOutput: normalizedJoinedOutput,
     samples,
     tags,
     rating: normalizedProblem.rating || "",

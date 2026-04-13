@@ -176,31 +176,22 @@ export default function HiddenTestPanel({
     }
     setRunning(true);
     try {
-      const collected = [];
-      const settled = await Promise.allSettled(
-        tests.map(async (test) => {
-          const { data } = await axios.post(`${serverUrl}/api/hidden-tests/run`, {
-            roomId,
-            code,
-            language,
-            testIds: [test.id],
-          });
-          const updated = data.tests?.[0];
-          if (!updated) return;
-          collected.push(updated);
-          setTests((prev) =>
-            prev.map((row) => (row.id === updated.id ? updated : row)),
-          );
-        }),
-      );
-      const failedRuns = settled.filter((row) => row.status === "rejected").length;
-      setLastRunResults(collected);
-      setShowResultsModal(true);
-      if (failedRuns > 0) {
-        toast.success(`Hidden tests executed (${collected.length} updated, ${failedRuns} failed)`);
-      } else {
-        toast.success("Hidden tests executed");
+      const { data } = await axios.post(`${serverUrl}/api/hidden-tests/run`, {
+        roomId,
+        code,
+        language,
+        testIds: tests.map((test) => test.id),
+      });
+      const updatedRows = Array.isArray(data.tests) ? data.tests : [];
+      if (!updatedRows.length) {
+        toast.error("Hidden tests did not return any updated results");
+        return;
       }
+      const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
+      setTests((prev) => prev.map((row) => updatedById.get(row.id) || row));
+      setLastRunResults(updatedRows);
+      setShowResultsModal(true);
+      toast.success("Hidden tests executed");
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to run hidden tests");
     } finally {
