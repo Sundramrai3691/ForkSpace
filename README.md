@@ -4,7 +4,7 @@
 
 # ForkSpace
 
-### Shared coding rooms for interview practice, DSA sessions, and mentoring.
+### One shared room for DSA practice, mock interviews, and mentoring.
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -19,15 +19,17 @@
 
 ## What is ForkSpace?
 
-ForkSpace is a realtime collaborative coding workspace for:
+ForkSpace is a realtime collaborative workspace for interview-style problem solving.
+
+It is built for:
 
 - peer DSA practice
 - mock interviews
-- mentor-led problem solving
+- mentor-led sessions
 
-Instead of juggling a call, a notes doc, an editor, and a compiler, both participants stay in one room with shared code, shared runs, shared problem context, and post-session feedback.
+Instead of splitting the session across a call, a notes doc, a compiler, and a separate review tool, ForkSpace keeps the shared brief, code editor, runs, hidden tests, AI review, and session reporting in one room.
 
-The product is focused on interview-style algorithm sessions rather than being a full online IDE.
+It is intentionally narrow: one problem, one shared solution, one focused workflow.
 
 ---
 
@@ -35,13 +37,13 @@ The product is focused on interview-style algorithm sessions rather than being a
 
 Recent product and workflow improvements reflected in this repo:
 
-- Added richer collaboration cues with remote cursors, colored participant presence, and shared run visibility
-- Added room-level language sync for C++, Python, and JavaScript with safer starter-template replacement behavior
-- Added Codeforces catalog browsing with filters for rating, tags, solves, and title/problem search
-- Added hidden test generation plus verified-vs-stress test runs inside the workspace
-- Added session intelligence reports with shareable links and signed-in report history
-- Moved analysis/report flows into cleaner overlays and improved the right-side workspace panel
-- Improved sample output comparison, execution feedback, and room persistence across refresh/restart
+- Refined the landing, workspace, analysis, and report surfaces so the main workflow reads more clearly
+- Expanded Codeforces support with browsable catalog filters plus room-side URL import helpers
+- Improved hidden test generation so room test sets refresh cleanly and useful failures can be promoted into sample tests
+- Added stronger session intelligence and standalone solution analysis flows with shareable links
+- Improved execution feedback, sample comparison, and room-side report visibility
+- Added cleaner fallback handling when AI quota or provider availability is limited
+- Kept guest-first entry intact while improving signed-in history and report persistence
 
 ---
 
@@ -55,11 +57,13 @@ Recent product and workflow improvements reflected in this repo:
 - Session modes: `Peer Practice`, `Mock Interview`, `Mentoring`
 - Remote cursor positions, usernames, colors, and selection highlights
 - Shared run results so both users can debug the same execution outcome
+- Theme and avatar personalization without changing the core room workflow
 
 ### Interview workflow
 
 - Shared problem brief, prompt, constraints, notes, and sample I/O
 - Codeforces-first workflow with browsable catalog and room problem selection
+- URL import helpers for supported problem pages, with manual editing kept available
 - Manual statement/sample copy flow for reliable external problem setup
 - Edge-case checklist for interview-style validation
 - Recent run history stored in the room session
@@ -71,6 +75,7 @@ Recent product and workflow improvements reflected in this repo:
 - Judge0-backed code execution for normal runs/submissions
 - Hidden test generation from the current problem statement
 - Verified tests and stress tests shown separately
+- Promote a hidden test into the visible sample suite when it is worth debugging in the room
 - Output diffing for expected vs actual sample output
 - Clear labels for pass, fail, timeout, crash, and stress-only results
 
@@ -80,6 +85,7 @@ Recent product and workflow improvements reflected in this repo:
 - AI solution review with complexity, bug-risk, style, and optimization feedback
 - Standalone analysis page with shareable analysis links
 - Session intelligence reports with strengths, gaps, next steps, and session score
+- Shareable session cards and report pages for recap, screenshots, or follow-up
 - Shareable report pages and a signed-in report history screen
 
 ### Auth and persistence
@@ -88,6 +94,7 @@ Recent product and workflow improvements reflected in this repo:
 - Sign up / sign in with JWT auth
 - Avatar selection and profile persistence
 - Saved room and run history for authenticated users
+- Saved report history for authenticated users
 - JSON-file persistence for room state and fallback intelligence logs
 - MongoDB-backed persistence when configured
 
@@ -109,7 +116,7 @@ Express + Socket Server
         |   (JWT + MongoDB)
         |
         |-- AI analysis/hints
-        |   (Groq / Gemini / Mistral)
+        |   (Groq / Gemini / Mistral with fallbacks)
         |
         |-- Codeforces catalog
         |
@@ -122,7 +129,7 @@ Express + Socket Server
 
 ### Notes
 
-- `server/server.js` is the main backend for auth, sockets, execution, analysis, reports, Codeforces, and hidden tests
+- `server/server.js` is the main backend for auth, sockets, execution, analysis, reports, Codeforces import/catalog, and hidden tests
 - Room state is persisted locally under `server/data/`
 - Redis pub/sub is supported for horizontal Socket.IO scaling when `REDIS_URL` is set
 - MongoDB is optional for local boot, but needed for full auth/history/report persistence
@@ -222,13 +229,13 @@ npm run start
 
 1. Open the home page and continue as guest or sign in.
 2. Create a room or join an existing room ID.
-3. Add the problem manually or choose one from the Codeforces picker.
-4. Pick the room language when needed.
-5. Solve together in the shared editor.
-6. Use `Run` and `Submit` to compare output against samples.
-7. Use `Generate Tests` to create verified and stress-style hidden tests.
-8. Use `Analyze` for AI review and `Report` for the session intelligence summary.
-9. Copy the share link if you want to send an analysis/report page to someone else.
+3. Pick a session mode: `Peer Practice`, `Mock Interview`, or `Mentoring`.
+4. Add the problem manually, browse Codeforces, or use a supported problem URL import helper.
+5. Choose the room language and solve together in the shared editor.
+6. Use `Run` and `Submit` to compare output against visible sample tests.
+7. Use `Generate Tests` to create verified and stress-style hidden tests, then promote useful failures into the sample suite when needed.
+8. Use `Analyze` for solution review and `Report` for the room/session summary.
+9. Copy a share link for analysis, report, or session card pages if you want to send the result elsewhere.
 
 ---
 
@@ -278,9 +285,12 @@ It is optimized for collaborative problem-solving sessions around one solution a
 - [x] Multi-language collaboration and execution
 - [x] Live cursors and shared run awareness
 - [x] Codeforces catalog workflow
+- [x] Supported problem URL import helpers
 - [x] Hidden tests and stress runs
 - [x] AI hints and solution review
+- [x] Standalone solution analysis pages
 - [x] Session intelligence reports and share links
+- [x] Shareable session cards
 - [x] Signed-in report history
 - [x] Room persistence across restart
 - [ ] Deeper room history UX

@@ -17,17 +17,17 @@ const useCases = [
     {
         icon: Sword,
         title: 'Mock Interview',
-        description: 'Candidate and interviewer in one room. Shared editor, live output, Driver/Navigator roles. No screen share needed.',
+        description: 'Candidate and interviewer stay in one room with a shared editor, shared runs, and clear Driver/Navigator structure.',
     },
     {
         icon: GraduationCap,
         title: 'DSA Mentoring',
-        description: 'Load a Codeforces problem, walk through the approach together, run and debug in the same editor. No back-and-forth screen passing.',
+        description: 'Bring in a Codeforces-style problem, talk through the approach, and debug together without handing the screen back and forth.',
     },
     {
         icon: Zap,
         title: 'Peer Practice',
-        description: 'Pick a problem, write a solution, stress-test it with generated hidden tests. Two people, one attempt, immediate feedback.',
+        description: 'Pick one problem, build one solution together, then pressure-test it with samples, hidden tests, and fast shared feedback.',
     },
 ];
 
@@ -37,36 +37,43 @@ const quickStartSteps = [
     'Write code together, run it, compare output against sample cases. Use Analyze for complexity and bug review, Report for a session summary — when you actually need it.',
 ];
 
+quickStartSteps.length = 0;
+quickStartSteps.push(
+    'Create a room or paste a Room ID. Start as a guest if you just want to get moving.',
+    'Choose the session mode, load the problem, and assign Driver or Navigator roles only if that structure helps the session.',
+    'Code together, run samples, generate hidden tests, then open Analyze or Report when you want a sharper post-run review.',
+);
+
 const featureHighlights = [
     {
         icon: Workflow,
-        title: 'Realtime Shared Workspace',
-        description: 'Socket-based code sync, live cursors, shared language switching, and role-aware collaboration in one room.',
+        title: 'One Shared Workspace',
+        description: 'The brief, editor, participants, and runs stay together so the session feels like one workflow instead of several tabs.',
     },
     {
         icon: Radar,
-        title: 'Codeforces-Ready Problem Flow',
-        description: 'Load metadata from Codeforces URL (title, tags, rating) and continue with an honest manual brief workflow.',
+        title: 'Problem Setup That Stays Honest',
+        description: 'Browse Codeforces, import what helps, and keep the editable brief in your control instead of locking the room to scraped text.',
     },
     {
         icon: FlaskConical,
-        title: 'Hidden Tests (Beta)',
-        description: 'Generate verified + stress test sets, run all tests quickly, and review timeout/crash/pass signals clearly.',
+        title: 'Hidden Tests That Help',
+        description: 'Generate verified and stress-style cases, see pass/fail/timeouts clearly, and bring useful failures back into sample tests.',
     },
     {
         icon: BrainCircuit,
-        title: 'Session Intelligence',
-        description: 'Analyze and report overlays summarize thinking patterns, strengths, gaps, and next practice priorities.',
+        title: 'Analysis With Follow-Through',
+        description: 'Use the solution analyser for code review, then capture a report that summarizes strengths, gaps, pace, and next-step practice.',
     },
     {
         icon: Users2,
-        title: 'Interview Modes',
-        description: 'Peer Practice, Mock Interview, and Mentoring modes keep sessions structured without extra setup.',
+        title: 'Structured Session Modes',
+        description: 'Peer Practice, Mock Interview, and Mentoring give the room the right shape without forcing a heavyweight setup flow.',
     },
     {
         icon: ShieldCheck,
-        title: 'Stable, Practical Workflow',
-        description: 'Run/submit with shared outputs, preserved room state, and optional account history when you need it.',
+        title: 'Guest-First, Account-Optional',
+        description: 'Start fast without signup, then keep rooms, reports, and history only when you actually want persistence.',
     },
 ];
 
@@ -169,7 +176,7 @@ function Login() {
     const [showAuthPanel, setShowAuthPanel] = useState(false);
     const [heroBadgeVisible, setHeroBadgeVisible] = useState(false);
     const [heroCtasVisible, setHeroCtasVisible] = useState(false);
-    const wordCount = 'Practice interviews and DSA in one polished collaborative room.'.split(' ').length;
+    const wordCount = 'One shared room for serious DSA practice, mock interviews, and mentoring.'.split(' ').length;
     const reduceMotion = prefersReducedMotion();
     const howItWorksRef = useScrollReveal();
     const useCasesRef = useScrollReveal();
@@ -323,13 +330,13 @@ function Login() {
                             }}
                         >
                             <Sparkles size={14} />
-                            Realtime interview practice platform for serious DSA sessions
+                            Realtime collaborative workspace for serious DSA practice
                         </div>
 
                         <div className="mt-8 space-y-5">
-                            <AnimatedHeadline text="Practice interviews and DSA in one polished collaborative room." />
+                            <AnimatedHeadline text="One shared room for serious DSA practice, mock interviews, and mentoring." />
                             <p className="mx-auto max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                                ForkSpace combines shared coding, Codeforces-ready problem setup, run/submit output, hidden tests, and AI-assisted session intelligence into one focused workspace.
+                                ForkSpace keeps the problem brief, shared editor, sample runs, hidden tests, solution analysis, and session reporting in one focused workflow.
                             </p>
                         </div>
 
@@ -347,14 +354,14 @@ function Login() {
                                 data-cursor="button"
                                 className="inline-flex items-center justify-center rounded-md bg-white px-5 py-2.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
                             >
-                                Start a Room
+                                Open a Room
                             </button>
                             <Link
                                 to="/analyse"
                                 data-cursor="button"
                                 className="inline-flex items-center justify-center rounded-md border border-amber-500 px-5 py-2.5 text-sm text-amber-400 transition hover:bg-amber-500/10"
                             >
-                                Solution Analyser
+                                Open Solution Analyser
                             </Link>
                         </div>
 
@@ -382,20 +389,20 @@ function Login() {
                         </form>
 
                         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                            {currentUser ? `Jump in as ${currentUser.name}.` : 'No signup needed. Sign in only to save room and run history.'}
+                            {currentUser ? `Jump in as ${currentUser.name}.` : 'No signup needed. Sign in only if you want saved rooms, reports, and history.'}
                         </p>
                         <div className="mt-6 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3">
                             <div data-cursor="card" className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Realtime</p>
-                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Shared editor, cursors, and role sync over Socket.IO.</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Shared Room</p>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Live editor sync, presence, room roles, and one source of truth for the whole session.</p>
                             </div>
                             <div data-cursor="card" className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Execution + Tests</p>
-                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Run, submit, and hidden-test your code with quick feedback loops.</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Runs + Hidden Tests</p>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Run samples, submit the parsed suite, then generate deeper tests when the obvious cases are no longer enough.</p>
                             </div>
                             <div data-cursor="card" className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Session Intelligence</p>
-                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Analyze and report overlays for better interview-quality reviews.</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Review + Report</p>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Inspect code quality, complexity, and edge-case coverage, then keep a shareable report when it is worth saving.</p>
                             </div>
                         </div>
 
@@ -416,7 +423,7 @@ function Login() {
                                 data-cursor="button"
                                 className="mt-5 inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:bg-stone-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
                             >
-                                {showAuthPanel ? 'Close account access' : 'Sign in to save history'}
+                                {showAuthPanel ? 'Close account access' : 'Sign in to save progress'}
                             </button>
                         )}
                     </div>
@@ -428,7 +435,7 @@ function Login() {
                             <div className="mx-auto flex w-full max-w-2xl items-start justify-between gap-4">
                                 <div className="space-y-2 text-left">
                                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Account Access</p>
-                                    <h2 className="text-2xl font-bold tracking-tight">Sign in only when you want saved history and rooms.</h2>
+                                    <h2 className="text-2xl font-bold tracking-tight">Sign in only when you want saved rooms, reports, and history.</h2>
                                 </div>
                                 <button
                                     type="button"
@@ -451,9 +458,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-3xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Core Features</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Everything needed for modern collaborative coding practice.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">Built for real interview-style problem solving.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                ForkSpace is purpose-built for pair problem solving with practical tools that help you move faster and review better.
+                                The goal is not to be a full IDE. The goal is to make one shared DSA session feel clear, fast, and reviewable from start to finish.
                             </p>
                         </div>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -478,9 +485,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">How It Works</p>
-                            <h2 className="text-3xl font-bold tracking-tight">From zero to coding together in under a minute.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">A simple flow that stays useful as the session gets deeper.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                No configuration. No plugins. Just open a room, load the problem, and start.
+                                Open the room, shape the problem, code together, then pull in tests and review only when they add value.
                             </p>
                         </div>
 
@@ -500,9 +507,9 @@ function Login() {
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Use Cases</p>
-                            <h2 className="text-3xl font-bold tracking-tight">Narrow by design. Strong where it counts.</h2>
+                            <h2 className="text-3xl font-bold tracking-tight">Three common session types. One consistent room.</h2>
                             <p className="text-slate-600 dark:text-slate-400">
-                                ForkSpace doesn&apos;t try to be a full IDE. It&apos;s built for one workflow: two people, one problem, solved together in real time.
+                                ForkSpace stays intentionally narrow so the room feels predictable whether you are interviewing, mentoring, or practicing with a peer.
                             </p>
                         </div>
 
