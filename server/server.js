@@ -176,7 +176,7 @@ app.use(
 app.use(
   cors({
     origin: corsOriginResolver,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   }),
 );
@@ -209,7 +209,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: corsOriginResolver,
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   },
   transports: ["polling", "websocket"],

@@ -353,6 +353,23 @@ function formatDuration(totalSeconds) {
     return minutes > 0 ? `${minutes} minutes ${seconds}s` : `${seconds}s`;
 }
 
+function formatExecutionTime(value) {
+    if (value == null || value === "" || value === "N/A") return "N/A";
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ""));
+    if (!Number.isFinite(numeric)) return String(value);
+    return `${numeric.toLocaleString("en-US", {
+        minimumFractionDigits: numeric > 0 && numeric < 1 ? 3 : 0,
+        maximumFractionDigits: 3,
+    })} seconds`;
+}
+
+function formatMemoryUsage(value) {
+    if (value == null || value === "" || value === "N/A") return "N/A";
+    const numeric = Number(String(value).replace(/[^0-9.]/g, ""));
+    if (!Number.isFinite(numeric)) return String(value);
+    return `${Math.round(numeric).toLocaleString("en-US")} KB`;
+}
+
 const TIMER_PRESETS = [
     { label: "15m", value: 15 * 60 },
     { label: "30m", value: 30 * 60 },
@@ -966,8 +983,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 hasStdin: sampleInput.trim().length > 0,
                 inputSource: sampleInput.trim().length > 0 ? "sample" : "none",
                 status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
-                time: time || "N/A",
-                memory: memory || "N/A",
+                time: formatExecutionTime(time),
+                memory: formatMemoryUsage(memory),
                 sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : normalizedExpectedOutput ? "not_checked" : "not_available",
                 updatedAt: Date.now(),
             });
@@ -1020,8 +1037,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     status,
                     stdout: stdout || "",
                     stderr: `${compile_output || ""}${compile_output && stderr ? "\n" : ""}${stderr || ""}`,
-                    time: time ? `${time}s` : "N/A",
-                    memory: memory ? `${memory} KB` : "N/A",
+                    time,
+                    memory,
                     runBy: resultRunBy || "Guest",
                     runCount: currentRunCount,
                     waCount: waBeforeThisRun,
@@ -2096,6 +2113,22 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </span>
                     </button>
                     <button
+                        type="button"
+                        data-cursor="button"
+                        onClick={() => setIsOutputCollapsed((prev) => !prev)}
+                        className="hidden xl:inline-flex h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 text-[15px] text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
+                        title={isOutputCollapsed ? "Show right sidebar" : "Collapse right sidebar"}
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                            {isOutputCollapsed ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6M4 5h2v14H4z" />
+                            ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 6l-6 6 6 6M18 5h2v14h-2z" />
+                            )}
+                        </svg>
+                        {isOutputCollapsed ? "Show Panel" : "Hide Panel"}
+                    </button>
+                    <button
                         data-cursor="button"
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 text-gray-300 transition-colors hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-50"
                         onClick={handleOpenClearConfirm}
@@ -2409,8 +2442,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-3 text-xs text-gray-400">
-                                                        <span>{run.time}</span>
-                                                        <span>{run.memory}</span>
+                                                        <span>{formatExecutionTime(run.time)}</span>
+                                                        <span>{formatMemoryUsage(run.memory)}</span>
                                                     </div>
                                                 </div>
                                                 {(run.stdin || run.stdout || run.expectedOutput) && (

@@ -606,10 +606,15 @@ function AnalysePage() {
             `}</style>
 
             <header className="flex items-center justify-between border-b border-[#21262d] px-5 py-4">
-                <div>
-                    <p className="text-sm font-semibold tracking-[0.25em] text-[#79c0ff]">ForkSpace - Solution Analyser</p>
-                    <p className="mt-1 text-xs text-[#8b949e]">Deep analytics for interview-style and Codeforces-style solutions.</p>
-                </div>
+                <Link to="/" data-cursor="button" className="flex items-center gap-3 rounded-xl px-1 py-1 transition hover:bg-[#161b22]">
+                    <div className="rounded-lg bg-white p-1 shadow-sm ring-1 ring-black/5">
+                        <img src="/logo.png" alt="ForkSpace logo" className="h-8 w-8 rounded-lg object-contain" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold tracking-[0.25em] text-[#79c0ff]">ForkSpace - Solution Analyser</p>
+                        <p className="mt-1 text-xs text-[#8b949e]">Deep analytics for interview-style and Codeforces-style solutions.</p>
+                    </div>
+                </Link>
                 <div className="flex items-center gap-3">
                     <Link data-cursor="button" to="/history/reports" className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">History</Link>
                     <button data-cursor="button" type="button" onClick={copyShareLink} className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">Share</button>

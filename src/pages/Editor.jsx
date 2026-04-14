@@ -41,6 +41,7 @@ function Editor() {
   const [roomState, setRoomState] = useState(null);
   const [currentSocketId, setCurrentSocketId] = useState('');
   const hasShownConnectionError = useRef(false);
+  const hasShownRoomEntryToast = useRef(false);
   const username = enteredUsername || 'Anonymous';
 
   const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
@@ -177,10 +178,15 @@ function Editor() {
           }));
         });
 
-        socketRef.current.on('joined', ({ users, username, role }) => {
+        socketRef.current.on('joined', ({ users, username: joinedUsername, role }) => {
           setUsers(users);
-          if (enteredUsername !== username) {
-            toast.success(`${username} joined as ${role}`);
+          if (!hasShownRoomEntryToast.current && joinedUsername === username) {
+            toast.success(`${joinedUsername} entered the room as ${role}`);
+            hasShownRoomEntryToast.current = true;
+            return;
+          }
+          if (joinedUsername !== username) {
+            toast.success(`${joinedUsername} joined as ${role}`);
           }
         });
 

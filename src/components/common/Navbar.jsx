@@ -42,6 +42,7 @@ function Navbar() {
     const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [isAvatarSaving, setIsAvatarSaving] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
     const [draftName, setDraftName] = useState('');
     const { theme, setTheme } = useContext(ThemeContext);
@@ -137,17 +138,21 @@ function Navbar() {
 
     const handleAvatarUpdate = async (avatarId) => {
         if (!currentUser) return;
+        if (currentUser.avatarId === avatarId || isAvatarSaving) return;
+        setIsAvatarSaving(true);
         try {
             const response = await axios.patch(
                 `${serverUrl}/api/auth/avatar`,
                 { avatarId },
                 { headers: getAuthHeaders() },
             );
-            setCurrentUser(response.data.user);
+            setCurrentUser(response.data.user || { ...currentUser, avatarId });
             setIsAvatarPickerOpen(true);
             toast.success('Avatar updated');
-        } catch {
-            toast.error('Could not update avatar right now');
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Could not update avatar right now');
+        } finally {
+            setIsAvatarSaving(false);
         }
     };
 
@@ -390,11 +395,12 @@ function Navbar() {
                                                             type="button"
                                                             onClick={() => handleAvatarUpdate(avatar.id)}
                                                             data-cursor="button"
+                                                            disabled={isAvatarSaving}
                                                             className={`flex h-12 items-center justify-center rounded-xl border transition ${
                                                                 isActive
                                                                     ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm dark:bg-amber-500/10 dark:text-amber-300'
                                                                     : 'border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:bg-amber-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:bg-gray-700'
-                                                            }`}
+                                                            } ${isAvatarSaving ? 'cursor-not-allowed opacity-70' : ''}`}
                                                             title={avatar.name}
                                                         >
                                                             <AvatarGlyph avatar={avatar} className="h-4 w-4" />

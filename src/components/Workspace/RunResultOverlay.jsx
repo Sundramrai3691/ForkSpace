@@ -9,6 +9,23 @@ function formatDuration(seconds) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+function formatExecutionTime(value) {
+  if (value == null || value === "" || value === "N/A") return "N/A";
+  const numeric = Number(String(value).replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(numeric)) return String(value);
+  return `${numeric.toLocaleString("en-US", {
+    minimumFractionDigits: numeric > 0 && numeric < 1 ? 3 : 0,
+    maximumFractionDigits: 3,
+  })} seconds`;
+}
+
+function formatMemoryUsage(value) {
+  if (value == null || value === "" || value === "N/A") return "N/A";
+  const numeric = Number(String(value).replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(numeric)) return String(value);
+  return `${Math.round(numeric).toLocaleString("en-US")} KB`;
+}
+
 function detectComplexity(result) {
   if (!result) return "Not analysed";
   const match = String(result).match(/O\([^)]+\)/i);
@@ -139,7 +156,7 @@ export default function RunResultOverlay({
                 ["Runs to AC", String(result.runCount), `${result.waCount} WA before`, "text-green-400"],
                 ["Time taken", formatDuration(result.sessionDuration), "session duration", "text-gray-100"],
                 ["Complexity", complexity, "from code analysis", "text-green-400"],
-                ["Exec time", result.time || "N/A", "within limit", "text-gray-100"],
+                ["Exec time", formatExecutionTime(result.time), "within limit", "text-gray-100"],
               ]
             : statusTone === "WA"
               ? [
@@ -152,7 +169,7 @@ export default function RunResultOverlay({
                 ? [
                     ["Your complexity", complexity, "detected", "text-amber-400"],
                     ["Needed", estimateNeeded(approachBoard), "target", "text-gray-100"],
-                    ["Exec time", `${result.time || "N/A"}+`, "limit exceeded", "text-amber-400"],
+                    ["Exec time", formatExecutionTime(result.time), "limit exceeded", "text-amber-400"],
                     ["Runs so far", String(result.runCount), "session", "text-gray-100"],
                   ]
                 : [
