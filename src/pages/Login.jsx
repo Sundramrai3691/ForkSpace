@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import axios from 'axios';
@@ -8,6 +9,9 @@ import AvatarGlyph from '../components/common/AvatarGlyph';
 import { getAuthHeaders, getAuthToken } from '../lib/auth';
 import { getAvatarById, getRandomAvatar } from '../lib/avatars';
 import { toast } from 'react-hot-toast';
+import useCursorGlow from '../hooks/useCursorGlow';
+import useScrollReveal from '../hooks/useScrollReveal';
+import useCardTilt from '../hooks/useCardTilt';
 
 const useCases = [
     {
@@ -70,14 +74,107 @@ function createRoomId() {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
+function prefersReducedMotion() {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function AnimatedHeadline({ text }) {
+    const [visible, setVisible] = useState(false);
+    const words = text.split(' ');
+
+    useEffect(() => {
+        if (prefersReducedMotion()) {
+            setVisible(true);
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setVisible(true), 20);
+        return () => window.clearTimeout(timer);
+    }, []);
+
+    return (
+        <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">
+            {words.map((word, index) => (
+                <span
+                    key={`${word}-${index}`}
+                    className={`word-reveal ${visible ? 'visible' : ''}`}
+                    style={visible && !prefersReducedMotion() ? { animationDelay: `${index * 80}ms` } : undefined}
+                >
+                    {word}
+                </span>
+            ))}
+        </h1>
+    );
+}
+
+function UseCaseCard({ item }) {
+    const tiltRef = useCardTilt(4);
+
+    return (
+        <article
+            ref={tiltRef}
+            data-cursor="card"
+            className="reveal-item rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+            style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+        >
+            <div className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                <item.icon size={18} strokeWidth={2} />
+            </div>
+            <h3 className="text-xl font-semibold">{item.title}</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{item.description}</p>
+        </article>
+    );
+}
+
+function StepCard({ step, index, isRight }) {
+    const tiltRef = useCardTilt(4);
+
+    return (
+        <div
+            className={`reveal-item relative flex items-start gap-4 md:gap-6 ${isRight ? 'md:flex-row-reverse' : ''}`}
+            data-cursor="card"
+        >
+            <div className="relative z-10 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 font-semibold text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300">
+                {index + 1}
+            </div>
+            <div className="absolute left-6 top-6 hidden h-px w-8 bg-amber-300/60 dark:bg-amber-500/40 md:block md:w-10" />
+            <div
+                className={`absolute top-6 hidden h-8 w-8 border-t border-amber-300/60 dark:border-amber-500/40 md:block ${
+                    isRight
+                        ? 'left-[calc(50%+2.5rem)] rounded-tr-full border-r'
+                        : 'left-[calc(50%-2rem)] rounded-tl-full border-l'
+                }`}
+            />
+            <div
+                ref={tiltRef}
+                className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 md:max-w-[42%]"
+                style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+            >
+                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
+                    Step {index + 1}
+                </p>
+                <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{step}</p>
+            </div>
+        </div>
+    );
+}
+
 function Login() {
     const navigate = useNavigate();
     const quickRoomRef = useRef(null);
     const authEntryRef = useRef(null);
+    const heroRef = useRef(null);
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
     const [currentUser, setCurrentUser] = useState(null);
     const [quickRoomId, setQuickRoomId] = useState('');
     const [showAuthPanel, setShowAuthPanel] = useState(false);
+    const [heroBadgeVisible, setHeroBadgeVisible] = useState(false);
+    const [heroCtasVisible, setHeroCtasVisible] = useState(false);
+    const wordCount = 'Practice interviews and DSA in one polished collaborative room.'.split(' ').length;
+    const reduceMotion = prefersReducedMotion();
+    const howItWorksRef = useScrollReveal();
+    const useCasesRef = useScrollReveal();
+
+    useCursorGlow(heroRef);
 
     useEffect(() => {
         const loadCurrentUser = async () => {
@@ -98,6 +195,21 @@ function Login() {
 
         loadCurrentUser();
     }, [serverUrl]);
+
+    useEffect(() => {
+        if (reduceMotion) {
+            setHeroBadgeVisible(true);
+            setHeroCtasVisible(true);
+            return undefined;
+        }
+
+        const badgeTimer = window.setTimeout(() => setHeroBadgeVisible(true), 200);
+        const ctaTimer = window.setTimeout(() => setHeroCtasVisible(true), wordCount * 80 + 200);
+        return () => {
+            window.clearTimeout(badgeTimer);
+            window.clearTimeout(ctaTimer);
+        };
+    }, [reduceMotion, wordCount]);
 
     const handleQuickJoin = (event) => {
         event.preventDefault();
@@ -143,34 +255,103 @@ function Login() {
             <Navbar />
 
             <main>
-                <section className="relative overflow-hidden border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 pb-20 pt-20 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8">
+                <section
+                    ref={heroRef}
+                    className="relative overflow-hidden border-b border-stone-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_28%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.1),_transparent_18%),linear-gradient(180deg,#fff8ef_0%,#f8fafc_48%,#f8fafc_100%)] px-4 pb-20 pt-20 dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_24%),radial-gradient(circle_at_78%_18%,_rgba(148,163,184,0.08),_transparent_18%),linear-gradient(180deg,#020617_0%,#0f172a_48%,#020617_100%)] sm:px-6 lg:px-8"
+                >
+                    {!reduceMotion ? (
+                        <div
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0"
+                            style={{
+                                background: 'radial-gradient(600px circle at var(--glow-x) var(--glow-y), rgba(245,158,11,0.04), transparent 80%)',
+                            }}
+                        />
+                    ) : null}
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute rounded-full ambient-blob"
+                        style={{
+                            width: 400,
+                            height: 400,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%)',
+                            top: '20%',
+                            left: '10%',
+                            filter: 'blur(60px)',
+                            animation: 'floatBlob1 25s ease-in-out infinite',
+                        }}
+                    />
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute rounded-full ambient-blob"
+                        style={{
+                            width: 300,
+                            height: 300,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, rgba(16,185,129,0.04) 0%, transparent 70%)',
+                            top: '60%',
+                            right: '15%',
+                            filter: 'blur(80px)',
+                            animation: 'floatBlob2 35s ease-in-out infinite',
+                        }}
+                    />
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute rounded-full ambient-blob"
+                        style={{
+                            width: 200,
+                            height: 200,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, rgba(245,158,11,0.04) 0%, transparent 70%)',
+                            top: '40%',
+                            right: '30%',
+                            filter: 'blur(40px)',
+                            animation: 'floatBlob3 20s ease-in-out infinite alternate',
+                        }}
+                    />
                     <div className="pointer-events-none absolute -left-20 top-20 h-56 w-56 rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-500/10" />
                     <div className="pointer-events-none absolute -right-20 top-12 h-64 w-64 rounded-full bg-sky-300/20 blur-3xl dark:bg-sky-500/10" />
                     <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                        <div
+                            data-cursor="card"
+                            className="inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-white/80 px-4 py-1.5 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+                            style={{
+                                opacity: heroBadgeVisible ? 1 : 0,
+                                transform: heroBadgeVisible ? 'translateY(0)' : 'translateY(8px)',
+                                transition: reduceMotion ? 'none' : 'opacity 400ms ease 200ms, transform 400ms ease 200ms',
+                            }}
+                        >
                             <Sparkles size={14} />
                             Realtime interview practice platform for serious DSA sessions
                         </div>
 
                         <div className="mt-8 space-y-5">
-                            <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">
-                                Practice interviews and DSA in one polished collaborative room.
-                            </h1>
+                            <AnimatedHeadline text="Practice interviews and DSA in one polished collaborative room." />
                             <p className="mx-auto max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
                                 ForkSpace combines shared coding, Codeforces-ready problem setup, run/submit output, hidden tests, and AI-assisted session intelligence into one focused workspace.
                             </p>
                         </div>
 
-                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                        <div
+                            className="mt-8 flex flex-col gap-3 sm:flex-row"
+                            style={{
+                                opacity: heroCtasVisible ? 1 : 0,
+                                transform: heroCtasVisible ? 'translateY(0)' : 'translateY(10px)',
+                                transition: reduceMotion ? 'none' : `opacity 400ms ease ${wordCount * 80 + 200}ms, transform 400ms ease ${wordCount * 80 + 200}ms`,
+                            }}
+                        >
                             <button
                                 type="button"
                                 onClick={focusQuickEntry}
+                                data-cursor="button"
                                 className="inline-flex items-center justify-center rounded-md bg-white px-5 py-2.5 text-sm font-medium text-gray-900 transition hover:bg-gray-100"
                             >
                                 Start a Room
                             </button>
                             <Link
                                 to="/analyse"
+                                data-cursor="button"
                                 className="inline-flex items-center justify-center rounded-md border border-amber-500 px-5 py-2.5 text-sm text-amber-400 transition hover:bg-amber-500/10"
                             >
                                 Solution Analyser
@@ -180,6 +361,7 @@ function Login() {
                         <form
                             id="join-session"
                             onSubmit={handleQuickJoin}
+                            data-cursor="card"
                             className="mt-8 flex w-full max-w-2xl flex-col gap-3 rounded-[1.75rem] border border-stone-200 bg-white/85 p-4 shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75 sm:flex-row sm:items-center"
                         >
                             <input
@@ -192,6 +374,7 @@ function Login() {
                             />
                             <button
                                 type="submit"
+                                data-cursor="button"
                                 className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
                             >
                                 Enter
@@ -202,15 +385,15 @@ function Login() {
                             {currentUser ? `Jump in as ${currentUser.name}.` : 'No signup needed. Sign in only to save room and run history.'}
                         </p>
                         <div className="mt-6 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3">
-                            <div className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
+                            <div data-cursor="card" className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Realtime</p>
                                 <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Shared editor, cursors, and role sync over Socket.IO.</p>
                             </div>
-                            <div className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
+                            <div data-cursor="card" className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Execution + Tests</p>
                                 <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Run, submit, and hidden-test your code with quick feedback loops.</p>
                             </div>
-                            <div className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
+                            <div data-cursor="card" className="rounded-2xl border border-stone-200 bg-white/75 px-4 py-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/55">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">Session Intelligence</p>
                                 <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">Analyze and report overlays for better interview-quality reviews.</p>
                             </div>
@@ -230,6 +413,7 @@ function Login() {
                                         return next;
                                     });
                                 }}
+                                data-cursor="button"
                                 className="mt-5 inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:bg-stone-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
                             >
                                 {showAuthPanel ? 'Close account access' : 'Sign in to save history'}
@@ -249,6 +433,7 @@ function Login() {
                                 <button
                                     type="button"
                                     onClick={() => setShowAuthPanel(false)}
+                                    data-cursor="button"
                                     className="rounded-xl border border-stone-200 bg-white p-2 text-slate-500 transition hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
                                     aria-label="Close sign-in panel"
                                 >
@@ -275,6 +460,7 @@ function Login() {
                             {featureHighlights.map((feature) => (
                                 <article
                                     key={feature.title}
+                                    data-cursor="card"
                                     className="group rounded-3xl border border-stone-200 bg-stone-50/75 p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-amber-300/60 hover:shadow-[0_16px_42px_-24px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-amber-500/40"
                                 >
                                     <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 transition group-hover:scale-105 dark:bg-amber-500/10 dark:text-amber-300">
@@ -288,7 +474,7 @@ function Login() {
                     </div>
                 </section>
 
-                <section id="how-it-works" className="scroll-mt-24 bg-white px-4 py-14 dark:bg-slate-950 sm:px-6 lg:px-8">
+                <section ref={howItWorksRef} id="how-it-works" className="reveal-container scroll-mt-24 bg-white px-4 py-14 dark:bg-slate-950 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">How It Works</p>
@@ -303,37 +489,14 @@ function Login() {
                             <div className="space-y-5">
                                 {quickStartSteps.map((step, index) => {
                                     const isRight = index % 2 === 1;
-                                    return (
-                                        <div
-                                            key={step}
-                                            className={`relative flex items-start gap-4 md:gap-6 ${isRight ? 'md:flex-row-reverse' : ''}`}
-                                        >
-                                            <div className="relative z-10 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 font-semibold text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300">
-                                                {index + 1}
-                                            </div>
-                                            <div className="absolute left-6 top-6 hidden h-px w-8 bg-amber-300/60 dark:bg-amber-500/40 md:block md:w-10" />
-                                            <div
-                                                className={`absolute top-6 hidden h-8 w-8 border-t border-amber-300/60 dark:border-amber-500/40 md:block ${
-                                                    isRight
-                                                        ? 'left-[calc(50%+2.5rem)] rounded-tr-full border-r'
-                                                        : 'left-[calc(50%-2rem)] rounded-tl-full border-l'
-                                                }`}
-                                            />
-                                            <div className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-stone-50 p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 md:max-w-[42%]">
-                                                <p className="mb-2 text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">
-                                                    Step {index + 1}
-                                                </p>
-                                                <p className="text-sm leading-7 text-slate-700 dark:text-slate-300">{step}</p>
-                                            </div>
-                                        </div>
-                                    );
+                                    return <StepCard key={step} step={step} index={index} isRight={isRight} />;
                                 })}
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <section id="use-cases" className="scroll-mt-24 border-y border-stone-200 bg-stone-100/70 px-4 py-14 dark:border-slate-800 dark:bg-slate-900/40 sm:px-6 lg:px-8">
+                <section ref={useCasesRef} id="use-cases" className="reveal-container scroll-mt-24 border-y border-stone-200 bg-stone-100/70 px-4 py-14 dark:border-slate-800 dark:bg-slate-900/40 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl space-y-8">
                         <div className="max-w-2xl space-y-3">
                             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">Use Cases</p>
@@ -345,13 +508,7 @@ function Login() {
 
                         <div className="grid gap-6 md:grid-cols-3">
                             {useCases.map((item) => (
-                                <article key={item.title} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
-                                    <div className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                                        <item.icon size={18} strokeWidth={2} />
-                                    </div>
-                                    <h3 className="text-xl font-semibold">{item.title}</h3>
-                                    <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{item.description}</p>
-                                </article>
+                                <UseCaseCard key={item.title} item={item} />
                             ))}
                         </div>
                     </div>
@@ -367,12 +524,14 @@ function Login() {
                             href="https://github.com/Sundramrai3691"
                             target="_blank"
                             rel="noopener noreferrer"
+                            data-cursor="button"
                             className="transition hover:text-slate-900 dark:hover:text-white"
                         >
                             GitHub
                         </a>
                         <a
                             href="/LICENSE"
+                            data-cursor="button"
                             className="transition hover:text-slate-900 dark:hover:text-white"
                         >
                             MIT License

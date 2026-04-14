@@ -22,6 +22,7 @@ import HiddenTestPanel from "../HiddenTestPanel.jsx";
 import { getAvatarById } from "../../lib/avatars";
 import AvatarGlyph from "../common/AvatarGlyph.jsx";
 import RunResultOverlay from "./RunResultOverlay.jsx";
+import useCardTilt from "../../hooks/useCardTilt.js";
 
 function normalizeEditorText(text) {
     return String(text ?? "").replace(/\r\n/g, "\n");
@@ -417,11 +418,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [showChecklist, setShowChecklist] = useState(false);
     const [celebrationResult, setCelebrationResult] = useState(null);
     const [showCelebration, setShowCelebration] = useState(false);
+    const [runVisualState, setRunVisualState] = useState("idle");
     const [rightPanelWidthPct, setRightPanelWidthPct] = useState(() => {
         const raw = Number(localStorage.getItem("forkspace.rightPanelWidthPct"));
         if (Number.isFinite(raw) && raw >= 25 && raw <= 50) return raw;
         return 35;
     });
+    const rightTabRefs = useRef({});
+    const [rightTabIndicator, setRightTabIndicator] = useState({ left: 0, width: 0 });
+    const reportCardTiltRef = useCardTilt(4);
     const [testGenerateSignal, setTestGenerateSignal] = useState(0);
     const [editorContentVersion, setEditorContentVersion] = useState(0);
     const [collabHintDismissed, setCollabHintDismissed] = useState(false);
@@ -479,6 +484,27 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         const id = window.setTimeout(() => setShowFormattedFlash(false), 1000);
         return () => window.clearTimeout(id);
     }, [showFormattedFlash]);
+
+    useEffect(() => {
+        const updateIndicator = () => {
+            const activeNode = rightTabRefs.current[activeRightTab];
+            if (!activeNode) return;
+            setRightTabIndicator({
+                left: activeNode.offsetLeft,
+                width: activeNode.offsetWidth,
+            });
+        };
+
+        updateIndicator();
+        window.addEventListener("resize", updateIndicator);
+        return () => window.removeEventListener("resize", updateIndicator);
+    }, [activeRightTab]);
+
+    useEffect(() => {
+        if (runVisualState === "idle" || runVisualState === "compiling") return undefined;
+        const timer = window.setTimeout(() => setRunVisualState("idle"), 700);
+        return () => window.clearTimeout(timer);
+    }, [runVisualState]);
 
     useEffect(() => {
         if (!unlockedTitle) return undefined;
@@ -958,6 +984,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 : /accepted/i.test(statusDescription)
                                     ? "AC"
                                     : "AC";
+            setRunVisualState(status === "AC" ? "success" : status === "TLE" ? "tle" : "error");
             setRunFeedbackTone(status);
             window.setTimeout(() => setRunFeedbackTone(""), status === "WA" ? 500 : status === "TLE" ? 500 : 350);
             const currentRunCount = runCountRef.current + 1;
@@ -1025,6 +1052,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         socket.on("run-error", ({ error }) => {
             const message = error || "Run request failed";
             toast.error(message);
+            setRunVisualState("error");
             setLastRunMeta((prev) => ({
                 ...(prev || {}),
                 status: "Request Failed",
@@ -1425,6 +1453,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         const inputSource = fallbackSampleInput.length > 0 ? "sample" : "none";
         const normalizedExpectedOutput = normalizeOutput(expectedOutput);
         setActiveRightTab("output");
+        setRunVisualState("compiling");
 
         setLastRunMeta({
             languageLabel: languageConfig.label,
@@ -1486,6 +1515,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             );
             setShowOutputModal(true);
             toast.error(runErrorMessage);
+            setRunVisualState("error");
         }
     };
 
@@ -1971,13 +2001,15 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
             <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121]">
                     <button
-                        className={`inline-flex h-10 items-center gap-2 rounded-md bg-teal-500 px-4 text-[15px] font-semibold text-white shadow-sm shadow-teal-900/40 transition-[transform,background-color] duration-150 hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50 ${runButtonAnimating ? "scale-105" : "scale-100"}`}
+                        data-cursor="button"
+                        data-run-state={runVisualState}
+                        className={`workspace-run-button inline-flex h-10 items-center gap-2 rounded-md bg-teal-500 px-4 text-[15px] font-semibold text-white shadow-sm shadow-teal-900/40 transition-[transform,background-color] duration-150 hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50 ${runButtonAnimating ? "scale-105" : "scale-100"}`}
                         onClick={runCode}
                         disabled={!canRunInCurrentMode || isRunBusy}
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
                     >
                         {isRunBusy ? <ButtonSpinner /> : (
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="workspace-run-button-icon h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <polygon points="5,3 19,12 5,21" />
                             </svg>
                         )}
@@ -1989,6 +2021,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </span>
                     ) : null}
                     <button
+                        data-cursor="button"
                         className="inline-flex h-10 items-center gap-2 rounded-md border border-amber-500/70 px-4 text-[15px] text-amber-400 transition-colors hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50"
                         onClick={submitSamples}
                         disabled={!canRunInCurrentMode || isSubmitBusy}
@@ -2007,6 +2040,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     <span className="mx-1 h-5 w-px bg-white/15" />
                     <button
                         type="button"
+                        data-cursor="button"
                         onClick={() => {
                             setShowAnalysisModal(true);
                             if (!reviewContent) {
@@ -2024,6 +2058,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </button>
                     <button
                         type="button"
+                        data-cursor="button"
                         onClick={() => {
                             if (lastReportPayload) {
                                 setShowReportModal(true);
@@ -2043,6 +2078,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     </button>
                     <button
                         type="button"
+                        data-cursor="button"
                         onClick={() => {
                             setActiveRightTab("tests");
                             setTestGenerateSignal((v) => v + 1);
@@ -2060,6 +2096,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </span>
                     </button>
                     <button
+                        data-cursor="button"
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/15 text-gray-300 transition-colors hover:bg-white/5 hover:text-white disabled:pointer-events-none disabled:opacity-50"
                         onClick={handleOpenClearConfirm}
                         disabled={!editorUnlocked}
@@ -2205,10 +2242,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         : { gridTemplateColumns: `minmax(0,1fr) 8px ${rightPanelWidthPct}%` }
                 }
             >
-                <div className={`relative min-h-[24rem] border-t xl:min-h-0 ${editorUnlocked
+                <div
+                    data-cursor="editor"
+                    className={`editor-wrapper relative min-h-[24rem] border-t xl:min-h-0 ${editorUnlocked
                     ? 'border-emerald-200/80 dark:border-emerald-800/40'
                     : 'border-rose-200/80 dark:border-rose-800/40'
-                    } bg-white dark:bg-[#0a1324]`}>
+                    } bg-white dark:bg-[#0a1324]`}
+                >
                     <textarea
                         id="realtimeEditor"
                         className="h-full w-full resize-none border-0 bg-transparent p-6 text-sm font-mono text-gray-900 outline-none dark:text-white"
@@ -2243,7 +2283,16 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         </div>
 
                         <div className="flex-none border-b border-white/10 bg-stone-50 px-4 py-3.5 dark:bg-[#0d172b]">
-                            <div className="flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1.5 shadow-sm dark:border-gray-700/80 dark:bg-slate-950/40">
+                            <div className="relative flex flex-wrap gap-2 rounded-[1.2rem] border border-gray-200/80 bg-white/70 p-1.5 shadow-sm dark:border-gray-700/80 dark:bg-slate-950/40">
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute bottom-1 h-0.5 rounded-full bg-amber-400"
+                                    style={{
+                                        left: `${rightTabIndicator.left}px`,
+                                        width: `${rightTabIndicator.width}px`,
+                                        transition: 'left 200ms ease, width 200ms ease',
+                                    }}
+                                />
                                 {[
                                     { key: "output", label: "Output" },
                                     { key: "submissions", label: "Submissions" },
@@ -2253,8 +2302,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                     return (
                                         <button
                                             key={tab.key}
+                                            ref={(node) => {
+                                                rightTabRefs.current[tab.key] = node;
+                                            }}
                                             type="button"
                                             onClick={() => setActiveRightTab(tab.key)}
+                                            data-cursor="button"
                                             className={`rounded-[0.95rem] border-b-2 px-3.5 py-2.5 text-sm transition ${isActive
                                                 ? "border-amber-400 text-white font-medium"
                                                 : "border-transparent text-gray-500 hover:text-gray-300"
@@ -2532,7 +2585,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
                                     {lastReportPayload ? (
                                         <div
+                                            ref={reportCardTiltRef}
+                                            data-cursor="card"
                                             className={`relative rounded-[1.5rem] border border-amber-200/35 bg-gradient-to-b from-amber-50/40 to-transparent p-1 shadow-[0_8px_40px_-16px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/15 transition-[box-shadow,ring] duration-500 dark:border-amber-900/40 dark:from-amber-950/25 dark:shadow-[0_12px_48px_-20px_rgba(0,0,0,0.75)] dark:ring-amber-500/10 ${isNewReport && activeRightTab === "report" ? "ring-2 ring-amber-400/60 shadow-[0_12px_48px_-12px_rgba(251,191,36,0.55)] dark:shadow-[0_16px_56px_-16px_rgba(251,191,36,0.25)]" : ""}`}
+                                            style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
                                         >
                                             <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 rounded-t-[1.25rem] border-b border-amber-200/40 bg-white/90 px-3 py-2.5 backdrop-blur-md dark:border-amber-900/35 dark:bg-[#0a1324]/92">
                                                 <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Link, useNavigate, useParams } from 'react-router';
 import toast from 'react-hot-toast';
 import { getAnalysisApiBases } from '../lib/analysisApi';
+import useCardTilt from '../hooks/useCardTilt';
 
 const LANGUAGE_CHOICES = [
     { value: 'cpp', label: 'C++' },
@@ -172,10 +173,14 @@ function formatLastAnalysed(dateValue) {
 }
 
 function Section({ index, title, children }) {
+    const tiltRef = useCardTilt(4);
+
     return (
         <section
+            ref={tiltRef}
+            data-cursor="card"
             className="rounded-xl border border-[#21262d] bg-[#161b22] p-4 opacity-0"
-            style={{ animation: `fadeUp 0.45s ease ${index * 0.1}s forwards` }}
+            style={{ transformStyle: 'preserve-3d', willChange: 'transform', animation: `fadeUp 0.45s ease ${index * 0.1}s forwards` }}
         >
             <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b949e]">{title}</h2>
             {children}
@@ -606,8 +611,8 @@ function AnalysePage() {
                     <p className="mt-1 text-xs text-[#8b949e]">Deep analytics for interview-style and Codeforces-style solutions.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link to="/history/reports" className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">History</Link>
-                    <button type="button" onClick={copyShareLink} className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">Share</button>
+                    <Link data-cursor="button" to="/history/reports" className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">History</Link>
+                    <button data-cursor="button" type="button" onClick={copyShareLink} className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">Share</button>
                 </div>
             </header>
 
@@ -658,6 +663,7 @@ function AnalysePage() {
                                 type="button"
                                 onClick={handleAnalyse}
                                 disabled={isLoading}
+                                data-cursor="button"
                                 className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
                             >
                                 {isLoading ? 'Analysing...' : analysis ? 'Re-analyse' : 'Analyse solution'}
@@ -704,8 +710,8 @@ function AnalysePage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <button type="button" onClick={copyShareLink} className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">Copy link</button>
-                                        <button type="button" onClick={() => navigate('/')} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">Open in ForkSpace</button>
+                                        <button data-cursor="button" type="button" onClick={copyShareLink} className="rounded-lg border border-[#30363d] px-3 py-2 text-sm text-[#e6edf3] transition hover:border-[#79c0ff]">Copy link</button>
+                                        <button data-cursor="button" type="button" onClick={() => navigate('/')} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">Open in ForkSpace</button>
                                     </div>
                                 </div>
                             </div>

@@ -226,6 +226,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         problemSnapshot: null,
     });
     const lastLocalProblemEditAtRef = useRef(0);
+    const sidebarTabRefs = useRef({});
+    const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0 });
 
     const updateProblemDraft = (updater) => {
         lastLocalProblemEditAtRef.current = Date.now();
@@ -316,6 +318,21 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
 
         return () => clearTimeout(timer);
     }, [problemDraft, roomId, socketRef, roomState]);
+
+    useEffect(() => {
+        const updateIndicator = () => {
+            const tabNode = sidebarTabRefs.current[activeTab];
+            if (!tabNode) return;
+            setTabIndicator({
+                left: tabNode.offsetLeft,
+                width: tabNode.offsetWidth,
+            });
+        };
+
+        updateIndicator();
+        window.addEventListener('resize', updateIndicator);
+        return () => window.removeEventListener('resize', updateIndicator);
+    }, [activeTab]);
 
     if (!hasJoinState) {
         return <Navigate to='/' />;
@@ -608,10 +625,23 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             ) : null}
                         </div>
 
-                        <div className="mb-4 grid grid-cols-2 gap-2 rounded-[1.2rem] border border-stone-200/80 bg-stone-50 p-1 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                        <div className="relative mb-4 grid grid-cols-2 gap-2 rounded-[1.2rem] border border-stone-200/80 bg-stone-50 p-1 dark:border-slate-700/80 dark:bg-[#0d172b]">
+                            <div
+                                aria-hidden="true"
+                                className="absolute bottom-1 h-0.5 rounded-full bg-amber-400"
+                                style={{
+                                    left: `${tabIndicator.left}px`,
+                                    width: `${tabIndicator.width}px`,
+                                    transition: 'left 200ms ease, width 200ms ease',
+                                }}
+                            />
                             <button
+                                ref={(node) => {
+                                    sidebarTabRefs.current.problem = node;
+                                }}
                                 type="button"
                                 onClick={() => setActiveTab('problem')}
+                                data-cursor="button"
                                 className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm transition ${
                                     activeTab === 'problem'
                                         ? 'border-amber-400 text-white font-medium'
@@ -621,8 +651,12 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                 Problem
                             </button>
                             <button
+                                ref={(node) => {
+                                    sidebarTabRefs.current.session = node;
+                                }}
                                 type="button"
                                 onClick={() => setActiveTab('session')}
+                                data-cursor="button"
                                 className={`rounded-[0.95rem] border-b-2 px-3 py-2 text-sm transition ${
                                     activeTab === 'session'
                                         ? 'border-amber-400 text-white font-medium'

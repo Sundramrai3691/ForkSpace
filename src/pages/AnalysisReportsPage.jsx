@@ -44,6 +44,7 @@ function AnalysisReportsPage() {
                     <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Analysis Reports</h1>
                     <Link
                         to="/"
+                        data-cursor="button"
                         className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
                     >
                         Home
@@ -64,6 +65,7 @@ function AnalysisReportsPage() {
                             <li key={r.shareId}>
                                 <Link
                                     to={`/report/${r.shareId}`}
+                                    data-cursor="card"
                                     className="block rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-sm transition hover:border-amber-300 dark:border-gray-700 dark:bg-slate-900/80 dark:hover:border-amber-600/50"
                                 >
                                     <p className="font-medium text-gray-900 dark:text-white">{r.problemTitle || "Session"}</p>

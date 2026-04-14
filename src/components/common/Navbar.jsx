@@ -40,6 +40,7 @@ function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+    const [scrolled, setScrolled] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
     const [isEditingName, setIsEditingName] = useState(false);
     const [draftName, setDraftName] = useState('');
@@ -120,6 +121,13 @@ function Navbar() {
         });
     }, [isAvatarPickerOpen]);
 
+    useEffect(() => {
+        const handler = () => setScrolled(window.scrollY > 60);
+        handler();
+        window.addEventListener('scroll', handler, { passive: true });
+        return () => window.removeEventListener('scroll', handler);
+    }, []);
+
     const handleSignOut = () => {
         clearAuthToken();
         setIsProfileOpen(false);
@@ -166,13 +174,21 @@ function Navbar() {
     ];
 
     return (
-        <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur-md dark:border-gray-700 dark:bg-gray-900/95">
+        <nav
+            className={`fixed top-0 z-50 w-full transition-all duration-300 ${
+                scrolled
+                    ? 'border-b border-white/5 bg-slate-900/80 backdrop-blur-md'
+                    : 'border-b border-transparent bg-transparent'
+            }`}
+            style={scrolled ? { backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' } : undefined}
+        >
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between gap-6">
                     <button
                         type="button"
                         onClick={handleScrollToJoin}
-                        className="flex shrink-0 items-center gap-3"
+                        data-cursor="button"
+                        className={`flex shrink-0 items-center gap-3 transition-all duration-300 ${scrolled ? 'border-l-2 border-amber-400 pl-2' : ''}`}
                     >
                         <div className="rounded-lg bg-white p-1 shadow-sm ring-1 ring-black/5 dark:bg-white">
                             <img
@@ -188,21 +204,28 @@ function Navbar() {
                         <button
                             type="button"
                             onClick={() => handleScrollToSection('how-it-works')}
-                            className="shrink-0 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                            data-cursor="button"
+                            className="group shrink-0 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                         >
-                            How It Works
+                            <span className="relative after:absolute after:bottom-0 after:left-1/2 after:h-px after:w-0 after:bg-amber-400 after:transition-all after:duration-200 group-hover:after:left-0 group-hover:after:w-full">
+                                How It Works
+                            </span>
                         </button>
                         <button
                             type="button"
                             onClick={() => handleScrollToSection('use-cases')}
-                            className="shrink-0 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                            data-cursor="button"
+                            className="group shrink-0 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                         >
-                            Use Cases
+                            <span className="relative after:absolute after:bottom-0 after:left-1/2 after:h-px after:w-0 after:bg-amber-400 after:transition-all after:duration-200 group-hover:after:left-0 group-hover:after:w-full">
+                                Use Cases
+                            </span>
                         </button>
                         <button
                             type="button"
                             onClick={handleScrollToJoin}
-                            className="shrink-0 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-400"
+                            data-cursor="button"
+                            className="shrink-0 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]"
                         >
                             Start a Room
                         </button>
@@ -214,6 +237,7 @@ function Navbar() {
                                     setIsProfileOpen((current) => !current);
                                     setIsAvatarPickerOpen(false);
                                 }}
+                                data-cursor="button"
                                 className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm transition hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                 aria-label="Open profile and theme menu"
                             >
@@ -295,6 +319,7 @@ function Navbar() {
                                                     key={option.key}
                                                     type="button"
                                                     onClick={() => setTheme(option.key)}
+                                                    data-cursor="button"
                                                     className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs transition ${
                                                         theme === option.key
                                                             ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
@@ -314,6 +339,7 @@ function Navbar() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsAvatarPickerOpen((prev) => !prev)}
+                                                    data-cursor="button"
                                                     className={`block w-full rounded-xl border px-3 py-2 text-left text-sm font-medium transition ${
                                                         isAvatarPickerOpen
                                                             ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/60 dark:bg-amber-500/10 dark:text-amber-200'
@@ -325,6 +351,7 @@ function Navbar() {
                                                 <button
                                                     type="button"
                                                     onClick={handleScrollToJoin}
+                                                    data-cursor="button"
                                                     className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                                 >
                                                     Continue to room
@@ -332,6 +359,7 @@ function Navbar() {
                                                 <button
                                                     type="button"
                                                     onClick={handleSignOut}
+                                                    data-cursor="button"
                                                     className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
                                                 >
                                                     Sign Out
@@ -341,6 +369,7 @@ function Navbar() {
                                             <button
                                                 type="button"
                                                 onClick={handleScrollToAuth}
+                                                data-cursor="button"
                                                 className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                                             >
                                                 Sign in to save rooms
@@ -360,6 +389,7 @@ function Navbar() {
                                                             key={avatar.id}
                                                             type="button"
                                                             onClick={() => handleAvatarUpdate(avatar.id)}
+                                                            data-cursor="button"
                                                             className={`flex h-12 items-center justify-center rounded-xl border transition ${
                                                                 isActive
                                                                     ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm dark:bg-amber-500/10 dark:text-amber-300'
@@ -378,6 +408,7 @@ function Navbar() {
                                                         key={avatar.key}
                                                         type="button"
                                                         onClick={() => handleProfileUpdate({ avatar: avatar.key })}
+                                                        data-cursor="button"
                                                         className={`rounded-xl border px-2 py-2 text-lg transition ${
                                                             currentUser.avatar === avatar.key
                                                                 ? 'border-amber-400 bg-amber-50 shadow-sm dark:bg-amber-500/10'
@@ -398,6 +429,7 @@ function Navbar() {
                     <div className="md:hidden">
                         <button
                             onClick={() => setIsMenuOpen((prev) => !prev)}
+                            data-cursor="button"
                             className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-orange-500 dark:hover:bg-gray-800"
                             aria-expanded={isMenuOpen}
                         >
@@ -422,6 +454,7 @@ function Navbar() {
                         <button
                             type="button"
                             onClick={() => handleScrollToSection('how-it-works')}
+                            data-cursor="button"
                             className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                         >
                             How It Works
@@ -429,6 +462,7 @@ function Navbar() {
                         <button
                             type="button"
                             onClick={() => handleScrollToSection('use-cases')}
+                            data-cursor="button"
                             className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                         >
                             Use Cases
@@ -436,6 +470,7 @@ function Navbar() {
                         <button
                             type="button"
                             onClick={handleScrollToJoin}
+                            data-cursor="button"
                             className="block w-full rounded-xl bg-amber-500 px-3 py-2 text-left text-base font-semibold text-slate-950 transition hover:bg-amber-400"
                         >
                             Start a Room
@@ -451,6 +486,7 @@ function Navbar() {
                                             key={option.key}
                                             type="button"
                                             onClick={() => setTheme(option.key)}
+                                            data-cursor="button"
                                             className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
                                                 theme === option.key
                                                     ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
@@ -470,6 +506,7 @@ function Navbar() {
                                 <button
                                     type="button"
                                     onClick={handleScrollToJoin}
+                                    data-cursor="button"
                                     className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                                 >
                                     Continue as {currentUser.name}
@@ -477,6 +514,7 @@ function Navbar() {
                                 <button
                                     type="button"
                                     onClick={handleSignOut}
+                                    data-cursor="button"
                                     className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
                                 >
                                     Sign Out
@@ -486,6 +524,7 @@ function Navbar() {
                             <button
                                 type="button"
                                 onClick={handleScrollToAuth}
+                                data-cursor="button"
                                 className="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                             >
                                 Sign in to save rooms

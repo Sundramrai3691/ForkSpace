@@ -42,12 +42,14 @@ function SessionReportPage() {
                 <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                     <Link
                         to="/"
+                        data-cursor="button"
                         className="text-sm font-semibold text-amber-700 transition hover:underline dark:text-amber-300"
                     >
                         ← Home
                     </Link>
                     <Link
                         to="/history/reports"
+                        data-cursor="button"
                         className="text-sm font-medium text-gray-600 transition hover:underline dark:text-gray-400"
                     >
                         Analysis Reports
@@ -75,12 +77,14 @@ function SessionReportPage() {
                                 Polished summary for screenshots and portfolios. Same data as the workspace Report tab.
                             </p>
                         </div>
-                        <SessionIntelligenceReportDashboard
-                            report={report}
-                            previousReport={payload.previousReport}
-                            title={payload.problemTitle || "Practice session"}
-                            variant="standalone"
-                        />
+                        <div data-cursor="card">
+                            <SessionIntelligenceReportDashboard
+                                report={report}
+                                previousReport={payload.previousReport}
+                                title={payload.problemTitle || "Practice session"}
+                                variant="standalone"
+                            />
+                        </div>
                         <p className="text-center text-[11px] text-gray-500 dark:text-gray-500">
                             ForkSpace session report · ID {shareId}
                         </p>
