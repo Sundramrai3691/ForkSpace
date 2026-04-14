@@ -38,11 +38,10 @@ import {
 } from "./services/sessionIntelligence.js";
 import { generateSessionCard } from "./services/sessionCard.js";
 import {
+  buildAnalysisFailure,
   buildAnalysisPrompt,
-  buildFallbackAnalysis,
-  parseAnalysisReview,
-  scoreAnalysisPayload,
-  sanitizeAnalysisPayload,
+  isUsableAnalysis,
+  parseAnalysisResponse,
 } from "./services/analysisService.js";
 import {
   loadCodeforcesCatalog,
@@ -960,7 +959,7 @@ async function getAiReview(prompt, apiKey, model = "mistral") {
   if (model === "gemini") {
     const { text } = await generateWithGemini(prompt, apiKey, {
       temperature: 0.2,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
       responseMimeType: "application/json",
     });
     return text;
@@ -2013,11 +2012,17 @@ ${code}
   }
 });
 
-app.post("/api/analysis", aiLimiter, async (req, res) => {
-  const { code, language = DEFAULT_LANGUAGE, prompt = "" } = req.body || {};
+async function handleStandaloneAnalysis(req, res) {
+  const {
+    code,
+    language = DEFAULT_LANGUAGE,
+    prompt = "",
+    problemContext = "",
+  } = req.body || {};
   const geminiKey = getGeminiApiKey();
   const groqKey = getGroqApiKey();
   const mistralKey = getMistralApiKey();
+  const effectiveProblemContext = problemContext || prompt || "";
 
   if (!code?.trim()) {
     return res.status(400).json({ error: "Missing code" });
@@ -2030,12 +2035,14 @@ app.post("/api/analysis", aiLimiter, async (req, res) => {
     });
   }
 
-  const analysisPrompt = buildAnalysisPrompt({ code, language, prompt });
+  const analysisPrompt = buildAnalysisPrompt({
+    code,
+    language,
+    problemContext: effectiveProblemContext,
+  });
 
   try {
-    let bestReview = "";
-    let bestParsed = null;
-    let bestScore = -1;
+    let lastRawResponse = "";
     const analysisProviders = [
       ["groq", groqKey],
       ["gemini", geminiKey],
@@ -2046,51 +2053,73 @@ app.post("/api/analysis", aiLimiter, async (req, res) => {
       try {
         const review = await getAiReview(analysisPrompt, key, provider);
         if (!review) continue;
+        lastRawResponse = review;
 
-        const parsedRaw = parseAnalysisReview(review);
-        const parsed = parsedRaw
-          ? sanitizeAnalysisPayload(parsedRaw, review)
-          : buildFallbackAnalysis(review);
-        const score = scoreAnalysisPayload(parsed);
+        try {
+          const parsed = parseAnalysisResponse({
+            responseText: review,
+            code,
+            language,
+            problemContext: effectiveProblemContext,
+            provider,
+          });
 
-        if (score > bestScore) {
-          bestReview = review;
-          bestParsed = parsed;
-          bestScore = score;
-        }
-
-        if (score >= 5) {
-          break;
+          if (isUsableAnalysis(parsed)) {
+            return res.status(200).json(parsed);
+          }
+        } catch {
+          console.warn(`${provider} returned non-JSON analysis, trying next provider`);
         }
       } catch {
         console.warn(`${provider} failed for analysis, falling back`);
       }
     }
 
-    if (!bestReview) {
-      return res.status(500).json({
-        error: "All configured AI providers failed or returned an empty response.",
-      });
+    if (lastRawResponse) {
+      return res.status(500).json(buildAnalysisFailure(lastRawResponse));
     }
 
-    const analysis = await Analysis.create({
-      code,
-      language,
-      prompt,
-      result: bestParsed,
-    });
-
-    res.status(201).json({
-      analysisId: analysis._id.toString(),
-      analysis: bestParsed,
+    return res.status(500).json({
+      error: "Analysis failed",
+      raw: "All configured AI providers failed or returned an empty response.",
     });
   } catch (error) {
     const errorMsg =
       error.response?.data?.error?.message || error.message || "Unknown error";
     console.error("Standalone analysis error:", errorMsg);
-    res.status(500).json({
-      error: `Analysis failed: ${errorMsg}`,
+    return res.status(500).json({
+      error: "Analysis failed",
+      raw: errorMsg,
     });
+  }
+}
+
+app.post("/api/analyse", aiLimiter, handleStandaloneAnalysis);
+app.post("/api/analysis", aiLimiter, handleStandaloneAnalysis);
+
+app.post("/api/analysis/save", async (req, res) => {
+  const {
+    code = "",
+    language = DEFAULT_LANGUAGE,
+    problemContext = "",
+    result = null,
+  } = req.body || {};
+
+  if (!code.trim() || !result || typeof result !== "object") {
+    return res.status(400).json({ error: "Missing analysis payload" });
+  }
+
+  try {
+    const analysis = await Analysis.create({
+      code,
+      language,
+      prompt: problemContext,
+      result,
+    });
+
+    return res.status(201).json({ id: analysis._id.toString() });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to save analysis" });
   }
 });
 

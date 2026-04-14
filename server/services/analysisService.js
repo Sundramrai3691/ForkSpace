@@ -1,280 +1,481 @@
-const DEFAULT_ANALYSIS_SUMMARY =
-  "Analysis generated. Review bugs and optimization suggestions below.";
-
-export function buildAnalysisPrompt({
-  code,
-  language = "cpp",
-  prompt = "",
-}) {
-  return `You are reviewing a DSA solution pasted into ForkSpace.
-Language: ${language}
-Optional problem context: ${prompt || "Not provided"}
-
-Return ONLY valid JSON in this exact shape:
-{
-  "bugs": ["specific edge case or bug 1", "specific edge case or bug 2", "specific edge case or bug 3"],
-  "time_complexity": "O(n)",
-  "space_complexity": "O(1)",
-  "complexity_reasoning": "one or two sentences explaining why those complexities apply to this exact solution",
-  "style_issues": ["optional readability issue"],
-  "optimization_suggestion": {
-    "before": "a short before snippet or description from the current code",
-    "after": "a short after snippet or concrete change",
-    "benefit": "why the change improves complexity, clarity, or robustness"
-  },
-  "summary": "one sentence describing how good this solution currently is"
-}
-
-Rules:
-- Be specific to the pasted code.
-- Do not invent a different algorithm unless needed for the optimization suggestion.
-- Keep bug findings concrete and interview-relevant.
-- If the code is already good, say what remains risky.
-
-Code:
-\`\`\`${language}
-${code}
-\`\`\``;
-}
+const DEFAULT_VERDICT = "Analysis complete";
 
 function toStr(value) {
   return value == null ? "" : String(value).trim();
 }
 
-function isNoiseString(value) {
-  const text = toStr(value);
-  if (!text) return true;
-  if ([...text].every((char) => '[]{}",:'.includes(char))) return true;
-  if (/^(?:bugs?|issues?|edge cases?)$/i.test(text)) return true;
-  return false;
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function stripCodeFences(text) {
-  return text
+function normalizeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function stripCodeFences(text = "") {
+  return String(text)
     .replace(/```json/gi, "")
     .replace(/```/g, "")
-    .replace(/^\s*json\s*/i, "")
     .trim();
 }
 
-function dedupeStrings(values = [], limit = 6) {
-  return [
-    ...new Set(
-      values
-        .map((value) => toStr(value))
-        .filter((value) => !isNoiseString(value)),
-    ),
-  ].slice(0, limit);
+function parseJsonObject(text = "") {
+  const normalized = stripCodeFences(text);
+  const candidates = [normalized];
+  const firstBrace = normalized.indexOf("{");
+  const lastBrace = normalized.lastIndexOf("}");
+
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(normalized.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  throw new Error("Response did not contain a JSON object");
 }
 
-function tryParseJson(candidate) {
-  if (!candidate) return null;
+function nonEmptyLines(code = "") {
+  return String(code)
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0);
+}
 
-  const attempts = [
-    candidate,
-    candidate.replace(/,\s*([}\]])/g, "$1"),
-    candidate
-      .replace(/[“”]/g, '"')
-      .replace(/[‘’]/g, "'")
-      .replace(/,\s*([}\]])/g, "$1"),
-  ];
+function getMaxNestingDepth(code = "") {
+  let current = 0;
+  let maxDepth = 0;
 
-  for (const attempt of attempts) {
-    try {
-      const parsed = JSON.parse(attempt);
-      if (typeof parsed === "string") {
-        try {
-          const nested = JSON.parse(parsed);
-          if (nested && typeof nested === "object") return nested;
-        } catch {
-          // Keep trying remaining candidates.
-        }
-      }
-      if (parsed && typeof parsed === "object") return parsed;
-    } catch {
-      // Try next candidate.
+  for (const char of String(code)) {
+    if (char === "{") {
+      current += 1;
+      maxDepth = Math.max(maxDepth, current);
+    } else if (char === "}") {
+      current = Math.max(0, current - 1);
     }
+  }
+
+  return maxDepth;
+}
+
+function countMatches(code = "", regex) {
+  return (String(code).match(regex) || []).length;
+}
+
+function estimateVariableCount(code = "", language = "cpp") {
+  const source = String(code);
+
+  if (language === "python") {
+    return countMatches(source, /^\s*([a-zA-Z_]\w*)\s*=/gm);
+  }
+
+  if (language === "javascript") {
+    return countMatches(
+      source,
+      /\b(?:const|let|var)\s+([a-zA-Z_$][\w$]*)/g,
+    );
+  }
+
+  return countMatches(
+    source,
+    /\b(?:int|long long|long|double|float|char|bool|string|vector<[^>]+>|set<[^>]+>|map<[^>]+>|unordered_map<[^>]+>|unordered_set<[^>]+>|pair<[^>]+>)\s+([a-zA-Z_]\w*)/g,
+  );
+}
+
+function estimateCyclomaticComplexity(code = "") {
+  return (
+    1 +
+    countMatches(code, /\bif\b/g) +
+    countMatches(code, /\bfor\b/g) +
+    countMatches(code, /\bwhile\b/g) +
+    countMatches(code, /\bcase\b/g) +
+    countMatches(code, /\bcatch\b/g) +
+    countMatches(code, /\?\s*/g) +
+    countMatches(code, /&&|\|\|/g)
+  );
+}
+
+function estimateBranchCount(code = "") {
+  return (
+    countMatches(code, /\bif\b/g) +
+    countMatches(code, /\belse\b/g) +
+    countMatches(code, /\bfor\b/g) +
+    countMatches(code, /\bwhile\b/g) +
+    countMatches(code, /\bswitch\b/g) +
+    countMatches(code, /\bcase\b/g)
+  );
+}
+
+function inferReadability({ linesOfCode, cyclomaticComplexity, nestingDepth }) {
+  if (cyclomaticComplexity <= 5 && nestingDepth <= 3 && linesOfCode <= 80) {
+    return "High";
+  }
+  if (cyclomaticComplexity <= 10 && nestingDepth <= 5 && linesOfCode <= 180) {
+    return "Medium";
+  }
+  return "Low";
+}
+
+function buildLocalMetrics(code = "", language = "cpp") {
+  const linesOfCode = nonEmptyLines(code).length;
+  const cyclomaticComplexity = estimateCyclomaticComplexity(code);
+  const nestingDepth = getMaxNestingDepth(code);
+  const variableCount = estimateVariableCount(code, language);
+  const branchCount = estimateBranchCount(code);
+
+  return {
+    linesOfCode,
+    cyclomaticComplexity,
+    nestingDepth,
+    variableCount,
+    branchCount,
+    readability: inferReadability({
+      linesOfCode,
+      cyclomaticComplexity,
+      nestingDepth,
+    }),
+  };
+}
+
+function inferConstraintWarning(problemContext = "", time = "") {
+  const context = toStr(problemContext);
+  const complexity = toStr(time);
+
+  if (!context || !complexity) return null;
+
+  if (/2.?x.?10\^5|2e5|200000/i.test(context) && /n\^2|n²/i.test(complexity)) {
+    return "For n <= 2x10^5, an O(n^2) approach is likely too slow in Codeforces-style limits.";
+  }
+
+  if (/10\^5|1e5|100000/i.test(context) && /n\^2|n²/i.test(complexity)) {
+    return "For n around 10^5, quadratic work is risky and can TLE unless the hidden constant is extremely small.";
   }
 
   return null;
 }
 
-function extractListFromSection(text, headingPattern) {
-  const match = text.match(
-    new RegExp(
-      `${headingPattern}\\s*[:\\-]?\\s*([\\s\\S]*?)(?=\\n\\s*[A-Za-z][A-Za-z _]{2,40}\\s*[:\\-]|$)`,
-      "i",
-    ),
-  );
-
-  if (!match?.[1]) return [];
-
-  return dedupeStrings(
-    match[1]
-      .split("\n")
-      .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
-      .filter(Boolean),
-    6,
-  );
+function normalizeComplexityRating(value, fallback = "acceptable") {
+  const normalized = toStr(value).toLowerCase();
+  if (["optimal", "acceptable", "suboptimal", "too slow", "high"].includes(normalized)) {
+    return normalized;
+  }
+  return fallback;
 }
 
-function extractSingleLineValue(text, label) {
-  const match = text.match(new RegExp(`${label}\\s*[:\\-]\\s*([^\\n]+)`, "i"));
-  return toStr(match?.[1]);
-}
-
-function extractOptimizationSuggestion(text) {
-  return {
-    before: extractSingleLineValue(text, "before"),
-    after: extractSingleLineValue(text, "after"),
-    benefit: extractSingleLineValue(text, "benefit"),
-  };
-}
-
-function inferStructuredAnalysis(rawReview = "") {
-  const text = stripCodeFences(String(rawReview || ""));
-  if (!text) return null;
-
-  const bugs = extractListFromSection(
-    text,
-    "(?:bugs|edge cases|missed edge cases|risks|issues)",
-  );
-  const styleIssues = extractListFromSection(text, "(?:style issues|readability)");
-  const timeComplexity = extractSingleLineValue(
-    text,
-    "(?:time complexity|time)",
-  );
-  const spaceComplexity = extractSingleLineValue(
-    text,
-    "(?:space complexity|space)",
-  );
-  const complexityReasoning = extractSingleLineValue(
-    text,
-    "(?:complexity reasoning|reasoning|why)",
-  );
-  const summary =
-    extractSingleLineValue(text, "summary") ||
-    text
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line && !line.startsWith("{") && !line.startsWith('"'));
-  const optimizationSuggestion = extractOptimizationSuggestion(text);
-
-  const hasUsefulSignal =
-    bugs.length > 0 ||
-    styleIssues.length > 0 ||
-    timeComplexity ||
-    spaceComplexity ||
-    complexityReasoning ||
-    summary ||
-    optimizationSuggestion.before ||
-    optimizationSuggestion.after ||
-    optimizationSuggestion.benefit;
-
-  if (!hasUsefulSignal) return null;
-
-  return {
-    bugs,
-    time_complexity: timeComplexity,
-    space_complexity: spaceComplexity,
-    complexity_reasoning: complexityReasoning,
-    style_issues: styleIssues,
-    optimization_suggestion: optimizationSuggestion,
-    summary,
-  };
-}
-
-export function sanitizeAnalysisPayload(payload, rawText = "") {
-  const obj = payload && typeof payload === "object" ? payload : {};
-  const optimizationObj =
-    obj.optimization_suggestion && typeof obj.optimization_suggestion === "object"
-      ? obj.optimization_suggestion
-      : {};
-
-  return {
-    bugs: dedupeStrings(obj.bugs, 6),
-    time_complexity: toStr(obj.time_complexity) || "N/A",
-    space_complexity: toStr(obj.space_complexity) || "N/A",
-    complexity_reasoning: toStr(obj.complexity_reasoning),
-    style_issues: dedupeStrings(obj.style_issues, 6),
-    optimization_suggestion: {
-      before: toStr(optimizationObj.before),
-      after: toStr(optimizationObj.after),
-      benefit: toStr(optimizationObj.benefit),
-    },
-    summary: toStr(obj.summary) || DEFAULT_ANALYSIS_SUMMARY,
-    raw_text: toStr(rawText).slice(0, 2400),
-  };
-}
-
-export function parseAnalysisReview(rawReview = "") {
-  const text = String(rawReview || "").trim();
-  if (!text) return null;
-
-  const candidates = [text, stripCodeFences(text)];
-  const firstBrace = text.indexOf("{");
-  const lastBrace = text.lastIndexOf("}");
-
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    candidates.push(text.slice(firstBrace, lastBrace + 1).trim());
+function normalizeBug(entry) {
+  if (typeof entry === "string") {
+    return {
+      severity: "medium",
+      title: entry,
+      location: "Solution",
+      explanation: entry,
+      fix: "Inspect this branch and add a targeted correction.",
+    };
   }
 
-  for (const candidate of candidates) {
-    const parsed = tryParseJson(candidate);
-    if (parsed) return parsed;
-  }
-
-  return inferStructuredAnalysis(text);
+  const bug = entry && typeof entry === "object" ? entry : {};
+  return {
+    severity: ["critical", "high", "medium", "low"].includes(toStr(bug.severity).toLowerCase())
+      ? toStr(bug.severity).toLowerCase()
+      : "medium",
+    title: toStr(bug.title) || "Potential issue",
+    location: toStr(bug.location) || "Solution",
+    explanation: toStr(bug.explanation) || "The model flagged this area as risky.",
+    fix: toStr(bug.fix) || "Review the flagged code path and patch the edge case.",
+  };
 }
 
-export function buildFallbackAnalysis(rawReview = "") {
-  return sanitizeAnalysisPayload(
+function normalizePattern(entry) {
+  const pattern = entry && typeof entry === "object" ? entry : {};
+  return {
+    name: toStr(pattern.name) || "Unknown pattern",
+    description: toStr(pattern.description) || "Pattern details were not provided.",
+    confidence: clamp(Number(pattern.confidence) || 0, 0, 100),
+  };
+}
+
+function normalizeStyle(entry) {
+  if (typeof entry === "string") {
+    return { type: "info", text: entry };
+  }
+  const style = entry && typeof entry === "object" ? entry : {};
+  return {
+    type: ["warning", "info", "good"].includes(toStr(style.type).toLowerCase())
+      ? toStr(style.type).toLowerCase()
+      : "info",
+    text: toStr(style.text) || "Style feedback unavailable.",
+  };
+}
+
+function normalizeSimilarProblem(entry) {
+  const item = entry && typeof entry === "object" ? entry : {};
+  return {
+    name: toStr(item.name) || "Related Codeforces problem",
+    difficulty: ["Easy", "Medium", "Hard"].includes(toStr(item.difficulty))
+      ? toStr(item.difficulty)
+      : "Medium",
+    rating: clamp(Number(item.rating) || 1200, 800, 4000),
+    tags: normalizeArray(item.tags).map((tag) => toStr(tag)).filter(Boolean).slice(0, 5),
+    reason: toStr(item.reason) || "Similar constraints or core idea.",
+  };
+}
+
+function normalizeInterviewReadiness(value, bugsCount = 0) {
+  const source = value && typeof value === "object" ? value : {};
+  const correctness = clamp(Number(source.correctness) || Math.max(35, 88 - bugsCount * 10), 0, 100);
+  const efficiency = clamp(Number(source.efficiency) || 78, 0, 100);
+  const edgeCoverage = clamp(Number(source.edgeCoverage) || Math.max(30, 80 - bugsCount * 8), 0, 100);
+  const clarity = clamp(Number(source.clarity) || 76, 0, 100);
+  const robustness = clamp(Number(source.robustness) || Math.max(30, 82 - bugsCount * 7), 0, 100);
+  const cfFitness = clamp(Number(source.cfFitness) || 79, 0, 100);
+
+  return {
+    correctness,
+    efficiency,
+    edgeCoverage,
+    clarity,
+    robustness,
+    cfFitness,
+    toReach95:
+      toStr(source.toReach95) ||
+      "Tighten the edge cases, document the invariant more clearly, and remove any remaining overflow or boundary risks.",
+  };
+}
+
+function inferVerdict(overallScore, bugs) {
+  if (bugs.some((bug) => bug.severity === "critical")) {
+    return "Needs work · correctness risk";
+  }
+  if (overallScore >= 85) return "Strong solution · interview ready";
+  if (overallScore >= 70) return "Good solution · minor cleanup left";
+  if (overallScore >= 55) return "Promising solution · some risk remains";
+  return "Needs revision · major issues detected";
+}
+
+function inferOverallScore(interviewReadiness) {
+  const values = [
+    interviewReadiness.correctness,
+    interviewReadiness.efficiency,
+    interviewReadiness.edgeCoverage,
+    interviewReadiness.clarity,
+    interviewReadiness.robustness,
+    interviewReadiness.cfFitness,
+  ];
+  return clamp(Math.round(values.reduce((sum, value) => sum + value, 0) / values.length), 0, 100);
+}
+
+export function buildAnalysisPrompt({ code, language = "cpp", problemContext = "" }) {
+  return `
+You are an expert competitive programming judge and code reviewer.
+Analyse the following ${language} solution deeply and return ONLY valid JSON.
+${problemContext ? `Problem context: ${problemContext}` : ""}
+
+Code:
+\`\`\`${language}
+${code}
+\`\`\`
+
+Return this exact JSON structure (no markdown, no explanation, only JSON):
+{
+  "overallScore": <integer 0-100>,
+  "verdict": "<one line: e.g. 'Good solution · minor overflow risk'>",
+  "summary": "<2-3 sentence paragraph explaining the solution's approach and main strengths/weaknesses>",
+
+  "complexity": {
+    "time": "<e.g. O(n log n)>",
+    "timeExplanation": "<why, referencing actual code>",
+    "timeRating": "<'optimal' | 'acceptable' | 'suboptimal' | 'too slow'>",
+    "space": "<e.g. O(n)>",
+    "spaceExplanation": "<why>",
+    "spaceRating": "<'optimal' | 'acceptable' | 'high'>",
+    "constraintWarning": "<null OR string warning if time*n could TLE given typical constraints>"
+  },
+
+  "patterns": [
     {
-      bugs: [],
-      time_complexity: "N/A",
-      space_complexity: "N/A",
-      complexity_reasoning: "",
-      style_issues: [],
-      optimization_suggestion: null,
-      summary:
-        "AI response format was invalid. Showing the raw output below so the analysis page still stays useful.",
-    },
-    rawReview,
-  );
+      "name": "<algorithm/pattern name>",
+      "description": "<one line>",
+      "confidence": <integer 0-100>
+    }
+  ],
+
+  "bugs": [
+    {
+      "severity": "<'critical' | 'high' | 'medium' | 'low'>",
+      "title": "<short title>",
+      "location": "<e.g. 'Line 14' or 'solve() function'>",
+      "explanation": "<what the bug is>",
+      "fix": "<exact code fix or clear instruction>"
+    }
+  ],
+
+  "metrics": {
+    "linesOfCode": <integer>,
+    "cyclomaticComplexity": <integer>,
+    "nestingDepth": <integer>,
+    "variableCount": <integer>,
+    "branchCount": <integer>,
+    "readability": "<'High' | 'Medium' | 'Low'>"
+  },
+
+  "optimization": {
+    "hasSuggestion": <boolean>,
+    "summary": "<one line describing the improvement>",
+    "complexityChange": "<e.g. 'O(n²) → O(n log n)' or 'same complexity, cleaner code'>",
+    "before": "<the relevant code snippet before>",
+    "after": "<the improved code snippet>",
+    "explanation": "<why this is better>"
+  },
+
+  "style": [
+    {
+      "type": "<'warning' | 'info' | 'good'>",
+      "text": "<observation about style, naming, portability, CF-specific notes>"
+    }
+  ],
+
+  "interviewReadiness": {
+    "correctness": <0-100>,
+    "efficiency": <0-100>,
+    "edgeCoverage": <0-100>,
+    "clarity": <0-100>,
+    "robustness": <0-100>,
+    "cfFitness": <0-100>,
+    "toReach95": "<what specifically needs fixing to hit 95+ score>"
+  },
+
+  "similarProblems": [
+    {
+      "name": "<CF problem name and number>",
+      "difficulty": "<'Easy' | 'Medium' | 'Hard'>",
+      "rating": <integer>,
+      "tags": ["<tag1>", "<tag2>"],
+      "reason": "<why this is similar>"
+    }
+  ],
+
+  "tags": ["<tag1>", "<tag2>"],
+  "missedEdgeCases": ["<edge case 1>", "<edge case 2>"],
+  "provider": "<which AI provider responded>"
+}
+`;
 }
 
-export function scoreAnalysisPayload(payload) {
-  if (!payload || typeof payload !== "object") return 0;
+export function normalizeAnalysisResult({
+  raw,
+  code = "",
+  language = "cpp",
+  problemContext = "",
+  provider = "",
+}) {
+  const parsed = raw && typeof raw === "object" ? raw : {};
+  const localMetrics = buildLocalMetrics(code, language);
+  const bugs = normalizeArray(parsed.bugs).map(normalizeBug).slice(0, 8);
+  const interviewReadiness = normalizeInterviewReadiness(
+    parsed.interviewReadiness,
+    bugs.length,
+  );
+  const overallScore = clamp(
+    Number(parsed.overallScore) || inferOverallScore(interviewReadiness),
+    0,
+    100,
+  );
 
-  let score = 0;
+  return {
+    overallScore,
+    verdict: toStr(parsed.verdict) || inferVerdict(overallScore, bugs) || DEFAULT_VERDICT,
+    summary:
+      toStr(parsed.summary) ||
+      "The solution was analysed, but the model returned only a partial summary. Review the sections below for the detailed breakdown.",
+    complexity: {
+      time: toStr(parsed?.complexity?.time) || "N/A",
+      timeExplanation:
+        toStr(parsed?.complexity?.timeExplanation) ||
+        "Time complexity explanation was not provided.",
+      timeRating: normalizeComplexityRating(parsed?.complexity?.timeRating, "acceptable"),
+      space: toStr(parsed?.complexity?.space) || "N/A",
+      spaceExplanation:
+        toStr(parsed?.complexity?.spaceExplanation) ||
+        "Space complexity explanation was not provided.",
+      spaceRating: normalizeComplexityRating(parsed?.complexity?.spaceRating, "acceptable"),
+      constraintWarning:
+        parsed?.complexity?.constraintWarning === null
+          ? null
+          : toStr(parsed?.complexity?.constraintWarning) ||
+            inferConstraintWarning(problemContext, parsed?.complexity?.time),
+    },
+    patterns: normalizeArray(parsed.patterns).map(normalizePattern).slice(0, 6),
+    bugs,
+    metrics: {
+      linesOfCode: clamp(Number(parsed?.metrics?.linesOfCode) || localMetrics.linesOfCode, 0, 5000),
+      cyclomaticComplexity: clamp(
+        Number(parsed?.metrics?.cyclomaticComplexity) || localMetrics.cyclomaticComplexity,
+        1,
+        200,
+      ),
+      nestingDepth: clamp(Number(parsed?.metrics?.nestingDepth) || localMetrics.nestingDepth, 0, 50),
+      variableCount: clamp(Number(parsed?.metrics?.variableCount) || localMetrics.variableCount, 0, 500),
+      branchCount: clamp(Number(parsed?.metrics?.branchCount) || localMetrics.branchCount, 0, 500),
+      readability:
+        ["High", "Medium", "Low"].includes(toStr(parsed?.metrics?.readability))
+          ? toStr(parsed?.metrics?.readability)
+          : localMetrics.readability,
+    },
+    optimization: {
+      hasSuggestion: Boolean(parsed?.optimization?.hasSuggestion),
+      summary: toStr(parsed?.optimization?.summary),
+      complexityChange: toStr(parsed?.optimization?.complexityChange),
+      before: toStr(parsed?.optimization?.before),
+      after: toStr(parsed?.optimization?.after),
+      explanation: toStr(parsed?.optimization?.explanation),
+    },
+    style: normalizeArray(parsed.style).map(normalizeStyle).slice(0, 8),
+    interviewReadiness,
+    similarProblems: normalizeArray(parsed.similarProblems)
+      .map(normalizeSimilarProblem)
+      .slice(0, 6),
+    tags: normalizeArray(parsed.tags).map((tag) => toStr(tag)).filter(Boolean).slice(0, 8),
+    missedEdgeCases: normalizeArray(parsed.missedEdgeCases)
+      .map((item) => toStr(item))
+      .filter(Boolean)
+      .slice(0, 8),
+    provider: toStr(parsed.provider || provider) || "unknown",
+  };
+}
 
-  if (Array.isArray(payload.bugs) && payload.bugs.length > 0) score += 2;
-  if (toStr(payload.time_complexity) && toStr(payload.time_complexity) !== "N/A") {
-    score += 2;
-  }
-  if (
-    toStr(payload.space_complexity) &&
-    toStr(payload.space_complexity) !== "N/A"
-  ) {
-    score += 2;
-  }
-  if (toStr(payload.complexity_reasoning)) score += 1;
-  if (
-    toStr(payload.summary) &&
-    toStr(payload.summary) !== DEFAULT_ANALYSIS_SUMMARY &&
-    !toStr(payload.summary).startsWith("AI response format was invalid")
-  ) {
-    score += 1;
-  }
+export function parseAnalysisResponse({
+  responseText = "",
+  code = "",
+  language = "cpp",
+  problemContext = "",
+  provider = "",
+}) {
+  const parsed = parseJsonObject(responseText);
+  return normalizeAnalysisResult({
+    raw: parsed,
+    code,
+    language,
+    problemContext,
+    provider,
+  });
+}
 
-  const optimization = payload.optimization_suggestion || {};
-  if (
-    toStr(optimization.before) ||
-    toStr(optimization.after) ||
-    toStr(optimization.benefit)
-  ) {
-    score += 1;
-  }
+export function isUsableAnalysis(result) {
+  if (!result || typeof result !== "object") return false;
+  if (result.overallScore > 0 && toStr(result.summary)) return true;
+  if (normalizeArray(result.patterns).length > 0) return true;
+  if (normalizeArray(result.bugs).length > 0) return true;
+  return Boolean(toStr(result.complexity?.time) || toStr(result.complexity?.space));
+}
 
-  return score;
+export function buildAnalysisFailure(raw = "") {
+  return {
+    error: "Analysis failed",
+    raw: stripCodeFences(raw),
+  };
 }

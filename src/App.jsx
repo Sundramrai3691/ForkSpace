@@ -2,7 +2,7 @@ import './App.css'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import Editor from './pages/Editor'
-import SolutionAnalyzer from './pages/SolutionAnalyzer'
+import AnalysePage from './pages/AnalysePage'
 import MockSummaryPage from './pages/MockSummaryPage'
 import SessionReportPage from './pages/SessionReportPage'
 import AnalysisReportsPage from './pages/AnalysisReportsPage'
@@ -22,8 +22,8 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Login />} />
-            <Route path="/analyse" element={<SolutionAnalyzer />} />
-            <Route path="/analysis/:analysisId" element={<SolutionAnalyzer />} />
+            <Route path="/analyse" element={<AnalysePage />} />
+            <Route path="/analysis/:analysisId" element={<AnalysePage />} />
             <Route path="/summary/:summaryId" element={<MockSummaryPage />} />
             <Route path="/report/:shareId" element={<SessionReportPage />} />
             <Route path="/card/:shareId" element={<SessionCardPage />} />

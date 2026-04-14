@@ -57,7 +57,6 @@ function SolutionAnalyzer() {
                 analysis.optimization_suggestion && typeof analysis.optimization_suggestion === 'object'
                     ? analysis.optimization_suggestion
                     : { before: '', after: '', benefit: '' },
-            raw_text: typeof analysis.raw_text === 'string' ? analysis.raw_text.trim() : '',
             summary:
                 typeof analysis.summary === 'string' && analysis.summary.trim()
                     ? analysis.summary.trim()
@@ -241,12 +240,6 @@ function SolutionAnalyzer() {
                                             </div>
                                         </div>
                                         <p className="mt-4 text-sm leading-7 text-amber-900 dark:text-amber-100">{normalizedAnalysis.optimization_suggestion.benefit}</p>
-                                    </div>
-                                ) : null}
-                                {normalizedAnalysis.raw_text ? (
-                                    <div className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Raw AI output</p>
-                                        <pre className="mt-4 whitespace-pre-wrap break-words rounded-2xl bg-stone-50 p-4 text-sm leading-7 text-slate-700 dark:bg-slate-950 dark:text-slate-300">{normalizedAnalysis.raw_text}</pre>
                                     </div>
                                 ) : null}
                             </>
