@@ -304,9 +304,11 @@ function AnalysePage() {
             key: 'overall',
             title: 'Overall Score',
             content: (
-                <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div className="relative h-24 w-24 shrink-0">
-                        <svg className="h-24 w-24 -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                    <div className="rounded-2xl border border-[#30363d] bg-[#0d1117] p-5">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                            <div className="relative h-28 w-28 shrink-0">
+                        <svg className="h-28 w-28 -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
                             <circle cx="40" cy="40" r="32" stroke="#21262d" strokeWidth="8" fill="none" />
                             <circle
                                 cx="40"
@@ -321,21 +323,34 @@ function AnalysePage() {
                                 style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1)' }}
                             />
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-[#e6edf3]">{score}</div>
+                        <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-[#e6edf3]">{score}</div>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b949e]">ForkSpace verdict</p>
+                                <h3 className="mt-2 text-2xl font-semibold text-[#e6edf3]">{displayAnalysis.verdict}</h3>
+                                <p className="mt-3 text-base leading-8 text-[#c9d1d9]">{displayAnalysis.summary}</p>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {displayAnalysis.tags.map((tag) => (
+                                        <span key={tag} className={`rounded-full border px-3 py-1 text-xs ${pillClass('blue')}`}>{tag}</span>
+                                    ))}
+                                    <span className={`rounded-full border px-3 py-1 text-xs ${displayAnalysis.bugs.length ? pillClass('red') : pillClass('green')}`}>
+                                        {displayAnalysis.bugs.length} issues
+                                    </span>
+                                    <span className={`rounded-full border px-3 py-1 text-xs ${displayAnalysis.complexity.timeRating === 'optimal' ? pillClass('green') : pillClass('amber')}`}>
+                                        {displayAnalysis.complexity.timeRating}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-medium text-[#e6edf3]">{displayAnalysis.verdict}</h3>
-                        <p className="mt-2 text-sm leading-7 text-[#8b949e]">{displayAnalysis.summary}</p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            {displayAnalysis.tags.map((tag) => (
-                                <span key={tag} className={`rounded-full border px-3 py-1 text-xs ${pillClass('blue')}`}>{tag}</span>
-                            ))}
-                            <span className={`rounded-full border px-3 py-1 text-xs ${displayAnalysis.bugs.length ? pillClass('red') : pillClass('green')}`}>
-                                {displayAnalysis.bugs.length} issues
-                            </span>
-                            <span className={`rounded-full border px-3 py-1 text-xs ${displayAnalysis.complexity.timeRating === 'optimal' ? pillClass('green') : pillClass('amber')}`}>
-                                {displayAnalysis.complexity.timeRating}
-                            </span>
+                    <div className="grid gap-3">
+                        <div className="rounded-2xl border border-[#30363d] bg-[#0d1117] p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b949e]">Time complexity</p>
+                            <p className="mt-3 text-2xl font-bold text-[#79c0ff]">{displayAnalysis.complexity.time}</p>
+                        </div>
+                        <div className="rounded-2xl border border-[#30363d] bg-[#0d1117] p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b949e]">Space complexity</p>
+                            <p className="mt-3 text-2xl font-bold text-green-400">{displayAnalysis.complexity.space}</p>
                         </div>
                     </div>
                 </div>
@@ -351,15 +366,15 @@ function AnalysePage() {
                             ['TIME COMPLEXITY', displayAnalysis.complexity.time, displayAnalysis.complexity.timeExplanation, displayAnalysis.complexity.timeRating],
                             ['SPACE COMPLEXITY', displayAnalysis.complexity.space, displayAnalysis.complexity.spaceExplanation, displayAnalysis.complexity.spaceRating],
                         ].map(([label, value, explanation, rating]) => (
-                            <div key={label} className="rounded-lg border border-[#21262d] bg-[#0d1117] p-3">
+                            <div key={label} className="rounded-2xl border border-[#21262d] bg-[#0d1117] p-4">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6e7681]">{label}</p>
-                                <p className={`mt-3 font-mono text-2xl ${complexityTone(rating)}`}>{value}</p>
-                                <p className="mt-2 text-[11px] leading-6 text-[#6e7681]">{explanation}</p>
-                                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#161b22]">
-                                    <div
-                                        className={`h-full rounded-full ${rating === 'optimal' ? 'bg-green-400' : rating === 'acceptable' ? 'bg-[#79c0ff]' : 'bg-amber-400'}`}
-                                        style={{ width: `${ratingToFill(rating)}%`, animation: 'barGrow 0.6s ease 0.4s both' }}
-                                    />
+                                <p className={`mt-4 font-mono text-4xl ${complexityTone(rating)}`}>{value}</p>
+                                <span className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs ${rating === 'optimal' ? pillClass('green') : rating === 'acceptable' ? pillClass('blue') : pillClass('amber')}`}>
+                                    {rating}
+                                </span>
+                                <p className="mt-4 text-sm leading-7 text-[#c9d1d9]">{explanation}</p>
+                                <div className="mt-4 rounded-xl border border-[#21262d] bg-[#11161d] px-4 py-3 text-sm text-[#8b949e]">
+                                    Complexity confidence: {ratingToFill(rating)} / 100
                                 </div>
                             </div>
                         ))}
@@ -496,13 +511,19 @@ function AnalysePage() {
                         ].map(([label, value]) => {
                             const [barClass, textClass] = readinessTone(value).split(' ');
                             return (
-                                <div key={label} className="rounded-lg border border-[#21262d] bg-[#0d1117] p-3">
+                                <div key={label} className="rounded-2xl border border-[#21262d] bg-[#0d1117] p-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="text-sm text-[#e6edf3]">{label}</p>
-                                        <span className={`text-sm font-semibold ${textClass}`}>{value}%</span>
+                                        <span className={`text-2xl font-bold ${textClass}`}>{value}%</span>
                                     </div>
-                                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#161b22]">
-                                        <div className={`h-full rounded-full ${barClass}`} style={{ width: `${value}%`, animation: 'barGrow 0.65s ease 0.4s both' }} />
+                                    <div className="mt-4 rounded-xl border border-[#21262d] bg-[#11161d] px-4 py-3">
+                                        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#8b949e]">
+                                            <span>Readiness</span>
+                                            <span>{value >= 80 ? 'Strong' : value >= 60 ? 'Solid' : 'Needs work'}</span>
+                                        </div>
+                                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#161b22]">
+                                            <div className={`h-full rounded-full ${barClass}`} style={{ width: `${value}%`, animation: 'barGrow 0.65s ease 0.4s both' }} />
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -591,7 +612,7 @@ function AnalysePage() {
             </header>
 
             <div className="flex h-[calc(100vh-73px)]">
-                <aside className="flex h-full w-full flex-col border-r border-[#21262d] lg:w-[42%]">
+                <aside className="flex h-full w-full flex-col border-r border-[#21262d] lg:w-[40%] xl:w-[38%]">
                     <div className="overflow-y-auto px-5 py-5">
                         <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
                             <label className="space-y-2">
@@ -617,9 +638,9 @@ function AnalysePage() {
                             </label>
                         </div>
 
-                        <div className="mt-5 flex items-center justify-between text-xs text-[#8b949e]">
+                        <div className="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm text-[#8b949e]">
                             <p>Lines: {lineCount} - Chars: {charCount}</p>
-                            {analysisError ? <p className="max-w-[60%] truncate text-red-400">{analysisError}</p> : null}
+                            {analysisError ? <p className="max-w-full rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 lg:max-w-[70%]">{analysisError}</p> : null}
                         </div>
 
                         <div className="mt-3 min-h-[60vh] rounded-2xl border border-[#21262d] bg-[#0d1117] p-1">

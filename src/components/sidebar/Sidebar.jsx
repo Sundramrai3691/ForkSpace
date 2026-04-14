@@ -35,6 +35,35 @@ function shouldResetImportedSource(sourceUrl = '') {
     }
 }
 
+function splitJoinedSamples(value = '') {
+    return String(value || '')
+        .replace(/\r\n/g, '\n')
+        .trim()
+        .split(/\n\s*\n/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function buildSamplesFromJoinedText(sampleInput = '', sampleOutput = '') {
+    const inputs = splitJoinedSamples(sampleInput);
+    const outputs = splitJoinedSamples(sampleOutput);
+    const total = Math.max(inputs.length, outputs.length);
+    const samples = [];
+
+    for (let index = 0; index < total; index += 1) {
+        const input = inputs[index] || '';
+        const output = outputs[index] || '';
+        if (!input && !output) continue;
+        samples.push({
+            id: `sample-${index + 1}`,
+            input,
+            output,
+        });
+    }
+
+    return samples;
+}
+
 
 
 const SESSION_MODE_OPTIONS = [
@@ -178,7 +207,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
     const [showImportModal, setShowImportModal] = useState(false);
     const [showCfInlineForm, setShowCfInlineForm] = useState(false);
     const [activeTab, setActiveTab] = useState('problem');
-    const [showPromptExample, setShowPromptExample] = useState(true);
     const [problemDraft, setProblemDraft] = useState({
         platform: 'codeforces',
         problemCode: '',
@@ -274,11 +302,6 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
             problemSnapshot: roomState?.problem?.problemSnapshot || null,
         });
     }, [roomState?.problem]);
-
-    useEffect(() => {
-        const hasPrompt = Boolean((problemDraft.prompt || '').trim());
-        setShowPromptExample(hasPrompt);
-    }, [problemDraft.prompt]);
 
     useEffect(() => {
         if (!socketRef?.current || !roomState) return;
@@ -698,42 +721,40 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                     </div>
                                     <div className="grid gap-3">
                                         <div className="rounded-[1.35rem] border border-stone-200/80 bg-stone-50 p-4 dark:border-slate-700/80 dark:bg-[#0d172b]">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPromptExample((v) => !v)}
-                                                className="mb-3 flex w-full items-center justify-between"
-                                            >
-                                                <p className="text-[10px] uppercase tracking-wide text-gray-500">Prompt & example</p>
-                                                {showPromptExample ? (
-                                                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 15l-7-7-7 7" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                            <div className={`overflow-hidden transition-all duration-200 ${showPromptExample ? 'max-h-[600px]' : 'max-h-0'}`}>
-                                                <label className="space-y-1.5">
-                                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                                                        Prompt
-                                                    </span>
-                                                    <textarea
-                                                        value={problemDraft.prompt}
-                                                        onChange={(event) => updateProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
-                                                        placeholder="Paste the statement or the specific prompt you want to discuss."
-                                                        className="h-24 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                                                    />
-                                                </label>
-                                                <div className="mt-3 space-y-3">
+                                            <div className="mb-3 flex items-center justify-between">
+                                                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-600 dark:text-gray-300">Prompt and sample tests</p>
+                                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+                                                    Always visible
+                                                </span>
+                                            </div>
+                                            <label className="space-y-1.5">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                                                    Prompt
+                                                </span>
+                                                <textarea
+                                                    value={problemDraft.prompt}
+                                                    onChange={(event) => updateProblemDraft((prev) => ({ ...prev, prompt: event.target.value }))}
+                                                    placeholder="Paste the full problem statement or the exact prompt you want to solve."
+                                                    className="min-h-[12rem] w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm leading-7 text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                                />
+                                            </label>
+                                            <div className="mt-3 space-y-3">
                                                 <label className="space-y-1.5">
                                                     <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                                         Input
                                                     </span>
                                                     <textarea
                                                         value={problemDraft.sampleInput}
-                                                        onChange={(event) => updateProblemDraft((prev) => ({ ...prev, sampleInput: event.target.value }))}
+                                                        onChange={(event) =>
+                                                            updateProblemDraft((prev) => {
+                                                                const sampleInput = event.target.value;
+                                                                return {
+                                                                    ...prev,
+                                                                    sampleInput,
+                                                                    samples: buildSamplesFromJoinedText(sampleInput, prev.sampleOutput),
+                                                                };
+                                                            })
+                                                        }
                                                         placeholder="Paste the sample input here"
                                                         className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                                     />
@@ -744,12 +765,20 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                                     </span>
                                                     <textarea
                                                         value={problemDraft.sampleOutput}
-                                                        onChange={(event) => updateProblemDraft((prev) => ({ ...prev, sampleOutput: event.target.value }))}
+                                                        onChange={(event) =>
+                                                            updateProblemDraft((prev) => {
+                                                                const sampleOutput = event.target.value;
+                                                                return {
+                                                                    ...prev,
+                                                                    sampleOutput,
+                                                                    samples: buildSamplesFromJoinedText(prev.sampleInput, sampleOutput),
+                                                                };
+                                                            })
+                                                        }
                                                         placeholder="Paste the expected output here"
                                                         className="h-36 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 font-mono text-sm text-stone-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                                     />
                                                 </label>
-                                            </div>
                                             </div>
                                         </div>
                                     </div>

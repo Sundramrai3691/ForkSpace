@@ -1,5 +1,6 @@
 import { useState, useContext, useEffect, useRef } from 'react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { ThemeContext } from '../../../Context/ThemeContext';
 import { Monitor, Sun, Moon } from 'lucide-react';
 import { clearAuthToken, getAuthHeaders, getAuthToken, onAuthChange } from '../../lib/auth';
@@ -44,6 +45,7 @@ function Navbar() {
     const [draftName, setDraftName] = useState('');
     const { theme, setTheme } = useContext(ThemeContext);
     const profileRef = useRef(null);
+    const avatarPickerRef = useRef(null);
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
 
     const closeMenu = () => {
@@ -110,6 +112,14 @@ function Navbar() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        if (!isAvatarPickerOpen) return;
+        avatarPickerRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+        });
+    }, [isAvatarPickerOpen]);
+
     const handleSignOut = () => {
         clearAuthToken();
         setIsProfileOpen(false);
@@ -126,9 +136,10 @@ function Navbar() {
                 { headers: getAuthHeaders() },
             );
             setCurrentUser(response.data.user);
-            setIsAvatarPickerOpen(false);
+            setIsAvatarPickerOpen(true);
+            toast.success('Avatar updated');
         } catch {
-            // Keep menu stable even if update fails.
+            toast.error('Could not update avatar right now');
         }
     };
 
@@ -210,7 +221,7 @@ function Navbar() {
                             </button>
 
                             {isProfileOpen && (
-                                <div className="absolute right-0 top-12 z-20 max-h-[calc(100vh-5rem)] w-[22rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                                <div className="absolute right-0 top-12 z-20 max-h-[min(82vh,44rem)] w-[24rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-lg ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:ring-white/10">
                                     {currentUser ? (
                                         <div className="border-b border-gray-100 px-1 pb-4 dark:border-gray-700">
                                             <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/70">
@@ -303,9 +314,13 @@ function Navbar() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsAvatarPickerOpen((prev) => !prev)}
-                                                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                    className={`block w-full rounded-xl border px-3 py-2 text-left text-sm font-medium transition ${
+                                                        isAvatarPickerOpen
+                                                            ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/60 dark:bg-amber-500/10 dark:text-amber-200'
+                                                            : 'border-transparent text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                                                    }`}
                                                 >
-                                                    Update avatar
+                                                    {isAvatarPickerOpen ? 'Avatar options open' : 'Update avatar'}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -333,7 +348,7 @@ function Navbar() {
                                         )}
                                     </div>
                                     {currentUser && isAvatarPickerOpen && (
-                                        <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+                                        <div ref={avatarPickerRef} className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-700">
                                             <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                                                 Choose avatar
                                             </p>
@@ -345,10 +360,10 @@ function Navbar() {
                                                             key={avatar.id}
                                                             type="button"
                                                             onClick={() => handleAvatarUpdate(avatar.id)}
-                                                            className={`flex h-10 items-center justify-center rounded-xl border transition ${
+                                                            className={`flex h-12 items-center justify-center rounded-xl border transition ${
                                                                 isActive
-                                                                    ? 'border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
-                                                                    : 'border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700'
+                                                                    ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm dark:bg-amber-500/10 dark:text-amber-300'
+                                                                    : 'border-gray-200 bg-white text-gray-700 hover:border-amber-300 hover:bg-amber-50 dark:border-gray-700 dark:bg-slate-900 dark:text-gray-200 dark:hover:bg-gray-700'
                                                             }`}
                                                             title={avatar.name}
                                                         >
@@ -363,7 +378,11 @@ function Navbar() {
                                                         key={avatar.key}
                                                         type="button"
                                                         onClick={() => handleProfileUpdate({ avatar: avatar.key })}
-                                                        className={`rounded-xl border px-2 py-2 text-lg transition ${currentUser.avatar === avatar.key ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10' : 'border-gray-200 dark:border-gray-700'}`}
+                                                        className={`rounded-xl border px-2 py-2 text-lg transition ${
+                                                            currentUser.avatar === avatar.key
+                                                                ? 'border-amber-400 bg-amber-50 shadow-sm dark:bg-amber-500/10'
+                                                                : 'border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50 dark:border-gray-700 dark:bg-slate-900'
+                                                        }`}
                                                     >
                                                         {avatar.emoji}
                                                     </button>

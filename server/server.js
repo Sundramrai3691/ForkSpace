@@ -1969,6 +1969,14 @@ Code to review:
 ${code}
 \`\`\``;
 
+  const toFriendlyAiError = (value = "") => {
+    const text = String(value || "");
+    if (/quota exceeded|rate.?limit|429/i.test(text)) {
+      return "The AI provider is temporarily out of quota. Try again shortly or configure another provider.";
+    }
+    return text || "Unknown error";
+  };
+
   try {
     let review;
     // Priority: Groq -> Gemini -> Mistral
@@ -2050,7 +2058,9 @@ ${code}
     res.json(jsonResponse);
   } catch (error) {
     const errorMsg =
-      error.response?.data?.error?.message || error.message || "Unknown error";
+      toFriendlyAiError(
+        error.response?.data?.error?.message || error.message || "Unknown error",
+      );
     console.error("AI review error:", errorMsg);
     res.status(500).json({
       error: `AI Review failed: ${errorMsg}. Please check your API key and connection.`,
@@ -2086,6 +2096,14 @@ async function handleStandaloneAnalysis(req, res) {
     language,
     problemContext: effectiveProblemContext,
   });
+
+  const toFriendlyAiError = (value = "") => {
+    const text = String(value || "");
+    if (/quota exceeded|rate.?limit|429/i.test(text)) {
+      return "The configured AI provider is out of quota right now. Try again shortly or configure another provider.";
+    }
+    return text || "Unknown error";
+  };
 
   try {
     let lastRawResponse = "";
@@ -2131,7 +2149,9 @@ async function handleStandaloneAnalysis(req, res) {
     });
   } catch (error) {
     const errorMsg =
-      error.response?.data?.error?.message || error.message || "Unknown error";
+      toFriendlyAiError(
+        error.response?.data?.error?.message || error.message || "Unknown error",
+      );
     console.error("Standalone analysis error:", errorMsg);
     return res.status(500).json({
       error: "Analysis failed",

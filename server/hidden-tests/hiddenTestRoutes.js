@@ -89,6 +89,15 @@ function deleteMemory(testId) {
   return false;
 }
 
+async function clearRoomTests(isDatabaseConnected, roomId) {
+  if (!roomId) return;
+  if (isDatabaseConnected()) {
+    await HiddenTest.deleteMany({ roomId });
+    return;
+  }
+  memoryTestsByRoom.set(roomId, []);
+}
+
 export default function createHiddenTestRouter({
   isDatabaseConnected,
   getRoomState,
@@ -178,6 +187,8 @@ export default function createHiddenTestRouter({
 
     const sessionId = roomState?.session?.intelligenceSessionId || "";
     const problemId = problem.problemSnapshot?.internalProblemId || problem.problemCode || "";
+
+    await clearRoomTests(isDatabaseConnected, roomId);
 
     const saved = [];
     for (const item of nextTests) {

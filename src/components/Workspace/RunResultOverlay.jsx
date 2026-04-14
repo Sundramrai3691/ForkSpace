@@ -10,7 +10,7 @@ function formatDuration(seconds) {
 }
 
 function detectComplexity(result) {
-  if (!result) return "Unknown";
+  if (!result) return "Not analysed";
   const match = String(result).match(/O\([^)]+\)/i);
   return match ? match[0] : "Analysing...";
 }
@@ -59,6 +59,7 @@ export default function RunResultOverlay({
   result,
   users = [],
   aiInsight,
+  complexityLabel,
   edgeCases = [],
   approachBoard = { brute: "", optimized: "" },
   onClose,
@@ -71,7 +72,7 @@ export default function RunResultOverlay({
   const isFirstAC = isAC && Number(result?.waCount || 0) > 0;
   const isCleanAC = isAC && Number(result?.runCount || 0) === 1;
   const runnerIsViewer = currentUsername && result?.runBy && currentUsername === result.runBy;
-  const complexity = detectComplexity(aiInsight || `${approachBoard?.optimized || ""} ${approachBoard?.brute || ""}`);
+  const complexity = detectComplexity(complexityLabel || aiInsight || `${approachBoard?.optimized || ""} ${approachBoard?.brute || ""}`);
   const fallbackInsight =
     statusTone === "TLE"
       ? `Your current approach looks heavier than needed. Try aligning to ${estimateNeeded(approachBoard)} and reduce nested passes.`

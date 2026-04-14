@@ -34,6 +34,17 @@ function fallbackPlans() {
   ];
 }
 
+function humanizePlannerWarning(message = "") {
+  const normalized = String(message || "").trim();
+  if (!normalized) {
+    return "Hidden-test planning fell back to safe defaults.";
+  }
+  if (/quota exceeded|rate.?limit|429/i.test(normalized)) {
+    return "AI planner quota is unavailable right now, so ForkSpace used built-in fallback hidden tests instead.";
+  }
+  return normalized;
+}
+
 function normalizePlans(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
@@ -124,10 +135,11 @@ ${sampleIO}
     return {
       plans: fallbackPlans(),
       source: "fallback_request_error",
-      warning:
+      warning: humanizePlannerWarning(
         error?.response?.data?.error?.message ||
         error.message ||
         "Planner failed. Used fallback plans.",
+      ),
     };
   }
 }

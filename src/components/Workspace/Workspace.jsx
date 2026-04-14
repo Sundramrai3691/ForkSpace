@@ -162,10 +162,29 @@ function AIReviewStructuredPanel({ reviewContent }) {
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">{`${reviewContent.time_complexity || "N/A"} Time`}</span>
-                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-900 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200">{`${reviewContent.space_complexity || "N/A"} Space`}</span>
-                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${bugCountTone}`}>{bugs.length > 0 ? `${bugs.length} bugs found` : "Clean"}</span>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem]">
+                <div className="rounded-2xl border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-slate-900/70">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Solution snapshot</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-950/30">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-800 dark:text-amber-200">Time complexity</p>
+                            <p className="mt-2 text-xl font-bold text-amber-950 dark:text-amber-100">{reviewContent.time_complexity || "N/A"}</p>
+                        </div>
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800/50 dark:bg-blue-950/30">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-800 dark:text-blue-200">Space complexity</p>
+                            <p className="mt-2 text-xl font-bold text-blue-950 dark:text-blue-100">{reviewContent.space_complexity || "N/A"}</p>
+                        </div>
+                        <div className={`rounded-xl border px-4 py-3 ${bugCountTone}`}>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em]">Risk count</p>
+                            <p className="mt-2 text-xl font-bold">{bugs.length > 0 ? `${bugs.length} issues` : "Clean"}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white/90 p-4 text-center shadow-sm dark:border-gray-700 dark:bg-slate-900/70">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Overall score</p>
+                    <p className={`mt-3 text-4xl font-black ${scoreTone.split(" ").at(-1)}`}>{score || 74}</p>
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">out of 100</p>
+                </div>
             </div>
 
             {bugs.length > 0 ? (
@@ -384,7 +403,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [showOutputModal, setShowOutputModal] = useState(false);
     const [reviewContent, setReviewContent] = useState(null);
     const [isReviewLoading, setIsReviewLoading] = useState(false);
-    const [isOutputCollapsed, setIsOutputCollapsed] = useState(true);
+    const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
     const [activeRightTab, setActiveRightTab] = useState("output");
     /** Brief highlight after a new report is generated (Output-like priority). */
     const [isNewReport, setIsNewReport] = useState(false);
@@ -1509,14 +1528,22 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const handleUseHiddenTestAsSample = (test) => {
         if (!socketRef?.current || !test) return;
         const input = String(test.input || "").trim();
-        const output = String(test.actualOutput || "").trim();
+        const output = String(test.expectedOutput ?? test.actualOutput ?? "").trim();
         if (!input || !output) {
-            toast.error("Run the test first so input/output is available.");
+            toast.error("This test needs a captured output before it can be added.");
             return;
         }
 
         const baseProblem = roomState?.problem || {};
         const existingSamples = Array.isArray(baseProblem.samples) ? baseProblem.samples : [];
+        const alreadyExists = existingSamples.some(
+            (sample) => String(sample.input || "").trim() === input && String(sample.output || "").trim() === output,
+        );
+        if (alreadyExists) {
+            toast.success("That sample test is already in the brief.");
+            return;
+        }
+
         const nextSamples = [
             ...existingSamples,
             {
@@ -1930,6 +1957,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         avatarId: user.avatarId || "clever-fox",
                     }))}
                     aiInsight={reviewContent?.summary || reviewContent?.complexity_reasoning || null}
+                    complexityLabel={reviewContent?.time_complexity}
                     edgeCases={session.edgeCaseChecklist || []}
                     approachBoard={{ brute: session.mentorNotes || "", optimized: session.approachNotes || "" }}
                     onClose={() => setShowCelebration(false)}
@@ -2103,21 +2131,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                             ))}
                         </div>
                     )}
-                        <button
-                        type="button"
-                        onClick={() => setIsOutputCollapsed((current) => !current)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/92 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
-                        title={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
-                        aria-label={isOutputCollapsed ? 'Show output panel' : 'Hide output panel'}
-                    >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-                            {isOutputCollapsed ? (
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16m0-12v12" />
-                            ) : (
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16M18 6v12" />
-                            )}
-                        </svg>
-                    </button>
                         {problemToolbarMeta && (
                         <div className="hidden min-w-0 max-w-[min(360px,42vw)] flex-col justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-left xl:flex">
                             <span className="truncate text-xs font-semibold text-gray-100">

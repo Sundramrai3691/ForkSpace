@@ -23,8 +23,10 @@ function statusPill(test) {
 }
 
 function TestCard({ test, onDelete, canDelete = true, onUseAsSample }) {
-  const [expanded, setExpanded] = useState(false);
   const status = statusPill(test);
+  const canPromoteToSample = typeof onUseAsSample === "function" && Boolean(
+    String(test.input || "").trim() && String(test.expectedOutput ?? test.actualOutput ?? "").trim(),
+  );
   return (
     <div className="rounded-2xl border border-gray-200/90 bg-white p-4 shadow-sm dark:border-gray-700/80 dark:bg-[#0d172b]">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -55,41 +57,38 @@ function TestCard({ test, onDelete, canDelete = true, onUseAsSample }) {
       <p className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
         {test.description || "Generated test"}
       </p>
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 space-y-3">
         {typeof onUseAsSample === "function" ? (
           <button
             type="button"
             onClick={() => onUseAsSample(test)}
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700/60 dark:bg-emerald-900/25 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
+            disabled={!canPromoteToSample}
+            className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-700/60 dark:bg-emerald-900/25 dark:text-emerald-200 dark:hover:bg-emerald-900/40"
           >
-            Use as sample test
+            {test.isVerified ? "Add to sample tests" : "Add using latest output"}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          {expanded ? "Hide input/output" : "Show input/output"}
-        </button>
-        {expanded ? (
-          <div className="space-y-2">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Input</p>
-              <pre className="mt-1 max-h-32 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{test.input || ""}</pre>
-            </div>
-            {test.isVerified && test.expectedOutput != null ? (
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Expected output</p>
-                <pre className="mt-1 max-h-24 overflow-auto rounded-lg bg-emerald-50 p-2 font-mono text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{test.expectedOutput || ""}</pre>
-              </div>
-            ) : null}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Actual output</p>
-              <pre className="mt-1 max-h-24 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{test.actualOutput || (test.runtimeError ? "(runtime error)" : test.timedOut ? "(timeout)" : "(not run yet)")}</pre>
-            </div>
-          </div>
+        {!canPromoteToSample && typeof onUseAsSample === "function" ? (
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            Run this test once to capture output before adding it into sample tests.
+          </p>
         ) : null}
+        <div className="grid gap-2 lg:grid-cols-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Input</p>
+            <pre className="mt-1 max-h-32 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{test.input || ""}</pre>
+          </div>
+          {test.isVerified && test.expectedOutput != null ? (
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Expected output</p>
+              <pre className="mt-1 max-h-32 overflow-auto rounded-lg bg-emerald-50 p-2 font-mono text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{test.expectedOutput || ""}</pre>
+            </div>
+          ) : null}
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Actual output</p>
+            <pre className="mt-1 max-h-32 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{test.actualOutput || (test.runtimeError ? "(runtime error)" : test.timedOut ? "(timeout)" : "(not run yet)")}</pre>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -99,13 +99,19 @@ export default function SessionIntelligenceReportDashboard({
                         </h2>
                         <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600 dark:text-gray-400">{subtitle}</p>
                     </div>
-                    <div className="min-w-[7.5rem] rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white px-4 py-3 text-right shadow-sm dark:border-amber-900/45 dark:from-amber-950/30 dark:to-slate-900/70">
+                    <div className="min-w-[11rem] rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-100/60 px-5 py-4 text-right shadow-sm dark:border-amber-900/45 dark:from-amber-950/30 dark:via-slate-900/70 dark:to-slate-900/70">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
                             Session score
                         </p>
-                        <p className="mt-1 text-3xl font-extrabold leading-none text-amber-900 dark:text-amber-100">
+                        <p className="mt-2 text-5xl font-extrabold leading-none text-amber-900 dark:text-amber-100">
                             {report.sessionScore}
                         </p>
+                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-amber-200/80 dark:bg-amber-950/50">
+                            <div
+                                className="h-full rounded-full bg-amber-500"
+                                style={{ width: `${Math.max(0, Math.min(100, Number(report.sessionScore) || 0))}%` }}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
