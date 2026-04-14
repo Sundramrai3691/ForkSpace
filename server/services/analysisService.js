@@ -41,6 +41,14 @@ function toStr(value) {
   return value == null ? "" : String(value).trim();
 }
 
+function isNoiseString(value) {
+  const text = toStr(value);
+  if (!text) return true;
+  if ([...text].every((char) => '[]{}",:'.includes(char))) return true;
+  if (/^(?:bugs?|issues?|edge cases?)$/i.test(text)) return true;
+  return false;
+}
+
 function stripCodeFences(text) {
   return text
     .replace(/```json/gi, "")
@@ -50,10 +58,13 @@ function stripCodeFences(text) {
 }
 
 function dedupeStrings(values = [], limit = 6) {
-  return [...new Set(values.map((value) => toStr(value)).filter(Boolean))].slice(
-    0,
-    limit,
-  );
+  return [
+    ...new Set(
+      values
+        .map((value) => toStr(value))
+        .filter((value) => !isNoiseString(value)),
+    ),
+  ].slice(0, limit);
 }
 
 function tryParseJson(candidate) {
@@ -230,4 +241,40 @@ export function buildFallbackAnalysis(rawReview = "") {
     },
     rawReview,
   );
+}
+
+export function scoreAnalysisPayload(payload) {
+  if (!payload || typeof payload !== "object") return 0;
+
+  let score = 0;
+
+  if (Array.isArray(payload.bugs) && payload.bugs.length > 0) score += 2;
+  if (toStr(payload.time_complexity) && toStr(payload.time_complexity) !== "N/A") {
+    score += 2;
+  }
+  if (
+    toStr(payload.space_complexity) &&
+    toStr(payload.space_complexity) !== "N/A"
+  ) {
+    score += 2;
+  }
+  if (toStr(payload.complexity_reasoning)) score += 1;
+  if (
+    toStr(payload.summary) &&
+    toStr(payload.summary) !== DEFAULT_ANALYSIS_SUMMARY &&
+    !toStr(payload.summary).startsWith("AI response format was invalid")
+  ) {
+    score += 1;
+  }
+
+  const optimization = payload.optimization_suggestion || {};
+  if (
+    toStr(optimization.before) ||
+    toStr(optimization.after) ||
+    toStr(optimization.benefit)
+  ) {
+    score += 1;
+  }
+
+  return score;
 }

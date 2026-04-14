@@ -41,6 +41,7 @@ import {
   buildAnalysisPrompt,
   buildFallbackAnalysis,
   parseAnalysisReview,
+  scoreAnalysisPayload,
   sanitizeAnalysisPayload,
 } from "./services/analysisService.js";
 import {
@@ -2032,49 +2033,56 @@ app.post("/api/analysis", aiLimiter, async (req, res) => {
   const analysisPrompt = buildAnalysisPrompt({ code, language, prompt });
 
   try {
-    let review = "";
+    let bestReview = "";
+    let bestParsed = null;
+    let bestScore = -1;
+    const analysisProviders = [
+      ["groq", groqKey],
+      ["gemini", geminiKey],
+      ["mistral", mistralKey],
+    ].filter(([, key]) => Boolean(key));
 
-    if (geminiKey) {
+    for (const [provider, key] of analysisProviders) {
       try {
-        review = await getAiReview(analysisPrompt, geminiKey, "gemini");
+        const review = await getAiReview(analysisPrompt, key, provider);
+        if (!review) continue;
+
+        const parsedRaw = parseAnalysisReview(review);
+        const parsed = parsedRaw
+          ? sanitizeAnalysisPayload(parsedRaw, review)
+          : buildFallbackAnalysis(review);
+        const score = scoreAnalysisPayload(parsed);
+
+        if (score > bestScore) {
+          bestReview = review;
+          bestParsed = parsed;
+          bestScore = score;
+        }
+
+        if (score >= 5) {
+          break;
+        }
       } catch {
-        console.warn("Gemini failed for analysis, falling back");
+        console.warn(`${provider} failed for analysis, falling back`);
       }
     }
 
-    if (!review && groqKey) {
-      try {
-        review = await getAiReview(analysisPrompt, groqKey, "groq");
-      } catch {
-        console.warn("Groq failed for analysis, falling back");
-      }
-    }
-
-    if (!review && mistralKey) {
-      review = await getAiReview(analysisPrompt, mistralKey, "mistral");
-    }
-
-    if (!review) {
+    if (!bestReview) {
       return res.status(500).json({
         error: "All configured AI providers failed or returned an empty response.",
       });
     }
 
-    const parsedRaw = parseAnalysisReview(review);
-    const parsed = parsedRaw
-      ? sanitizeAnalysisPayload(parsedRaw, review)
-      : buildFallbackAnalysis(review);
-
     const analysis = await Analysis.create({
       code,
       language,
       prompt,
-      result: parsed,
+      result: bestParsed,
     });
 
     res.status(201).json({
       analysisId: analysis._id.toString(),
-      analysis: parsed,
+      analysis: bestParsed,
     });
   } catch (error) {
     const errorMsg =
