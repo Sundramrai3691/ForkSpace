@@ -488,13 +488,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         return () => window.clearInterval(intervalId);
     }, [showClearConfirmModal]);
 
-    useEffect(() => {
-        if (!partnerUser?.username) return;
-        setPartnerLastActivity((current) => current[partnerUser.username]
-            ? current
-            : { ...current, [partnerUser.username]: Date.now() });
-    }, [partnerUser?.username]);
-
     useEffect(() => () => {
         if (clearUndoTimeoutRef.current) {
             window.clearTimeout(clearUndoTimeoutRef.current);
@@ -620,6 +613,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const partnerIdle = partnerUser?.username
         ? activityClock - (partnerLastActivity[partnerUser.username] || activityClock) >= 180000
         : false;
+
+    useEffect(() => {
+        if (!partnerUser?.username) return;
+        setPartnerLastActivity((current) => current[partnerUser.username]
+            ? current
+            : { ...current, [partnerUser.username]: Date.now() });
+    }, [partnerUser?.username]);
 
     const canEdit =
         isMentoringMode

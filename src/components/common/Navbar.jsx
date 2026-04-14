@@ -210,12 +210,12 @@ function Navbar() {
                             </button>
 
                             {isProfileOpen && (
-                                <div className="absolute right-0 top-12 z-20 w-56 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                                <div className="absolute right-0 top-12 z-20 max-h-[calc(100vh-5rem)] w-[22rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                                     {currentUser ? (
-                                        <div className="border-b border-gray-100 px-2 pb-3 dark:border-gray-700">
-                                            <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/70">
+                                        <div className="border-b border-gray-100 px-1 pb-4 dark:border-gray-700">
+                                            <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/70">
                                                 <div className="flex items-start gap-3">
-                                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-3xl dark:bg-amber-500/10">
+                                                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-4xl dark:bg-amber-500/10">
                                                         {PROFILE_AVATARS.find((avatar) => avatar.key === currentUser.avatar)?.emoji || '🧑‍💻'}
                                                     </div>
                                                     <div className="min-w-0 flex-1">
@@ -240,16 +240,16 @@ function Navbar() {
                                                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{getRatingLabel(currentUser.forkspaceRating)}</p>
                                                     </div>
                                                 </div>
-                                                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                                                    <div className="rounded-xl bg-white px-2 py-2 dark:bg-slate-950">
+                                                <div className="mt-4 grid grid-cols-3 gap-2.5 text-center text-xs">
+                                                    <div className="rounded-xl bg-white px-2 py-2.5 dark:bg-slate-950">
                                                         <p className="font-semibold text-gray-900 dark:text-white">{currentUser.totalSessions ?? 0}</p>
                                                         <p className="text-gray-500">sessions</p>
                                                     </div>
-                                                    <div className="rounded-xl bg-white px-2 py-2 dark:bg-slate-950">
+                                                    <div className="rounded-xl bg-white px-2 py-2.5 dark:bg-slate-950">
                                                         <p className="font-semibold text-gray-900 dark:text-white">{currentUser.problemsAttempted ?? 0}</p>
                                                         <p className="text-gray-500">problems</p>
                                                     </div>
-                                                    <div className="rounded-xl bg-white px-2 py-2 dark:bg-slate-950">
+                                                    <div className="rounded-xl bg-white px-2 py-2.5 dark:bg-slate-950">
                                                         <p className="font-semibold text-gray-900 dark:text-white">{currentUser.currentStreak ?? 0} 🔥</p>
                                                         <p className="text-gray-500">streak</p>
                                                     </div>
@@ -262,9 +262,9 @@ function Navbar() {
                                                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-200">+{(currentUser.titles || []).length - 3} more</span>
                                                     ) : null}
                                                 </div>
-                                                <div className="mt-3 grid grid-cols-12 gap-1">
+                                                <div className="mt-4 grid grid-cols-12 gap-1.5">
                                                     {buildActivityGrid(currentUser.activityLog).map((cell) => (
-                                                        <span key={cell.key} className={`h-2.5 rounded-[3px] border ${cell.active ? 'border-amber-400 bg-amber-400/90' : 'border-gray-300 bg-transparent dark:border-gray-700'}`} title={cell.key} />
+                                                        <span key={cell.key} className={`h-3 rounded-[4px] border ${cell.active ? 'border-amber-400 bg-amber-400/90' : 'border-gray-300 bg-transparent dark:border-gray-700'}`} title={cell.key} />
                                                     ))}
                                                 </div>
                                             </div>
