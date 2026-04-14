@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./public/favicon-dark.svg" alt="ForkSpace Logo" width="96" height="96" />
+<img src="./public/favicon-dark.png" alt="ForkSpace Logo" width="96" height="96" />
 
 # ForkSpace
 
