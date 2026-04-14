@@ -6,11 +6,42 @@ import { clearAuthToken, getAuthHeaders, getAuthToken, onAuthChange } from '../.
 import AvatarGlyph from './AvatarGlyph';
 import { AVATARS, getAvatarById } from '../../lib/avatars';
 
+const PROFILE_AVATARS = [
+    { key: 'dev1', emoji: '🧑‍💻' },
+    { key: 'dev2', emoji: '👾' },
+    { key: 'dev3', emoji: '🤖' },
+    { key: 'dev4', emoji: '🦊' },
+    { key: 'dev5', emoji: '🐧' },
+    { key: 'dev6', emoji: '🦅' },
+    { key: 'dev7', emoji: '🐉' },
+    { key: 'dev8', emoji: '⚡' },
+];
+
+function getRatingLabel(rating = 1000) {
+    if (rating > 2100) return 'Grandmaster';
+    if (rating >= 1800) return 'Master';
+    if (rating >= 1500) return 'Expert';
+    if (rating >= 1200) return 'Coder';
+    return 'Novice';
+}
+
+function buildActivityGrid(activityLog = []) {
+    const activeDays = new Set((activityLog || []).map((entry) => new Date(entry.date).toISOString().slice(0, 10)));
+    return Array.from({ length: 84 }, (_, index) => {
+        const day = new Date();
+        day.setDate(day.getDate() - (83 - index));
+        const key = day.toISOString().slice(0, 10);
+        return { key, active: activeDays.has(key) };
+    });
+}
+
 function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [draftName, setDraftName] = useState('');
     const { theme, setTheme } = useContext(ThemeContext);
     const profileRef = useRef(null);
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
@@ -49,6 +80,7 @@ function Navbar() {
                     headers: getAuthHeaders(),
                 });
                 setCurrentUser(response.data.user);
+                setDraftName(response.data.user?.name || '');
             } catch {
                 clearAuthToken();
                 setCurrentUser(null);
@@ -97,6 +129,22 @@ function Navbar() {
             setIsAvatarPickerOpen(false);
         } catch {
             // Keep menu stable even if update fails.
+        }
+    };
+
+    const handleProfileUpdate = async (updates = {}) => {
+        if (!currentUser) return;
+        try {
+            const response = await axios.patch(
+                `${serverUrl}/api/auth/profile`,
+                updates,
+                { headers: getAuthHeaders() },
+            );
+            setCurrentUser(response.data.user);
+            setDraftName(response.data.user?.name || '');
+            setIsEditingName(false);
+        } catch {
+            // keep UI stable
         }
     };
 
@@ -165,8 +213,61 @@ function Navbar() {
                                 <div className="absolute right-0 top-12 z-20 w-56 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                                     {currentUser ? (
                                         <div className="border-b border-gray-100 px-2 pb-3 dark:border-gray-700">
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{currentUser.name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.email}</p>
+                                            <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/70">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-3xl dark:bg-amber-500/10">
+                                                        {PROFILE_AVATARS.find((avatar) => avatar.key === currentUser.avatar)?.emoji || '🧑‍💻'}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        {isEditingName ? (
+                                                            <input
+                                                                value={draftName}
+                                                                onChange={(event) => setDraftName(event.target.value)}
+                                                                onBlur={() => handleProfileUpdate({ name: draftName })}
+                                                                onKeyDown={(event) => {
+                                                                    if (event.key === 'Enter') handleProfileUpdate({ name: draftName });
+                                                                }}
+                                                                className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm font-semibold text-gray-900 dark:border-gray-600 dark:bg-slate-950 dark:text-white"
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <button type="button" onClick={() => setIsEditingName(true)} className="text-left text-sm font-semibold text-gray-900 dark:text-white">
+                                                                {currentUser.name}
+                                                            </button>
+                                                        )}
+                                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{currentUser.email}</p>
+                                                        <p className="mt-2 text-2xl font-bold text-amber-500">{currentUser.forkspaceRating ?? 1000}</p>
+                                                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{getRatingLabel(currentUser.forkspaceRating)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                                                    <div className="rounded-xl bg-white px-2 py-2 dark:bg-slate-950">
+                                                        <p className="font-semibold text-gray-900 dark:text-white">{currentUser.totalSessions ?? 0}</p>
+                                                        <p className="text-gray-500">sessions</p>
+                                                    </div>
+                                                    <div className="rounded-xl bg-white px-2 py-2 dark:bg-slate-950">
+                                                        <p className="font-semibold text-gray-900 dark:text-white">{currentUser.problemsAttempted ?? 0}</p>
+                                                        <p className="text-gray-500">problems</p>
+                                                    </div>
+                                                    <div className="rounded-xl bg-white px-2 py-2 dark:bg-slate-950">
+                                                        <p className="font-semibold text-gray-900 dark:text-white">{currentUser.currentStreak ?? 0} 🔥</p>
+                                                        <p className="text-gray-500">streak</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                                    {(currentUser.titles || []).slice(0, 3).map((title) => (
+                                                        <span key={title} className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">{title}</span>
+                                                    ))}
+                                                    {(currentUser.titles || []).length > 3 ? (
+                                                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-200">+{(currentUser.titles || []).length - 3} more</span>
+                                                    ) : null}
+                                                </div>
+                                                <div className="mt-3 grid grid-cols-12 gap-1">
+                                                    {buildActivityGrid(currentUser.activityLog).map((cell) => (
+                                                        <span key={cell.key} className={`h-2.5 rounded-[3px] border ${cell.active ? 'border-amber-400 bg-amber-400/90' : 'border-gray-300 bg-transparent dark:border-gray-700'}`} title={cell.key} />
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="border-b border-gray-100 px-2 pb-3 dark:border-gray-700">
@@ -255,6 +356,18 @@ function Navbar() {
                                                         </button>
                                                     );
                                                 })}
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-4 gap-2">
+                                                {PROFILE_AVATARS.map((avatar) => (
+                                                    <button
+                                                        key={avatar.key}
+                                                        type="button"
+                                                        onClick={() => handleProfileUpdate({ avatar: avatar.key })}
+                                                        className={`rounded-xl border px-2 py-2 text-lg transition ${currentUser.avatar === avatar.key ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10' : 'border-gray-200 dark:border-gray-700'}`}
+                                                    >
+                                                        {avatar.emoji}
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
                                     )}

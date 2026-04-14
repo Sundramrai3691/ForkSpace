@@ -3,6 +3,13 @@
  * Visual dashboard for Session Intelligence report data (embedded + share page).
  * Presentational only — same fields as API report object.
  */
+import {
+    PolarAngleAxis,
+    PolarGrid,
+    Radar,
+    RadarChart,
+    ResponsiveContainer,
+} from 'recharts';
 
 /** Remove duplicate lines while preserving order (backend can repeat filler lines). */
 function dedupeStrings(list) {
@@ -34,6 +41,7 @@ function SectionDivider({ label }) {
 
 export default function SessionIntelligenceReportDashboard({
     report,
+    previousReport = null,
     title = 'Practice session',
     subtitle = 'Based on runs, checklist, and reviews in this session.',
     variant = 'embedded',
@@ -50,6 +58,33 @@ export default function SessionIntelligenceReportDashboard({
     const gaps = dedupeStrings(report.biggestGaps);
     const steps = dedupeStrings(report.nextSteps);
     const targets = dedupeStrings(report.nextPracticeTargets);
+    const toRadarMetrics = (source) => {
+        if (!source) return null;
+        const stats = source.stats || {};
+        const score = Number(source.sessionScore) || 0;
+        const speed = Math.max(20, Math.min(100, 100 - Math.min(70, Math.round((Number(stats.firstSubmitMs || 0) / 60000) * 2))));
+        const correctness = Math.max(15, Math.min(100, score + (Number(stats.sampleSuitePassCount || 0) * 4) - (Number(stats.sampleMismatchCount || 0) * 8)));
+        const codeQuality = Math.max(20, Math.min(100, score + (Number(stats.aiReviewCount || 0) * 3) - (Number(stats.compileErrors || 0) * 6)));
+        const edgeCoverage = Math.max(20, Math.min(100, score + ((source.issueLabels || []).includes('edge_case') ? -10 : 6)));
+        const complexityHandling = Math.max(20, Math.min(100, score + ((source.issueLabels || []).includes('complexity') ? -8 : 7)));
+        return { speed, correctness, codeQuality, edgeCoverage, complexityHandling };
+    };
+    const currentRadar = toRadarMetrics(report);
+    const previousRadar = toRadarMetrics(previousReport);
+    const radarData = currentRadar ? [
+        { subject: 'Speed', current: currentRadar.speed, previous: previousRadar?.speed ?? 0 },
+        { subject: 'Correctness', current: currentRadar.correctness, previous: previousRadar?.correctness ?? 0 },
+        { subject: 'Code Quality', current: currentRadar.codeQuality, previous: previousRadar?.codeQuality ?? 0 },
+        { subject: 'Edge Case Coverage', current: currentRadar.edgeCoverage, previous: previousRadar?.edgeCoverage ?? 0 },
+        { subject: 'Complexity Handling', current: currentRadar.complexityHandling, previous: previousRadar?.complexityHandling ?? 0 },
+    ] : [];
+    const deltaRows = previousRadar ? [
+        ['Speed', currentRadar.speed - previousRadar.speed],
+        ['Correctness', currentRadar.correctness - previousRadar.correctness],
+        ['Code Quality', currentRadar.codeQuality - previousRadar.codeQuality],
+        ['Edge Case Coverage', currentRadar.edgeCoverage - previousRadar.edgeCoverage],
+        ['Complexity Handling', currentRadar.complexityHandling - previousRadar.complexityHandling],
+    ].filter(([, delta]) => Math.abs(delta) >= 5) : [];
 
     return (
         <div className={`${shell} ${pad} space-y-1`}>
@@ -73,6 +108,47 @@ export default function SessionIntelligenceReportDashboard({
                         </p>
                     </div>
                 </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200/80 bg-white/90 px-5 py-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/65 sm:px-6">
+                <div className="mx-auto h-[260px] w-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={radarData}>
+                            <PolarGrid stroke="#334155" strokeOpacity={0.4} />
+                            <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                            {previousRadar ? (
+                                <Radar
+                                    dataKey="previous"
+                                    stroke="#3b82f6"
+                                    fill="#3b82f6"
+                                    fillOpacity={0.3}
+                                    strokeDasharray="4 4"
+                                />
+                            ) : null}
+                            <Radar
+                                dataKey="current"
+                                stroke="#f59e0b"
+                                fill="#f59e0b"
+                                fillOpacity={0.6}
+                            />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                </div>
+                {previousRadar ? (
+                    <div className="mt-4 flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />This session</span>
+                        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />Last session</span>
+                    </div>
+                ) : null}
+                {deltaRows.length ? (
+                    <div className="mt-4 space-y-2">
+                        {deltaRows.map(([label, delta]) => (
+                            <p key={label} className={`text-sm ${delta > 0 ? 'text-green-500' : 'text-red-400'}`}>
+                                {delta > 0 ? '↑' : '↓'} {label} {delta > 0 ? '+' : ''}{delta}% from last session
+                            </p>
+                        ))}
+                    </div>
+                ) : null}
             </div>
 
             {/* Insight — blue */}

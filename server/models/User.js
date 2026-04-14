@@ -6,6 +6,20 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   avatarId: { type: String, default: "clever-fox" },
+  forkspaceRating: { type: Number, default: 1000 },
+  totalSessions: { type: Number, default: 0 },
+  problemsAttempted: { type: Number, default: 0 },
+  currentStreak: { type: Number, default: 0 },
+  lastActiveDate: { type: Date, default: null },
+  titles: [{ type: String }],
+  avatar: { type: String, default: "dev1" },
+  sessionsAsNavigator: { type: Number, default: 0 },
+  activityLog: [
+    {
+      date: { type: Date, default: Date.now },
+      sessionId: { type: String, default: "" },
+    },
+  ],
   roomHistory: [
     {
       roomId: String,

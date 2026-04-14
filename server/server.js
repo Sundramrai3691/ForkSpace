@@ -36,6 +36,7 @@ import {
   listReportsForUser,
   getLatestReportForRoom,
 } from "./services/sessionIntelligence.js";
+import { checkAndAwardTitles } from "./services/titleService.js";
 import { generateSessionCard } from "./services/sessionCard.js";
 import {
   buildAnalysisFailure,
@@ -101,6 +102,28 @@ function safeVerifyJwt(token) {
   } catch {
     return null;
   }
+}
+
+function buildUserPayload(user) {
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    avatarId: user.avatarId,
+    forkspaceRating: user.forkspaceRating ?? 1000,
+    totalSessions: user.totalSessions ?? 0,
+    problemsAttempted: user.problemsAttempted ?? 0,
+    currentStreak: user.currentStreak ?? 0,
+    lastActiveDate: user.lastActiveDate || null,
+    titles: user.titles || [],
+    avatar: user.avatar || "dev1",
+    activityLog: user.activityLog || [],
+    sessionsAsNavigator: user.sessionsAsNavigator ?? 0,
+  };
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 const configuredOrigins = [
@@ -232,7 +255,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
+      user: buildUserPayload(user),
     });
   } catch (err) {
     console.error("Registration error details:", err);
@@ -266,7 +289,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
+      user: buildUserPayload(user),
     });
   } catch (err) {
     console.error("Login error details:", err);
@@ -287,7 +310,7 @@ app.get("/api/auth/me", async (req, res) => {
     if (!user) return res.status(401).json({ error: "Unauthorized" });
 
     res.json({
-      user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
+      user: buildUserPayload(user),
     });
   } catch (err) {
     res.status(401).json({ error: "Unauthorized" });
@@ -322,7 +345,30 @@ app.patch("/api/auth/avatar", async (req, res) => {
   await user.save();
 
   return res.json({
-    user: { id: user._id, name: user.name, email: user.email, avatarId: user.avatarId },
+    user: buildUserPayload(user),
+  });
+});
+
+app.patch("/api/auth/profile", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  if (!user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const nextName = String(req.body?.name || "").trim();
+  const nextAvatar = String(req.body?.avatar || "").trim();
+
+  if (nextName) {
+    user.name = nextName.slice(0, 60);
+  }
+  if (nextAvatar) {
+    user.avatar = nextAvatar;
+  }
+
+  await user.save();
+
+  return res.json({
+    user: buildUserPayload(user),
   });
 });
 
@@ -2635,6 +2681,14 @@ app.post("/api/session-intelligence/report", async (req, res) => {
 
   let report = aggregateSessionReport(logDoc, filter);
   report = await enrichReportWithHiddenTestSignals({ roomId, sessionId, report });
+  let previousReport = null;
+  if (user?._id) {
+    const existingReports = await listReportsForUser(
+      isDatabaseConnected,
+      String(user._id),
+    );
+    previousReport = existingReports?.[0]?.report || null;
+  }
   let shareId = null;
   if (saveShare !== false && saveShare !== "false") {
     shareId = await saveShareableReport(isDatabaseConnected, {
@@ -2644,6 +2698,46 @@ app.post("/api/session-intelligence/report", async (req, res) => {
       problemTitle: report.problemTitle,
       report,
     });
+  }
+
+  let newTitle = null;
+  if (user) {
+    const today = new Date();
+    const priorDate = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
+    const diffDays = priorDate
+      ? Math.floor((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - Date.UTC(priorDate.getUTCFullYear(), priorDate.getUTCMonth(), priorDate.getUTCDate())) / 86400000)
+      : null;
+    const nextStreak = diffDays === null
+      ? 1
+      : diffDays === 0
+        ? Math.max(1, user.currentStreak || 1)
+        : diffDays === 1
+          ? (user.currentStreak || 0) + 1
+          : 1;
+    const solvedScore = Number(report.sessionScore || 0);
+    const cfProblemRating = Number(report.problemRating || roomState?.problem?.rating || 0) || 0;
+    const solvedInMinutes = report.stats?.firstSubmitMs
+      ? Math.round(report.stats.firstSubmitMs / 60000)
+      : null;
+    const halfTimeLimitMinutes = Number(roomState?.problem?.timeLimitMinutes || 0) / 2 || null;
+    const timeBonus = halfTimeLimitMinutes && solvedInMinutes && solvedInMinutes <= halfTimeLimitMinutes ? 10 : 0;
+    const cfBonus = cfProblemRating >= 1600 ? 25 : 0;
+    user.forkspaceRating = clampNumber(
+      Math.round((user.forkspaceRating || 1000) + (solvedScore - 60) * 1.5 + cfBonus + timeBonus),
+      600,
+      3000,
+    );
+    user.totalSessions = (user.totalSessions || 0) + 1;
+    user.problemsAttempted = (user.problemsAttempted || 0) + 1;
+    user.currentStreak = nextStreak;
+    user.lastActiveDate = today;
+    user.activityLog = [...(user.activityLog || []), { date: today, sessionId }].slice(-84);
+    await user.save();
+    const awarded = await checkAndAwardTitles(String(user._id), {
+      solvedInMinutes,
+      cfProblemRating,
+    });
+    newTitle = awarded.newTitle;
   }
 
   if (endSession === true || endSession === "true") {
@@ -2663,7 +2757,7 @@ app.post("/api/session-intelligence/report", async (req, res) => {
     io.to(roomId).emit("session-update", { session: roomState.session });
   }
 
-  return res.json({ report, shareId, sessionId });
+  return res.json({ report, shareId, sessionId, previousReport, newTitle, user: user ? buildUserPayload(user) : null });
 });
 
 app.get("/api/session-intelligence/report/:shareId", async (req, res) => {
@@ -2674,10 +2768,16 @@ app.get("/api/session-intelligence/report/:shareId", async (req, res) => {
   if (!doc) {
     return res.status(404).json({ error: "Report not found" });
   }
+  let previousReport = null;
+  if (doc.userId) {
+    const rows = await listReportsForUser(isDatabaseConnected, String(doc.userId));
+    previousReport = rows.find((row) => row.shareId !== doc.shareId)?.report || null;
+  }
   return res.json({
     shareId: doc.shareId,
     problemTitle: doc.problemTitle,
     report: doc.report,
+    previousReport,
     createdAt: doc.createdAt,
   });
 });

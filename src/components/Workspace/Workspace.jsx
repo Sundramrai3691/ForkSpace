@@ -1,10 +1,11 @@
 /* eslint-disable react/prop-types */
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router";
 import Codemirror from "codemirror";
 import axios from "axios";
 import toast from "react-hot-toast";
+import confetti from "canvas-confetti";
+import { toPng } from "html-to-image";
 import "codemirror/lib/codemirror.css";
 import "codemirror/theme/dracula.css";
 import "codemirror/mode/javascript/javascript";
@@ -66,6 +67,136 @@ function OutputSection({ tone, title, children }) {
                 <span className="font-medium">{title}</span>
             </div>
             <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{children}</pre>
+        </div>
+    );
+}
+
+function ProgressiveSampleSuiteResults({ allPass, summary, results = [] }) {
+    const [visibleCount, setVisibleCount] = useState(0);
+
+    useEffect(() => {
+        setVisibleCount(0);
+        const timers = results.map((_, index) => window.setTimeout(() => {
+            setVisibleCount((current) => Math.max(current, index + 1));
+        }, index * 200));
+
+        return () => timers.forEach((timerId) => window.clearTimeout(timerId));
+    }, [results]);
+
+    return (
+        <div className="space-y-3 text-sm">
+            <OutputSection tone={allPass ? "success" : "warning"} title="Sample suite">
+                {`Passed ${summary?.passed ?? 0} / ${summary?.total ?? 0}`}
+            </OutputSection>
+            {results.slice(0, visibleCount).map((r, index) => {
+                const passed = Boolean(r.passed);
+                return (
+                    <div
+                        key={r.id || r.index}
+                        className={`rounded-lg border p-3 opacity-0 ${passed ? "border-green-300/50" : "border-red-300/40"} ${passed ? "workspace-sample-pass" : "workspace-sample-fail"}`}
+                        style={{
+                            animation: `sampleReveal 150ms ease ${index * 10}ms forwards, ${passed ? "samplePassFlash" : "sampleFailFlash"} 400ms ease forwards`,
+                        }}
+                    >
+                        <p className="font-semibold text-gray-900 dark:text-white">Test {r.index}{passed ? " ✓" : " ✗"}</p>
+                        {r.compile_output ? (
+                            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-gray-800 dark:text-gray-200">{r.compile_output}</pre>
+                        ) : null}
+                        {r.stderr ? (
+                            <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-red-700 dark:text-red-300">{r.stderr}</pre>
+                        ) : null}
+                        {!passed && !r.compile_output && !r.stderr ? (
+                            <div className="mt-2">
+                                <ComparisonPanel expectedOutput={r.expectedOutput} actualOutput={r.actualOutput} />
+                            </div>
+                        ) : null}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function AIReviewBugCard({ bug, defaultOpen = false }) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    const title = typeof bug === "string" ? bug : bug?.title || bug?.explanation || "Potential issue";
+    const explanation = typeof bug === "string" ? bug : bug?.explanation || bug?.description || "";
+    const codeSnippet = typeof bug === "object" ? bug?.code || bug?.fix || "" : "";
+
+    return (
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white/90 shadow-sm dark:border-gray-700 dark:bg-slate-900/70">
+            <button
+                type="button"
+                onClick={() => setIsOpen((current) => !current)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            >
+                <div className="flex min-w-0 items-center gap-3">
+                    <span className="text-base">🐛</span>
+                    <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{title}</p>
+                </div>
+                <span className={`text-xs text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}>⌄</span>
+            </button>
+            <div
+                className="overflow-hidden transition-[max-height] duration-200 ease-out"
+                style={{ maxHeight: isOpen ? "280px" : "0px" }}
+            >
+                <div className="space-y-3 border-t border-gray-200 px-4 py-3 text-sm text-slate-600 dark:border-gray-700 dark:text-slate-300">
+                    {explanation ? <p>{explanation}</p> : null}
+                    {codeSnippet ? (
+                        <pre className="overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-slate-200">{codeSnippet}</pre>
+                    ) : null}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function AIReviewStructuredPanel({ reviewContent }) {
+    if (!reviewContent) return null;
+
+    const bugs = Array.isArray(reviewContent.bugs) ? reviewContent.bugs : [];
+    const optimization = reviewContent.optimization_suggestion || reviewContent.optimization || null;
+    const score = Number(reviewContent.overallScore || reviewContent.score || 0);
+    const bugCountTone = bugs.length > 0 ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-300" : "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-300";
+    const scoreTone = score >= 80 ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-950/30 dark:text-green-300" : score >= 60 ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-300" : "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-300";
+
+    return (
+        <div className="space-y-5">
+            <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">{`${reviewContent.time_complexity || "N/A"} Time`}</span>
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-900 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-200">{`${reviewContent.space_complexity || "N/A"} Space`}</span>
+                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${bugCountTone}`}>{bugs.length > 0 ? `${bugs.length} bugs found` : "Clean"}</span>
+            </div>
+
+            {bugs.length > 0 ? (
+                <div className="space-y-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600 dark:text-amber-300">Issues found</p>
+                    {bugs.map((bug, index) => (
+                        <AIReviewBugCard key={`${typeof bug === "string" ? bug : bug?.title || index}-${index}`} bug={bug} defaultOpen={index === 0} />
+                    ))}
+                </div>
+            ) : null}
+
+            {optimization && (optimization.before || optimization.after || optimization.benefit || optimization.explanation) ? (
+                <div className="space-y-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Suggested improvement</p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-xl border-l-4 border-red-500 bg-white/90 p-4 shadow-sm dark:bg-slate-900/70">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-500">Before</p>
+                            <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300">{optimization.before || "No before snippet provided."}</pre>
+                        </div>
+                        <div className="rounded-xl border-l-4 border-green-500 bg-white/90 p-4 shadow-sm dark:bg-slate-900/70">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-500">After</p>
+                            <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-950 px-3 py-2 font-mono text-xs text-green-100">{optimization.after || "No after snippet provided."}</pre>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-slate-900/70">
+                <p className="text-sm text-slate-700 dark:text-slate-200">{reviewContent.summary || "AI review complete."}</p>
+                <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${scoreTone}`}>{`${score || 74} / 100`}</span>
+            </div>
         </div>
     );
 }
@@ -195,6 +326,13 @@ function formatTimerLabel(totalSeconds) {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatDuration(totalSeconds) {
+    const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const minutes = Math.floor(safeSeconds / 60);
+    const seconds = safeSeconds % 60;
+    return minutes > 0 ? `${minutes} minutes ${seconds}s` : `${seconds}s`;
+}
+
 const TIMER_PRESETS = [
     { label: "15m", value: 15 * 60 },
     { label: "30m", value: 30 * 60 },
@@ -221,7 +359,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const settingsRef = useRef(null);
     const selectedLanguageRef = useRef(DEFAULT_LANGUAGE);
     const isUserLanguageChangeRef = useRef(false);
-    const navigate = useNavigate();
     const {
         ghostHint,
         fetchHint,
@@ -239,7 +376,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     );
     const [output, setOutput] = useState("");
     const [showSettings, setShowSettings] = useState(false);
-    const [copyingRoomLink, setCopyingRoomLink] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState(DEFAULT_LANGUAGE);
     const [lastRunMeta, setLastRunMeta] = useState(null);
     const [timerDuration, setTimerDuration] = useState(45 * 60);
@@ -255,6 +391,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [runBy, setRunBy] = useState('');
     const [reportLoading, setReportLoading] = useState(false);
     const [lastReportPayload, setLastReportPayload] = useState(null);
+    const [previousReportPayload, setPreviousReportPayload] = useState(null);
     const [lastShareId, setLastShareId] = useState('');
     const [showReportModal, setShowReportModal] = useState(false);
     const [showAnalysisModal, setShowAnalysisModal] = useState(false);
@@ -275,12 +412,32 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const [clearConfirmCountdown, setClearConfirmCountdown] = useState(0);
     const [canUndoClear, setCanUndoClear] = useState(false);
     const [showFormattedFlash, setShowFormattedFlash] = useState(false);
+    const [runButtonAnimating, setRunButtonAnimating] = useState(false);
+    const [runFeedbackTone, setRunFeedbackTone] = useState("");
+    const [hasCelebratedAcceptedRun, setHasCelebratedAcceptedRun] = useState(false);
+    const [activityScore, setActivityScore] = useState(0);
+    const [partnerLastActivity, setPartnerLastActivity] = useState({});
+    const [activityClock, setActivityClock] = useState(Date.now());
+    const [unlockedTitle, setUnlockedTitle] = useState("");
+    const shareCardCaptureRef = useRef(null);
     const lastClearedCodeRef = useRef("");
     const clearUndoTimeoutRef = useRef(null);
     const runCountRef = useRef(0);
     const waCountRef = useRef(0);
     const sessionStartedAtRef = useRef(Date.now());
     const celebrationTimeoutRef = useRef(null);
+
+    const markActivity = useCallback((delta = 1) => {
+        setActivityScore((current) => Math.min(100, current + delta));
+    }, []);
+
+    const markPartnerActivity = useCallback((username) => {
+        if (!username) return;
+        setPartnerLastActivity((current) => ({
+            ...current,
+            [username]: Date.now(),
+        }));
+    }, []);
 
     useEffect(() => {
         setCollabHintDismissed(false);
@@ -305,6 +462,21 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     }, [showFormattedFlash]);
 
     useEffect(() => {
+        if (!unlockedTitle) return undefined;
+        const timeoutId = window.setTimeout(() => setUnlockedTitle(""), 1500);
+        return () => window.clearTimeout(timeoutId);
+    }, [unlockedTitle]);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setActivityScore((current) => Math.max(0, current - 1));
+            setActivityClock(Date.now());
+        }, 10000);
+
+        return () => window.clearInterval(intervalId);
+    }, []);
+
+    useEffect(() => {
         if (!showClearConfirmModal) return undefined;
         setClearConfirmCountdown(2);
         const startedAt = Date.now();
@@ -315,6 +487,13 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         }, 100);
         return () => window.clearInterval(intervalId);
     }, [showClearConfirmModal]);
+
+    useEffect(() => {
+        if (!partnerUser?.username) return;
+        setPartnerLastActivity((current) => current[partnerUser.username]
+            ? current
+            : { ...current, [partnerUser.username]: Date.now() });
+    }, [partnerUser?.username]);
 
     useEffect(() => () => {
         if (clearUndoTimeoutRef.current) {
@@ -370,64 +549,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             );
         }
 
-        return (
-            <div className="space-y-5">
-                {reviewContent.summary && (
-                    <div className="rounded-[1.4rem] border border-gray-200/80 bg-white/90 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
-                        <p className="text-base leading-7 text-slate-800 dark:text-slate-200">{reviewContent.summary}</p>
-                        {reviewContent?.complexity_reasoning ? (
-                            <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">{reviewContent.complexity_reasoning}</p>
-                        ) : null}
-                    </div>
-                )}
-
-                <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[1.35rem] border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Time Complexity</p>
-                        <p className="mt-2 text-lg font-semibold text-blue-950 dark:text-blue-100">{reviewContent?.time_complexity || 'N/A'}</p>
-                    </div>
-                    <div className="rounded-[1.35rem] border border-purple-200 bg-purple-50/80 p-4 dark:border-purple-800/40 dark:bg-purple-950/20">
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Space Complexity</p>
-                        <p className="mt-2 text-lg font-semibold text-purple-950 dark:text-purple-100">{reviewContent?.space_complexity || 'N/A'}</p>
-                    </div>
-                </div>
-
-                {reviewContent?.bugs?.length > 0 && (
-                    <div className="rounded-[1.4rem] border border-red-200 bg-red-50/80 p-5 dark:border-red-800/40 dark:bg-red-950/20">
-                        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Potential Bugs</h3>
-                        <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-red-900 dark:text-red-200">
-                            {reviewContent.bugs.map((bug, index) => <li key={index}>{bug}</li>)}
-                        </ul>
-                    </div>
-                )}
-
-                {reviewContent?.style_issues?.length > 0 && (
-                    <div className="rounded-[1.4rem] border border-amber-200 bg-amber-50/80 p-5 dark:border-amber-800/40 dark:bg-amber-950/20">
-                        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Style And Readability</h3>
-                        <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-7 text-amber-900 dark:text-amber-200">
-                            {reviewContent.style_issues.map((issue, index) => <li key={index}>{issue}</li>)}
-                        </ul>
-                    </div>
-                )}
-
-                {reviewContent?.optimization_suggestion && (
-                    <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50/80 p-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-                        <h3 className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Optimization Suggestion</h3>
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
-                            <div className="rounded-2xl border-l-2 border-red-500/30 bg-white/80 p-4 pl-3 dark:bg-slate-900/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Before</p>
-                                <p className="mt-2 text-sm leading-7 text-gray-400">{reviewContent.optimization_suggestion.before}</p>
-                            </div>
-                            <div className="rounded-2xl border-l-2 border-green-500/40 bg-white/80 p-4 pl-3 dark:bg-slate-900/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">After</p>
-                                <p className="mt-2 text-sm font-medium leading-7 text-gray-200">{reviewContent.optimization_suggestion.after}</p>
-                            </div>
-                        </div>
-                        <p className="mt-4 text-sm leading-7 text-emerald-900 dark:text-emerald-100">{reviewContent.optimization_suggestion.benefit}</p>
-                    </div>
-                )}
-            </div>
-        );
+        return <AIReviewStructuredPanel reviewContent={reviewContent} />;
     };
 
     const sampleInput = roomState?.problem?.sampleInput || "";
@@ -492,6 +614,12 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     ).length;
     const isRunBusy = lastRunMeta?.status === "Running";
     const isSubmitBusy = lastRunMeta?.status === "Submitting samples...";
+    const roomEnergyPercent = Math.max(0, Math.min(100, activityScore));
+    const roomEnergyTone = activityScore > 20 ? "bg-amber-500" : "bg-gray-600";
+    const partnerUser = users.find((user) => user.socketId !== currentSocketId);
+    const partnerIdle = partnerUser?.username
+        ? activityClock - (partnerLastActivity[partnerUser.username] || activityClock) >= 180000
+        : false;
 
     const canEdit =
         isMentoringMode
@@ -564,6 +692,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const reviewSolution = async () => {
         setIsReviewLoading(true);
         setShowAnalysisModal(true);
+        markActivity(2);
         try {
             const code = editorRef.current?.getValue() || "";
             setReviewContent(null);
@@ -608,6 +737,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 setEditorContentVersion((v) => v + 1);
                 if (origin !== "setValue") {
                     setCollabHintDismissed(true);
+                    markActivity(1);
                 }
                 const code = instance.getValue();
                 if (origin !== "setValue") {
@@ -634,7 +764,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             });
         }
         connect();
-    }, [roomId, socketRef]);
+    }, [markActivity, roomId, socketRef]);
 
     useEffect(() => {
         if (!editorRef.current) return;
@@ -690,6 +820,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
         const handleCodeChange = ({ code }) => {
             if (code !== null && editorRef.current) {
+                const otherUser = users.find((user) => user.socketId !== currentSocketId);
+                markPartnerActivity(otherUser?.username);
                 const currentCode = editorRef.current.getValue();
                 if (code !== currentCode) {
                     const cursor = editorRef.current.getCursor();
@@ -731,7 +863,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             const labelEl = document.createElement('span');
             labelEl.className = 'remote-cursor-label';
             labelEl.style.backgroundColor = userColor;
-            const remoteUser = users.find((u) => u.socketId === socketId);
             labelEl.textContent = `${username || 'Guest'}`;
             cursorEl.appendChild(labelEl);
 
@@ -757,6 +888,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             delete remoteCursorMarkersRef.current[socketId];
         });
         socket.on("run-result", ({ result, runBy: resultRunBy }) => {
+            if (resultRunBy && resultRunBy !== currentUsername) {
+                toast(`${resultRunBy} ran the code`, {
+                    duration: 2000,
+                    position: "bottom-right",
+                });
+                markPartnerActivity(resultRunBy);
+            }
+            markActivity(5);
             const languageConfig = LANGUAGE_OPTIONS[selectedLanguageRef.current] || LANGUAGE_OPTIONS[DEFAULT_LANGUAGE];
             const { stdout, stderr, compile_output, message, time, memory } = result || {};
             const statusDescription = String(result?.status?.description || result?.status?.status || "");
@@ -800,12 +939,33 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 : /accepted/i.test(statusDescription)
                                     ? "AC"
                                     : "AC";
+            setRunFeedbackTone(status);
+            window.setTimeout(() => setRunFeedbackTone(""), status === "WA" ? 500 : status === "TLE" ? 500 : 350);
             const currentRunCount = runCountRef.current + 1;
             const waBeforeThisRun = waCountRef.current;
             if (status === "WA") {
                 waCountRef.current = waCountRef.current + 1;
             }
             runCountRef.current = currentRunCount;
+            if (status === "AC" && !hasCelebratedAcceptedRun) {
+                confetti({
+                    particleCount: 160,
+                    spread: 90,
+                    origin: { x: 0.5, y: 0 },
+                    colors: ["#f59e0b", "#14b8a6", "#fbbf24", "#2dd4bf"],
+                    ticks: 240,
+                });
+                window.setTimeout(() => {
+                    confetti({
+                        particleCount: 120,
+                        spread: 110,
+                        origin: { x: 0.5, y: 0.05 },
+                        colors: ["#f59e0b", "#14b8a6", "#fbbf24", "#2dd4bf"],
+                        ticks: 220,
+                    });
+                }, 350);
+                setHasCelebratedAcceptedRun(true);
+            }
             if (celebrationTimeoutRef.current) {
                 window.clearTimeout(celebrationTimeoutRef.current);
             }
@@ -826,7 +986,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     language: languageConfig.label,
                 });
                 setShowCelebration(true);
-            }, 400);
+            }, 800);
 
             const nextOutput = (
                 <div className="space-y-4 text-sm">
@@ -838,8 +998,10 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     {message && <OutputSection tone="info" title="System Message">{message}</OutputSection>}
                 </div>
             );
-            setOutput(nextOutput);
-            setShowOutputModal(true);
+            window.setTimeout(() => {
+                setOutput(nextOutput);
+                setShowOutputModal(true);
+            }, 800);
         });
         socket.on("run-error", ({ error }) => {
             const message = error || "Run request failed";
@@ -880,7 +1042,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             });
             remoteCursorMarkersRef.current = {};
         };
-    }, [socketRef, roomId, currentSocketId, expectedOutput, sampleInput, roomState?.problem?.title]);
+    }, [socketRef, roomId, currentSocketId, currentUsername, expectedOutput, hasCelebratedAcceptedRun, markActivity, markPartnerActivity, sampleInput, roomState?.problem?.title, users]);
 
     // AI Hint Keymap
     useEffect(() => {
@@ -1055,30 +1217,6 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         timerDuration,
     ]);
 
-    const handleCopyRoomId = async () => {
-        try {
-            setCopyingRoomLink(true);
-            await navigator.clipboard.writeText(roomId);
-            toast.success("Room ID copied");
-            setShowSettings(false);
-        } catch {
-            toast.error("Failed to copy room ID");
-        } finally {
-            setTimeout(() => setCopyingRoomLink(false), 1500);
-        }
-    };
-
-    const handleGoHome = () => {
-        setShowSettings(false);
-        navigate("/");
-    };
-
-    const handleLeaveRoom = () => {
-        setShowSettings(false);
-        socketRef.current?.disconnect();
-        navigate("/");
-    };
-
     const handleTimerPresetChange = (event) => {
         const nextDuration = Number(event.target.value);
         setTimerDuration(nextDuration);
@@ -1219,46 +1357,41 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
     const handleShareSessionCard = async () => {
         try {
-            const { data } = await axios.post(
-                `${serverUrl}/api/session-card/generate`,
-                { roomId },
-                { headers: getAuthHeaders() },
-            );
-            const shareId = String(data?.shareId || "").trim();
-            if (!shareId) {
-                throw new Error("Could not generate session card");
+            if (!lastReportPayload) {
+                throw new Error("Generate a session report first");
             }
-            const cardUrl = `${window.location.origin}/card/${shareId}`;
-            window.open(cardUrl, "_blank", "noopener,noreferrer");
-            await navigator.clipboard.writeText(cardUrl);
-            toast.success("Session card link copied");
+            if (shareCardCaptureRef.current) {
+                const dataUrl = await toPng(shareCardCaptureRef.current, {
+                    cacheBust: true,
+                    pixelRatio: 2,
+                });
+                const link = document.createElement("a");
+                link.download = "forkspace-session.png";
+                link.href = dataUrl;
+                link.click();
+            }
+
+            const shareUrl = lastShareId
+                ? `${window.location.origin}/report/${lastShareId}`
+                : window.location.href;
+            await navigator.clipboard.writeText(shareUrl);
+            toast.success("Session image downloaded and link copied");
         } catch (error) {
             const msg =
                 error?.response?.data?.error ||
                 error?.message ||
-                "Could not generate session card";
+                "Could not prepare the session share card";
             toast.error(msg);
         }
     };
-
-    const handleFormatCode = () => {
-        const currentCode = editorRef.current?.getValue() ?? "";
-        const formattedCode = formatCode(selectedLanguageRef.current, currentCode);
-
-        if (formattedCode !== currentCode) {
-            editorRef.current?.setValue(formattedCode);
-            syncCodeToRoom(formattedCode);
-            toast.success("Code formatted");
-        } else {
-            toast("Code is already formatted enough for the current formatter.");
-        }
-    };
-
     const runCode = async () => {
         if (!canRunInCurrentMode) {
             toast.error("Only the Driver can run code in mock mode.");
             return;
         }
+        setRunButtonAnimating(true);
+        window.setTimeout(() => setRunButtonAnimating(false), 150);
+        markActivity(5);
         const currentCode = editorRef.current.getValue();
         const autoFormattedCode = formatCode(selectedLanguageRef.current, currentCode);
         const rawCode = autoFormattedCode !== currentCode ? autoFormattedCode : currentCode;
@@ -1288,7 +1421,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg p-4">
                 <div className="flex items-center gap-3">
                     <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-blue-700 dark:text-blue-400 font-medium">Running Code...</span>
+                    <span className="text-blue-700 dark:text-blue-400 font-medium">Compiling...<span className="workspace-blink-cursor">|</span></span>
                 </div>
             </div>
         );
@@ -1353,10 +1486,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 { headers: getAuthHeaders() },
             );
             setLastReportPayload(res.data.report);
+            setPreviousReportPayload(res.data.previousReport || null);
             setLastShareId(res.data.shareId || "");
             setIsOutputCollapsed(false);
             setIsNewReport(true);
             setShowReportModal(true);
+            if (res.data.newTitle) {
+                setUnlockedTitle(res.data.newTitle);
+            }
             toast.success("Session intelligence report is ready.");
         } catch (error) {
             const msg =
@@ -1408,6 +1545,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             toast.error("Only the Driver can run code in mock mode.");
             return;
         }
+        markActivity(5);
         const samples = roomState?.problem?.samples || [];
         if (!samples.length) {
             toast.error("Add sample tests in the brief (parsed samples) before submitting.");
@@ -1429,7 +1567,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
         });
         setOutput(
             <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
-                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Running full sample suite…</p>
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Compiling...<span className="workspace-blink-cursor">|</span></p>
             </div>,
         );
         try {
@@ -1455,29 +1593,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                 sampleCheck: allPass ? "passed" : "mismatch",
                 updatedAt: Date.now(),
             });
-            const blocks = (
-                <div className="space-y-3 text-sm">
-                    <OutputSection tone={allPass ? "success" : "warning"} title="Sample suite">
-                        {`Passed ${summary?.passed ?? 0} / ${summary?.total ?? 0}`}
-                    </OutputSection>
-                    {results?.map((r) => (
-                        <div key={r.id || r.index} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700 dark:bg-gray-800/40">
-                            <p className="font-semibold text-gray-900 dark:text-white">Test {r.index}{r.passed ? " ✓" : " ✗"}</p>
-                            {r.compile_output ? (
-                                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-gray-800 dark:text-gray-200">{r.compile_output}</pre>
-                            ) : null}
-                            {r.stderr ? (
-                                <pre className="mt-2 whitespace-pre-wrap font-mono text-xs text-red-700 dark:text-red-300">{r.stderr}</pre>
-                            ) : null}
-                            {!r.passed && !r.compile_output && !r.stderr ? (
-                                <div className="mt-2">
-                                    <ComparisonPanel expectedOutput={r.expectedOutput} actualOutput={r.actualOutput} />
-                                </div>
-                            ) : null}
-                        </div>
-                    ))}
-                </div>
-            );
+            const blocks = <ProgressiveSampleSuiteResults allPass={allPass} summary={summary} results={results || []} />;
             setOutput(blocks);
             setShowOutputModal(true);
             if (allPass) {
@@ -1505,6 +1621,51 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
     return (
         <div className="flex h-full min-h-0 flex-col bg-transparent">
+            {unlockedTitle ? (
+                <div className="pointer-events-none fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm">
+                    <div className="rounded-3xl border border-amber-400/30 bg-slate-950/95 px-10 py-8 text-center text-white shadow-2xl">
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">Title Unlocked</p>
+                        <div className="mt-4 text-4xl">🏆</div>
+                        <p className="mt-4 text-2xl font-bold text-amber-300">{unlockedTitle}</p>
+                    </div>
+                </div>
+            ) : null}
+            {lastReportPayload ? (
+                <div className="pointer-events-none absolute -left-[9999px] top-0">
+                    <div
+                        ref={shareCardCaptureRef}
+                        className="h-[630px] w-[1200px] bg-slate-900 px-14 py-12 text-white"
+                        style={{ background: "linear-gradient(135deg, #0f172a 0%, #111827 55%, #1f2937 100%)" }}
+                    >
+                        <p className="text-sm font-semibold uppercase tracking-[0.28em] text-amber-300">ForkSpace</p>
+                        <p className="mt-2 text-5xl font-black">{roomState?.problem?.title || "Untitled Practice Session"}</p>
+                        <div className="mt-6 inline-flex rounded-full bg-amber-400 px-5 py-2 text-3xl font-bold text-slate-950">
+                            {lastReportPayload.sessionScore} / 100
+                        </div>
+                        <div className="mt-8 flex items-center gap-8 text-2xl">
+                            {users.slice(0, 2).map((user) => (
+                                <div key={user.socketId} className="flex items-center gap-3">
+                                    <span className="text-3xl">{getAvatarById(user.avatarId || "clever-fox").emoji}</span>
+                                    <span>{user.username}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-8 grid grid-cols-2 gap-6 text-xl text-slate-200">
+                            <p>Language: {LANGUAGE_OPTIONS[selectedLanguageRef.current]?.label || "C++"}</p>
+                            <p>Duration: {formatDuration(Math.floor((Date.now() - sessionStartedAtRef.current) / 1000))}</p>
+                            <p>Date: {new Date().toLocaleDateString()}</p>
+                            <p>URL: fork-space.vercel.app</p>
+                        </div>
+                        <p className="mt-10 max-w-4xl text-lg leading-8 text-slate-300">{lastReportPayload.howYouThink}</p>
+                    </div>
+                </div>
+            ) : null}
+            <div className="h-[2px] w-full bg-gray-700/60">
+                <div
+                    className={`h-full transition-[width] duration-500 ${roomEnergyTone}`}
+                    style={{ width: `${roomEnergyPercent}%` }}
+                />
+            </div>
             {showOutputModal && output && (
                 <OverlayPanel
                     title={lastRunMeta?.inputSource === "suite" ? "Submission Output" : "Run Output"}
@@ -1530,7 +1691,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{lastRunMeta?.memory ?? 'Not run yet'}</p>
                             </div>
                         </div>
-                        <div className="rounded-[1.5rem] border border-gray-200/80 bg-white/88 p-5 shadow-sm dark:border-gray-700/80 dark:bg-slate-900/70">
+                        <div className={`rounded-[1.5rem] border bg-white/88 p-5 shadow-sm dark:bg-slate-900/70 ${runFeedbackTone === "AC" ? "workspace-output-success border-green-200/80 dark:border-green-700/60" : runFeedbackTone === "WA" ? "workspace-output-wa border-red-200/80 dark:border-red-700/60" : runFeedbackTone === "TLE" ? "workspace-output-tle border-amber-200/80 dark:border-amber-700/60" : "border-gray-200/80 dark:border-gray-700/80"}`}>
                             {output}
                         </div>
                     </div>
@@ -1545,6 +1706,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     <div className="space-y-4">
                         <SessionIntelligenceReportDashboard
                             report={lastReportPayload}
+                            previousReport={previousReportPayload}
                             title={roomState?.problem?.title || "Practice session"}
                             variant="standalone"
                         />
@@ -1781,7 +1943,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
             <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white px-4 py-2.5 dark:bg-[#081121]">
                     <button
-                        className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-500 px-4 text-[15px] font-semibold text-white shadow-sm shadow-teal-900/40 transition-colors hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50"
+                        className={`inline-flex h-10 items-center gap-2 rounded-md bg-teal-500 px-4 text-[15px] font-semibold text-white shadow-sm shadow-teal-900/40 transition-[transform,background-color] duration-150 hover:bg-teal-400 disabled:pointer-events-none disabled:opacity-50 ${runButtonAnimating ? "scale-105" : "scale-100"}`}
                         onClick={runCode}
                         disabled={!canRunInCurrentMode || isRunBusy}
                         title={canRunInCurrentMode ? 'Run code for everyone in this room' : 'Only the Driver can run code in mock mode'}
@@ -1811,6 +1973,9 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                         )}
                         {isSubmitBusy ? "Submitting..." : "Submit"}
                     </button>
+                    {partnerIdle ? (
+                        <span className="ml-2 text-sm italic text-gray-500 dark:text-gray-400">{partnerUser?.username} seems to be thinking...</span>
+                    ) : null}
                     <span className="mx-1 h-5 w-px bg-white/15" />
                     <button
                         type="button"
@@ -2382,6 +2547,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                             <div className="p-2 pt-3 sm:p-3">
                                                 <SessionIntelligenceReportDashboard
                                                     report={lastReportPayload}
+                                                    previousReport={previousReportPayload}
                                                     title={
                                                         roomState?.problem?.title ||
                                                         "Practice session"

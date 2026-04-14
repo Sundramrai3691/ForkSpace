@@ -77,6 +77,7 @@ function SessionReportPage() {
                         </div>
                         <SessionIntelligenceReportDashboard
                             report={report}
+                            previousReport={payload.previousReport}
                             title={payload.problemTitle || "Practice session"}
                             variant="standalone"
                         />
