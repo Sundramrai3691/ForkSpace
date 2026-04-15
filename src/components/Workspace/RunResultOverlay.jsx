@@ -137,6 +137,7 @@ export default function RunResultOverlay({
 
         <div className="mt-4 flex items-center justify-center gap-2">
           {users.slice(0, 2).map((user, idx) => {
+            if (!user) return null;
             const avatar = getAvatarById(user.avatarId);
             return (
               <div key={`${user.username}-${idx}`} className="flex items-center gap-2">

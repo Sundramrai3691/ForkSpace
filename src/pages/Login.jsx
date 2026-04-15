@@ -218,6 +218,10 @@ function Login() {
         };
     }, [reduceMotion, wordCount]);
 
+    const handleGenerateRoomId = () => {
+        setQuickRoomId(createRoomId());
+    };
+
     const handleQuickJoin = (event) => {
         event.preventDefault();
         const resolvedRoomId = quickRoomId.trim() || createRoomId();
@@ -376,16 +380,26 @@ function Login() {
                                 type="text"
                                 value={quickRoomId}
                                 onChange={(event) => setQuickRoomId(event.target.value.toUpperCase())}
-                                placeholder="Paste a Room ID, or leave blank to create one"
+                                placeholder="Paste a room ID or generate one"
                                 className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                             />
-                            <button
-                                type="submit"
-                                data-cursor="button"
-                                className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
-                            >
-                                Enter
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateRoomId}
+                                    data-cursor="button"
+                                    className="inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-stone-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                >
+                                    Generate
+                                </button>
+                                <button
+                                    type="submit"
+                                    data-cursor="button"
+                                    className="inline-flex flex-1 items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:flex-none"
+                                >
+                                    Enter
+                                </button>
+                            </div>
                         </form>
 
                         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">

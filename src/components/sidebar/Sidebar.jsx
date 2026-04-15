@@ -254,8 +254,8 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                 : session.driverSocketId
                     ? session.driverSocketId === currentSocketId
                     : true;
-    const driver = users.find((user) => user.socketId === session.driverSocketId);
-    const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
+    const driver = users.find((user) => user && user.socketId === session.driverSocketId);
+    const navigatorUser = users.find((user) => user && user.socketId === session.navigatorSocketId);
     const getEditorAccess = (user) => {
         const normalizedRole = (user?.role || '').toLowerCase();
 
@@ -1029,7 +1029,7 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                             </div>
                         ) : (
                             <div className="space-y-1">
-                                {users.map((user) => (
+                                {users.filter(Boolean).map((user) => (
                                 <User
                                     key={user.socketId}
                                     username={user.username}

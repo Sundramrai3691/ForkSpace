@@ -653,8 +653,8 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const normalizedRole = (currentRole || 'Peer').toLowerCase();
     const isDriver = session.driverSocketId === currentSocketId;
     const isNavigator = session.navigatorSocketId === currentSocketId;
-    const driverUser = users.find((user) => user.socketId === session.driverSocketId);
-    const navigatorUser = users.find((user) => user.socketId === session.navigatorSocketId);
+    const driverUser = users.find((user) => user && user.socketId === session.driverSocketId);
+    const navigatorUser = users.find((user) => user && user.socketId === session.navigatorSocketId);
     const hasAssignedDriver = Boolean(session.driverSocketId);
     const isMentoringMode = session.mode === 'mentoring';
     const isMockMode = session.mode === 'mock_interview';
@@ -671,7 +671,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
     const isSubmitBusy = lastRunMeta?.status === "Submitting samples...";
     const roomEnergyPercent = Math.max(0, Math.min(100, activityScore));
     const roomEnergyTone = activityScore > 20 ? "bg-amber-500" : "bg-gray-600";
-    const partnerUser = users.find((user) => user.socketId !== currentSocketId);
+    const partnerUser = users.find((user) => user && user.socketId !== currentSocketId);
     const partnerIdle = partnerUser?.username
         ? activityClock - (partnerLastActivity[partnerUser.username] || activityClock) >= 180000
         : false;
@@ -882,7 +882,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
 
         const handleCodeChange = ({ code }) => {
             if (code !== null && editorRef.current) {
-                const otherUser = users.find((user) => user.socketId !== currentSocketId);
+                const otherUser = users.find((user) => user && user.socketId !== currentSocketId);
                 markPartnerActivity(otherUser?.username);
                 const currentCode = editorRef.current.getValue();
                 if (code !== currentCode) {
@@ -1999,7 +1999,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
             {showCelebration && celebrationResult ? (
                 <RunResultOverlay
                     result={celebrationResult}
-                    users={users.map((user) => ({
+                    users={users.filter(Boolean).map((user) => ({
                         username: user.username || "Guest",
                         avatarId: user.avatarId || "clever-fox",
                     }))}
@@ -2189,16 +2189,19 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                     )}
                         {users.length > 0 && (
                         <div className="flex h-9 items-center rounded-full border border-gray-200 bg-white/92 px-2 shadow-sm dark:border-gray-700 dark:bg-gray-800/92">
-                            {users.slice(0, 5).map((user, index) => (
-                                <div
-                                    key={user.socketId}
-                                    style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
-                                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-sm dark:border-[#081121]"
-                                    title={`${user.username || "Guest"} (${user.role || "Peer"})`}
-                                >
-                                    <AvatarGlyph avatar={getAvatarById(user.avatarId)} className="h-3.5 w-3.5" />
-                                </div>
-                            ))}
+                            {users.slice(0, 5).map((user, index) => {
+                                if (!user) return null;
+                                return (
+                                    <div
+                                        key={user.socketId}
+                                        style={{ backgroundColor: user.color || '#94a3b8', marginLeft: index === 0 ? 0 : -6 }}
+                                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-sm dark:border-[#081121]"
+                                        title={`${user.username || "Guest"} (${user.role || "Peer"})`}
+                                    >
+                                        <AvatarGlyph avatar={getAvatarById(user.avatarId)} className="h-3.5 w-3.5" />
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                         {problemToolbarMeta && (
