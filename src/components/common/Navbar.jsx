@@ -36,7 +36,7 @@ function buildActivityGrid(activityLog = []) {
     });
 }
 
-function Navbar() {
+function Navbar({ onSignInClick }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
@@ -63,7 +63,11 @@ function Navbar() {
     const handleScrollToAuth = () => {
         closeMenu();
         setIsProfileOpen(false);
-        document.getElementById('auth-entry')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (onSignInClick) {
+            onSignInClick();
+        } else {
+            document.getElementById('auth-entry')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     };
 
     const handleScrollToSection = (sectionId) => {

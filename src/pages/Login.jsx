@@ -261,9 +261,16 @@ function Login() {
         quickRoomRef.current?.focus();
     };
 
+    const handleOnSignInClick = () => {
+        setShowAuthPanel(true);
+        window.setTimeout(() => {
+            authEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 30);
+    };
+
     return (
         <div className="min-h-screen bg-stone-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-            <Navbar />
+            <Navbar onSignInClick={handleOnSignInClick} />
 
             <main>
                 <section
