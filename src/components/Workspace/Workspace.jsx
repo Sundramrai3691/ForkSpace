@@ -2244,7 +2244,7 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 <select
                                     value={timerDuration}
                                     onChange={handleTimerPresetChange}
-                                    className="h-9 rounded-xl border border-gray-200 bg-white/92 px-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800/92 dark:text-white"
+                                    className="h-9 rounded-xl border border-gray-200 bg-white px-2 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                 >
                                     {TIMER_PRESETS.map((preset) => (
                                         <option key={preset.value} value={preset.value}>
@@ -2255,14 +2255,14 @@ function Workspace({ socketRef, roomId, roomState, currentSocketId, currentRole 
                                 <button
                                     type="button"
                                     onClick={handleTimerToggle}
-                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-slate-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                 >
                                     {isTimerRunning ? "Pause" : "Start"}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleTimerReset}
-                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white/92 px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800/92 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white hover:text-gray-900 dark:border-gray-700 dark:bg-slate-800 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:text-white"
                                 >
                                     Reset
                                 </button>

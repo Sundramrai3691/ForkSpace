@@ -338,6 +338,28 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
         return <Navigate to='/' />;
     }
 
+    const handleResetBrief = () => {
+        updateProblemDraft({
+            platform: 'codeforces',
+            problemCode: '',
+            problemUrl: '',
+            sourceUrl: '',
+            title: '',
+            prompt: '',
+            constraints: '',
+            sampleInput: '',
+            sampleOutput: '',
+            samples: [],
+            tags: [],
+            rating: '',
+            difficulty: '',
+            difficultyLabel: '',
+            problemSource: 'manual',
+            problemSnapshot: null,
+        });
+        toast.success('Problem brief reset');
+    };
+
     const handleCopyRoomId = async () => {
         try {
             await navigator.clipboard.writeText(roomId);
@@ -599,6 +621,14 @@ function Sidebar({ users = [], roomId, roomState, socketRef, currentSocketId, cu
                                     className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                                 >
                                     Use manual brief
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleResetBrief}
+                                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-white dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-200 dark:hover:bg-rose-900/40"
+                                    title="Clear all problem details"
+                                >
+                                    Reset Brief
                                 </button>
                             </div>
                             {showCfInlineForm ? (
