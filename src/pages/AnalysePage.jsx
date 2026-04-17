@@ -267,7 +267,26 @@ function AnalysePage() {
     const handleShareScore = async () => {
         if (!cardRef.current) return;
         try {
-            const dataUrl = await htmlToImage.toPng(cardRef.current, { width: 800, height: 420 });
+            // Fix for blank image: call it once to warm up the fonts/rendering
+            await htmlToImage.toPng(cardRef.current, { cacheBust: true });
+            
+            // Wait a tiny bit for the next frame
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Actual capture
+            const dataUrl = await htmlToImage.toPng(cardRef.current, { 
+                width: 800, 
+                height: 420,
+                pixelRatio: 2,
+                cacheBust: true,
+                style: {
+                    visibility: 'visible',
+                    position: 'static',
+                    left: '0',
+                    top: '0'
+                }
+            });
+
             const link = document.createElement('a');
             link.download = 'forkspace-score.png';
             link.href = dataUrl;
@@ -277,6 +296,7 @@ function AnalysePage() {
             await handleChallengeFriend();
             toast.success('Image downloaded + challenge link copied!');
         } catch (err) {
+            console.error('Share image error:', err);
             toast.error('Failed to generate share image');
         }
     };

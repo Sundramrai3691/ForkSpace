@@ -14,9 +14,12 @@ const ScoreCard = forwardRef(({ score, verdict, problemTitle, language, timeComp
         padding: '40px',
         color: 'white',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        position: 'absolute',
-        left: '-9999px',
+        position: 'fixed',
         top: 0,
+        left: 0,
+        visibility: 'hidden',
+        pointerEvents: 'none',
+        zIndex: -1000,
         overflow: 'hidden',
         boxSizing: 'border-box'
       }}
@@ -34,8 +37,8 @@ const ScoreCard = forwardRef(({ score, verdict, problemTitle, language, timeComp
 
         <div style={{ position: 'relative', width: '160px', height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '8px solid rgba(245, 158, 11, 0.1)' }} />
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '8px solid #f59e0b', clipPath: `inset(0 0 0 0)` }} />
-          <div style={{ fontSize: '64px', fontWeight: '900', color: 'white' }}>{score}</div>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '8px solid #f59e0b' }} />
+          <div style={{ fontSize: '64px', fontWeight: '900', color: 'white', position: 'relative', zIndex: 2 }}>{score}</div>
         </div>
 
         <div style={{ marginTop: '24px', textAlign: 'center', maxWidth: '300px' }}>
