@@ -8,25 +8,23 @@ const ScoreCard = forwardRef(({ score, verdict, problemTitle, language, timeComp
         width: '800px',
         height: '420px',
         backgroundColor: '#0f172a',
-        border: '1px solid rgba(245, 158, 11, 0.3)',
+        border: '1px solid #f59e0b4d',
         display: 'flex',
         flexDirection: 'row',
         padding: '40px',
         color: 'white',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        visibility: 'hidden',
-        pointerEvents: 'none',
-        zIndex: -1000,
+        fontFamily: 'Arial, sans-serif',
+        position: 'absolute',
+        top: '-10000px',
+        left: '-10000px',
         overflow: 'hidden',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        zIndex: -100
       }}
     >
-      {/* Background blobs */}
-      <div style={{ position: 'absolute', top: '-100px', left: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0 }} />
-      <div style={{ position: 'absolute', bottom: '-100px', right: '-100px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0 }} />
+      {/* Simplified background - use solid color circles instead of blurs */}
+      <div style={{ position: 'absolute', top: '-100px', left: '-100px', width: '300px', height: '300px', borderRadius: '50%', backgroundColor: '#f59e0b0d', zIndex: 0 }} />
+      <div style={{ position: 'absolute', bottom: '-100px', right: '-100px', width: '300px', height: '300px', borderRadius: '50%', backgroundColor: '#10b9810d', zIndex: 0 }} />
 
       {/* LEFT HALF */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', position: 'relative', zIndex: 1 }}>

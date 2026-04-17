@@ -269,32 +269,34 @@ function AnalysePage({ isDaily = false }) {
     const handleShareScore = async () => {
         if (!cardRef.current) return;
         try {
-            await htmlToImage.toPng(cardRef.current, { cacheBust: true });
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Wait for any potential layout changes
+            await new Promise(resolve => setTimeout(resolve, 50));
 
+            // Use toPng with improved options
             const dataUrl = await htmlToImage.toPng(cardRef.current, { 
                 width: 800, 
                 height: 420,
                 pixelRatio: 2,
                 cacheBust: true,
-                style: {
-                    visibility: 'visible',
-                    position: 'static',
-                    left: '0',
-                    top: '0'
-                }
+                skipAutoScale: true,
+                // These help with resource loading
+                preferredFontFormat: 'woff2'
             });
 
+            if (!dataUrl || dataUrl.length < 1000) {
+                throw new Error('Generated image is too small or empty');
+            }
+
             const link = document.createElement('a');
-            link.download = 'forkspace-score.png';
+            link.download = `forkspace-score-${Date.now()}.png`;
             link.href = dataUrl;
             link.click();
 
             await handleChallengeFriend();
-            toast.success('Image downloaded + challenge link copied!');
+            toast.success('Score card downloaded!');
         } catch (err) {
             console.error('Share image error:', err);
-            toast.error('Failed to generate share image');
+            toast.error('Image generation failed. Please try again.');
         }
     };
 
