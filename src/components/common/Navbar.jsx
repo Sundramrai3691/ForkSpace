@@ -1,5 +1,6 @@
 import { useState, useContext, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router';
 import toast from 'react-hot-toast';
 import { ThemeContext } from '../../../Context/ThemeContext';
 import { Monitor, Sun, Moon } from 'lucide-react';
@@ -210,6 +211,24 @@ function Navbar({ onSignInClick }) {
                     </button>
 
                     <div className="hidden flex-nowrap items-center gap-8 md:flex">
+                        <Link
+                            to="/analyse"
+                            data-cursor="button"
+                            className="group shrink-0 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                        >
+                            <span className="relative after:absolute after:bottom-0 after:left-1/2 after:h-px after:w-0 after:bg-amber-400 after:transition-all after:duration-200 group-hover:after:left-0 group-hover:after:w-full">
+                                Solution Analyser
+                            </span>
+                        </Link>
+                        <Link
+                            to="/daily-challenge"
+                            data-cursor="button"
+                            className="group shrink-0 text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                        >
+                            <span className="relative after:absolute after:bottom-0 after:left-1/2 after:h-px after:w-0 after:bg-amber-400 after:transition-all after:duration-200 group-hover:after:left-0 group-hover:after:w-full">
+                                Daily Challenge
+                            </span>
+                        </Link>
                         <button
                             type="button"
                             onClick={() => handleScrollToSection('how-it-works')}

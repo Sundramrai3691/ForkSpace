@@ -9,6 +9,7 @@ import DailyChallenge from '../components/DailyChallenge';
 import Leaderboard from '../components/Leaderboard';
 import ScoreCard from '../components/ScoreCard';
 import * as htmlToImage from 'html-to-image';
+import { Sparkles } from 'lucide-react';
 
 const LANGUAGE_CHOICES = [
     { value: 'cpp', label: 'C++' },
@@ -192,7 +193,7 @@ function Section({ index, title, children }) {
     );
 }
 
-function AnalysePage() {
+function AnalysePage({ isDaily = false }) {
     const { analysisId } = useParams();
     const navigate = useNavigate();
     const apiBases = useMemo(() => getAnalysisApiBases(), []);
@@ -214,8 +215,10 @@ function AnalysePage() {
     const [percentileText, setPercentileText] = useState('');
     const [activeDailyProblem, setActiveDailyProblem] = useState(null);
     const [scorePulse, setScorePulse] = useState(false);
-    const [isDbConnected, setIsDbConnected] = useState(true); // Default to true, will check if needed
+    const [isDbConnected, setIsDbConnected] = useState(true); 
+    const [challengeModal, setChallengeModal] = useState(null);
     const cardRef = useRef(null);
+    const editorRef = useRef(null);
     const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
 
     useEffect(() => {
@@ -240,7 +243,6 @@ function AnalysePage() {
             if (progress < 1) {
                 requestAnimationFrame(frame);
             } else {
-                // Pulse at completion
                 setScorePulse(true);
                 setTimeout(() => setScorePulse(false), 300);
             }
@@ -267,13 +269,9 @@ function AnalysePage() {
     const handleShareScore = async () => {
         if (!cardRef.current) return;
         try {
-            // Fix for blank image: call it once to warm up the fonts/rendering
             await htmlToImage.toPng(cardRef.current, { cacheBust: true });
-            
-            // Wait a tiny bit for the next frame
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Actual capture
             const dataUrl = await htmlToImage.toPng(cardRef.current, { 
                 width: 800, 
                 height: 420,
@@ -292,7 +290,6 @@ function AnalysePage() {
             link.href = dataUrl;
             link.click();
 
-            // Also create challenge
             await handleChallengeFriend();
             toast.success('Image downloaded + challenge link copied!');
         } catch (err) {
@@ -303,6 +300,9 @@ function AnalysePage() {
 
     const handleChallengeFriend = async () => {
         try {
+            const displayAnalysis = analysis ? normalizeAnalysisPayload(analysis, code) : null;
+            if (!displayAnalysis) return;
+
             const response = await axios.post(`${serverUrl}/api/challenge/create`, {
                 challengerName: localStorage.getItem('forkspace-username') || 'Anonymous',
                 challengerScore: displayAnalysis.overallScore,
@@ -316,22 +316,27 @@ function AnalysePage() {
             const challengeUrl = response.data.challengeUrl;
             await navigator.clipboard.writeText(challengeUrl);
             
-            // Show custom modal (simplified here as toast + alert for now, 
-            // but we can add a proper modal if needed)
-            toast.success('Challenge link copied to clipboard!');
-            
-            // Open share options (Twitter/WhatsApp)
-            const text = `I scored ${displayAnalysis.overallScore}/100 on today's DSA challenge with ForkSpace. Can you beat it? ${challengeUrl}`;
-            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            const waText = encodeURIComponent( 
+                `I scored ${displayAnalysis.overallScore}/100 on ForkSpace Daily Challenge${ 
+                  activeDailyProblem?.platform === 'leetcode' ? " (today's LeetCode POTD)" : 
+                  activeDailyProblem?.platform === 'codeforces' ? " (today's CF Daily)" : "" 
+                }. Can you beat it? ${challengeUrl}` 
+            ); 
+            const waUrl = `https://wa.me/?text=${waText}`;
+
+            setChallengeModal({ open: true, challengeUrl, waUrl, score: displayAnalysis.overallScore });
+            toast.success('Challenge created and link copied!');
         } catch (err) {
+            console.error('Challenge creation failed:', err);
             toast.error('Failed to create challenge');
         }
     };
 
     const handleUseDailyProblem = (problem) => {
-        setProblemContext(`${problem.title}\n\n${problem.statement}`);
+        setProblemContext(problem.title + ' - ' + problem.statement.slice(0, 200));
         setActiveDailyProblem(problem);
         if (language === '') setLanguage('cpp');
+        editorRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
     const lineCount = code ? code.split(/\r?\n/).length : 0;
@@ -339,8 +344,8 @@ function AnalysePage() {
     const displayAnalysis = analysis ? normalizeAnalysisPayload(analysis, code) : null;
     const provider = displayAnalysis?.provider || 'ForkSpace AI';
     const circumference = 251;
-    const score = displayAnalysis?.overallScore || 0;
-    const scoreOffset = circumference - (score / 100) * circumference;
+    const currentScoreValue = displayAnalysis?.overallScore || 0;
+    const scoreOffset = circumference - (animatedScore / 100) * circumference;
 
     useEffect(() => {
         if (!isLoading) {
@@ -490,6 +495,16 @@ function AnalysePage() {
                                 {percentileText && (
                                     <p className="mt-1 text-xs font-bold text-amber-500 uppercase tracking-wider">{percentileText}</p>
                                 )}
+                                
+                                {isDaily && isDbConnected && (
+                                    <button 
+                                        onClick={() => setIsLeaderboardOpen(true)}
+                                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-500 transition hover:bg-amber-500/20"
+                                    >
+                                        🏆 View Today's Leaderboard
+                                    </button>
+                                )}
+
                                 <p className="mt-3 text-base leading-8 text-[#c9d1d9]">{displayAnalysis.summary}</p>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     {displayAnalysis.tags.map((tag) => (
@@ -506,7 +521,7 @@ function AnalysePage() {
                         </div>
                     </div>
                     <div className="grid gap-3">
-                        <div className="rounded-2xl border border-[#30363d] bg-[#0d1117] p-4">
+                        <div ref={editorRef} className="rounded-xl border border-[#30363d] bg-[#0d1117] p-4">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b949e]">Time complexity</p>
                             <p className="mt-3 text-2xl font-bold text-[#79c0ff]">{displayAnalysis.complexity.time}</p>
                         </div>
@@ -781,7 +796,19 @@ function AnalysePage() {
             <div className="flex h-[calc(100vh-73px)]">
                 <aside className="flex h-full w-full flex-col border-r border-[#21262d] lg:w-[40%] xl:w-[38%]">
                     <div className="overflow-y-auto px-5 py-5">
-                        <DailyChallenge onUseAsContext={handleUseDailyProblem} />
+                        <div className="mb-6 space-y-2">
+                            <h1 className="text-2xl font-bold text-white">
+                                {isDaily ? 'Daily Challenge' : 'Solution Analyser'}
+                            </h1>
+                            <p className="text-sm text-[#8b949e]">
+                                {isDaily 
+                                    ? 'Daily problems. Deep analysis. Real rankings. Challenge your friends.' 
+                                    : 'Deep AI review for complexity, bugs, and interview readiness.'}
+                            </p>
+                        </div>
+                        
+                        {isDaily && <DailyChallenge onUseAsContext={handleUseDailyProblem} />}
+                        
                         <div className="mt-6 grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
                             <label className="space-y-2">
                                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b949e]">Language</span>
@@ -918,13 +945,58 @@ function AnalysePage() {
                 ref={cardRef}
                 score={displayAnalysis?.overallScore || 0}
                 verdict={displayAnalysis?.verdict || ''}
-                problemTitle={activeDailyProblem?.title || problemContext.split('\n')[0] || 'Custom Solution'}
+                problemTitle={activeDailyProblem?.title || problemContext.split(' - ')[0] || 'Custom Solution'}
                 language={language}
                 timeComplexity={displayAnalysis?.complexity.time || 'O(?)'}
                 spaceComplexity={displayAnalysis?.complexity.space || 'O(?)'}
                 bugCount={displayAnalysis?.bugs.length || 0}
                 percentile={percentileText}
             />
+
+            {challengeModal?.open && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-amber-500/30 bg-[#0d1117] p-8 text-center shadow-2xl">
+                        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500 text-black shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+                            <Sparkles size={40} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white">Challenge Created!</h2>
+                        <p className="mt-2 text-gray-400">Your score: <span className="font-bold text-amber-500">{challengeModal.score}/100</span></p>
+                        
+                        <div className="mt-8 space-y-4">
+                            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Challenge URL</p>
+                                <p className="mt-1 truncate text-sm font-mono text-gray-300">{challengeModal.challengeUrl}</p>
+                            </div>
+                            
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(challengeModal.challengeUrl);
+                                    toast.success('Link copied!');
+                                }}
+                                className="w-full rounded-xl bg-white px-6 py-3 font-bold text-black transition hover:bg-gray-200"
+                            >
+                                Copy Link
+                            </button>
+                            
+                            <a
+                                href={challengeModal.waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-6 py-3 font-bold text-white transition hover:opacity-90"
+                            >
+                                Share on WhatsApp
+                            </a>
+                            
+                            <button
+                                onClick={() => setChallengeModal(null)}
+                                className="w-full rounded-xl border border-white/10 bg-white/5 px-6 py-3 font-bold text-white transition hover:bg-white/10"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Leaderboard 
                 isOpen={isLeaderboardOpen} 

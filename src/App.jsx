@@ -32,6 +32,7 @@ function AppChrome() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/analyse" element={<AnalysePage />} />
+        <Route path="/daily-challenge" element={<AnalysePage isDaily={true} />} />
         <Route path="/analysis/:analysisId" element={<AnalysePage />} />
         <Route path="/summary/:summaryId" element={<MockSummaryPage />} />
         <Route path="/challenge/:id" element={<ChallengePage />} />

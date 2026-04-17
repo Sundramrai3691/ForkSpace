@@ -176,7 +176,31 @@ function Login() {
     const [showAuthPanel, setShowAuthPanel] = useState(false);
     const [heroBadgeVisible, setHeroBadgeVisible] = useState(false);
     const [heroCtasVisible, setHeroCtasVisible] = useState(false);
+    const [dailyStats, setDailyStats] = useState(null);
     const wordCount = 'One shared room for serious DSA practice, mock interviews, and mentoring.'.split(' ').length;
+
+    useEffect(() => {
+        const fetchDailyStats = async () => {
+            try {
+                const response = await axios.get(`${serverUrl}/api/daily/leetcode/leaderboard`);
+                if (response.data && response.data.totalCount > 0) {
+                    const entries = response.data.entries || [];
+                    const avgScore = entries.length > 0 
+                        ? Math.round(entries.reduce((acc, curr) => acc + curr.score, 0) / entries.length) 
+                        : 0;
+                    const topScore = entries.length > 0 ? entries[0].score : 0;
+                    setDailyStats({
+                        totalCount: response.data.totalCount,
+                        avgScore,
+                        topScore
+                    });
+                }
+            } catch (err) {
+                // silent fail
+            }
+        };
+        fetchDailyStats();
+    }, [serverUrl]);
     const reduceMotion = prefersReducedMotion();
     const howItWorksRef = useScrollReveal();
     const useCasesRef = useScrollReveal();
@@ -370,11 +394,26 @@ function Login() {
                             <Link
                                 to="/analyse"
                                 data-cursor="button"
-                                className="inline-flex items-center justify-center rounded-md border border-amber-500 px-5 py-2.5 text-sm text-amber-400 transition hover:bg-amber-500/10"
+                                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
                             >
                                 Open Solution Analyser
                             </Link>
+                            <Link
+                                to="/daily-challenge"
+                                data-cursor="button"
+                                className="inline-flex items-center justify-center rounded-md border border-amber-500 px-5 py-2.5 text-sm text-amber-400 transition hover:bg-amber-500/10"
+                            >
+                                Daily Challenge
+                            </Link>
                         </div>
+
+                        {dailyStats && (
+                            <div className="mt-4 flex items-center gap-6 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-500/80">
+                                <span>{dailyStats.totalCount} Solutions today</span>
+                                <span>Avg {dailyStats.avgScore} pts</span>
+                                <span>Top {dailyStats.topScore} pts</span>
+                            </div>
+                        )}
 
                         <form
                             id="join-session"
