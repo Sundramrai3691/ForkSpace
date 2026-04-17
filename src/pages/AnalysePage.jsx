@@ -1,10 +1,14 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams } from 'react-router';
 import toast from 'react-hot-toast';
 import { getAnalysisApiBases } from '../lib/analysisApi';
 import useCardTilt from '../hooks/useCardTilt';
+import DailyChallenge from '../components/DailyChallenge';
+import Leaderboard from '../components/Leaderboard';
+import ScoreCard from '../components/ScoreCard';
+import * as htmlToImage from 'html-to-image';
 
 const LANGUAGE_CHOICES = [
     { value: 'cpp', label: 'C++' },
@@ -203,6 +207,113 @@ function AnalysePage() {
     const [lastAnalysedAt, setLastAnalysedAt] = useState('');
     const [analysisError, setAnalysisError] = useState('');
 
+    // Daily Challenge & Leaderboard states
+    const [animatedScore, setAnimatedScore] = useState(0);
+    const [showActionButtons, setShowActionButtons] = useState(false);
+    const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+    const [percentileText, setPercentileText] = useState('');
+    const [activeDailyProblem, setActiveDailyProblem] = useState(null);
+    const [scorePulse, setScorePulse] = useState(false);
+    const [isDbConnected, setIsDbConnected] = useState(true); // Default to true, will check if needed
+    const cardRef = useRef(null);
+    const serverUrl = (import.meta.env.VITE_SERVER_URL || window.location.origin).trim();
+
+    useEffect(() => {
+        const checkHealth = async () => {
+            try {
+                const res = await axios.get(`${serverUrl}/health`);
+                setIsDbConnected(res.data.db);
+            } catch {
+                setIsDbConnected(false);
+            }
+        };
+        checkHealth();
+    }, [serverUrl]);
+
+    const animateScore = (target, onUpdate) => {
+        const start = performance.now();
+        const duration = 1500;
+        function frame(now) {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3); // ease-out-cubic
+            onUpdate(Math.round(eased * target));
+            if (progress < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                // Pulse at completion
+                setScorePulse(true);
+                setTimeout(() => setScorePulse(false), 300);
+            }
+        }
+        requestAnimationFrame(frame);
+    };
+
+    const fetchPercentile = async (platform, userScore) => {
+        try {
+            const response = await axios.get(`${serverUrl}/api/daily/${platform}/leaderboard`);
+            const { entries, totalCount } = response.data;
+            if (totalCount < 5) {
+                setPercentileText('One of the first to analyse today');
+            } else {
+                const lowerScores = entries.filter(e => e.score < userScore).length;
+                const percentile = Math.round((lowerScores / totalCount) * 100);
+                setPercentileText(`Better than ${percentile}% of solutions today`);
+            }
+        } catch (err) {
+            console.error('Percentile fetch failed:', err);
+        }
+    };
+
+    const handleShareScore = async () => {
+        if (!cardRef.current) return;
+        try {
+            const dataUrl = await htmlToImage.toPng(cardRef.current, { width: 800, height: 420 });
+            const link = document.createElement('a');
+            link.download = 'forkspace-score.png';
+            link.href = dataUrl;
+            link.click();
+
+            // Also create challenge
+            await handleChallengeFriend();
+            toast.success('Image downloaded + challenge link copied!');
+        } catch (err) {
+            toast.error('Failed to generate share image');
+        }
+    };
+
+    const handleChallengeFriend = async () => {
+        try {
+            const response = await axios.post(`${serverUrl}/api/challenge/create`, {
+                challengerName: localStorage.getItem('forkspace-username') || 'Anonymous',
+                challengerScore: displayAnalysis.overallScore,
+                challengerVerdict: displayAnalysis.verdict,
+                challengerTimeComplexity: displayAnalysis.complexity.time,
+                language: language,
+                problemContext: problemContext || 'Custom Problem',
+                platform: activeDailyProblem ? `daily-${activeDailyProblem.platform}` : 'custom'
+            });
+
+            const challengeUrl = response.data.challengeUrl;
+            await navigator.clipboard.writeText(challengeUrl);
+            
+            // Show custom modal (simplified here as toast + alert for now, 
+            // but we can add a proper modal if needed)
+            toast.success('Challenge link copied to clipboard!');
+            
+            // Open share options (Twitter/WhatsApp)
+            const text = `I scored ${displayAnalysis.overallScore}/100 on today's DSA challenge with ForkSpace. Can you beat it? ${challengeUrl}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        } catch (err) {
+            toast.error('Failed to create challenge');
+        }
+    };
+
+    const handleUseDailyProblem = (problem) => {
+        setProblemContext(`${problem.title}\n\n${problem.statement}`);
+        setActiveDailyProblem(problem);
+        if (language === '') setLanguage('cpp');
+    };
+
     const lineCount = code ? code.split(/\r?\n/).length : 0;
     const charCount = code.length;
     const displayAnalysis = analysis ? normalizeAnalysisPayload(analysis, code) : null;
@@ -287,6 +398,29 @@ function AnalysePage() {
             setAnalysis(parsedResult);
             setSavedId(nextId);
             setLastAnalysedAt(new Date().toISOString());
+            
+            // Trigger score animation
+            setAnimatedScore(0);
+            animateScore(parsedResult.overallScore, setAnimatedScore);
+
+            // Fetch percentile and show action buttons after delay
+            if (activeDailyProblem) {
+                fetchPercentile(activeDailyProblem.platform, parsedResult.overallScore);
+                
+                // Submit to leaderboard automatically if matching daily problem
+                axios.post(`${serverUrl}/api/daily/submit`, {
+                    platform: activeDailyProblem.platform,
+                    score: parsedResult.overallScore,
+                    verdict: parsedResult.verdict,
+                    timeComplexity: parsedResult.complexity.time,
+                    spaceComplexity: parsedResult.complexity.space,
+                    language: language,
+                    displayName: localStorage.getItem('forkspace-username') || 'Anonymous'
+                }).catch(err => console.error('Leaderboard auto-submit failed:', err));
+            }
+
+            setTimeout(() => setShowActionButtons(true), 800);
+
             window.history.pushState({}, '', `/analysis/${nextId}`);
             navigate(`/analysis/${nextId}`, { replace: true });
             toast.success('Analysis ready');
@@ -312,14 +446,14 @@ function AnalysePage() {
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                     <div className="rounded-2xl border border-[#30363d] bg-[#0d1117] p-5">
                         <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                            <div className="relative h-28 w-28 shrink-0">
+                            <div className={`relative h-28 w-28 shrink-0 transition-shadow duration-300 ${scorePulse ? 'shadow-[0_0_20px_rgba(245,158,11,0.5)] rounded-full' : ''}`}>
                         <svg className="h-28 w-28 -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
                             <circle cx="40" cy="40" r="32" stroke="#21262d" strokeWidth="8" fill="none" />
                             <circle
                                 cx="40"
                                 cy="40"
                                 r="32"
-                                stroke={scoreColor(score)}
+                                stroke={scoreColor(animatedScore)}
                                 strokeWidth="8"
                                 fill="none"
                                 strokeLinecap="round"
@@ -328,11 +462,14 @@ function AnalysePage() {
                                 style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1)' }}
                             />
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-[#e6edf3]">{score}</div>
+                        <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-[#e6edf3]">{animatedScore}</div>
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b949e]">ForkSpace verdict</p>
                                 <h3 className="mt-2 text-2xl font-semibold text-[#e6edf3]">{displayAnalysis.verdict}</h3>
+                                {percentileText && (
+                                    <p className="mt-1 text-xs font-bold text-amber-500 uppercase tracking-wider">{percentileText}</p>
+                                )}
                                 <p className="mt-3 text-base leading-8 text-[#c9d1d9]">{displayAnalysis.summary}</p>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     {displayAnalysis.tags.map((tag) => (
@@ -624,7 +761,8 @@ function AnalysePage() {
             <div className="flex h-[calc(100vh-73px)]">
                 <aside className="flex h-full w-full flex-col border-r border-[#21262d] lg:w-[40%] xl:w-[38%]">
                     <div className="overflow-y-auto px-5 py-5">
-                        <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
+                        <DailyChallenge onUseAsContext={handleUseDailyProblem} />
+                        <div className="mt-6 grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
                             <label className="space-y-2">
                                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b949e]">Language</span>
                                 <select
@@ -720,10 +858,60 @@ function AnalysePage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {showActionButtons && (
+                                <div className="grid grid-cols-3 gap-4 animate-slideUp">
+                                    {isDbConnected && (
+                                        <button
+                                            onClick={() => setIsLeaderboardOpen(true)}
+                                            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
+                                        >
+                                            <span className="text-2xl">📊</span>
+                                            <span className="text-sm font-bold text-white uppercase tracking-wider">View Leaderboard</span>
+                                        </button>
+                                    )}
+                                    {isDbConnected && (
+                                        <button
+                                            onClick={handleChallengeFriend}
+                                            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 transition hover:bg-amber-500/10"
+                                        >
+                                            <span className="text-2xl">🏆</span>
+                                            <span className="text-sm font-bold text-amber-500 uppercase tracking-wider">Challenge a Friend</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleShareScore}
+                                        className={`flex flex-col items-center justify-center gap-2 rounded-2xl border border-blue-500/30 bg-blue-500/5 p-4 transition hover:bg-blue-500/10 ${!isDbConnected ? 'col-span-3' : ''}`}
+                                    >
+                                        <span className="text-2xl">📤</span>
+                                        <span className="text-sm font-bold text-blue-400 uppercase tracking-wider">Share Score</span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </main>
             </div>
+
+            {/* Hidden Score Card for image generation */}
+            <ScoreCard 
+                ref={cardRef}
+                score={displayAnalysis?.overallScore || 0}
+                verdict={displayAnalysis?.verdict || ''}
+                problemTitle={activeDailyProblem?.title || problemContext.split('\n')[0] || 'Custom Solution'}
+                language={language}
+                timeComplexity={displayAnalysis?.complexity.time || 'O(?)'}
+                spaceComplexity={displayAnalysis?.complexity.space || 'O(?)'}
+                bugCount={displayAnalysis?.bugs.length || 0}
+                percentile={percentileText}
+            />
+
+            <Leaderboard 
+                isOpen={isLeaderboardOpen} 
+                onClose={() => setIsLeaderboardOpen(false)}
+                platform={activeDailyProblem?.platform}
+                problemTitle={activeDailyProblem?.title}
+            />
         </div>
     );
 }

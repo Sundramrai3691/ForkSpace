@@ -52,6 +52,8 @@ import {
   parseInternalProblemId,
 } from "./services/codeforcesCatalog.js";
 import createHiddenTestRouter from "./hidden-tests/hiddenTestRoutes.js";
+import dailyRoutes from "./routes/dailyRoutes.js";
+import challengeRoutes from "./routes/challengeRoutes.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
 mongoose.set("bufferCommands", false);
@@ -185,10 +187,7 @@ app.use(express.json());
 
 // Middleware to check database connection
 app.use((req, res, next) => {
-  if (
-    !isDatabaseConnected() &&
-    req.path.startsWith("/api/auth")
-  ) {
+  if (!isDatabaseConnected() && req.path.startsWith("/api/auth")) {
     return res.status(503).json({
       error: "Database is not connected. Please ensure MongoDB is running.",
     });
@@ -203,6 +202,9 @@ app.use(
     getRoomState: getOrCreateRoomState,
   }),
 );
+
+app.use("/api/daily", dailyRoutes);
+app.use("/api/challenge", challengeRoutes);
 
 const server = http.createServer(app);
 
@@ -220,7 +222,10 @@ if (pubClient && subClient) {
 }
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    db: mongoose.connection.readyState === 1,
+  });
 });
 
 app.get("/", (_req, res) => {
@@ -233,7 +238,12 @@ app.get("/", (_req, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
-  const { name = "", email = "", password = "", avatarId = "clever-fox" } = req.body || {};
+  const {
+    name = "",
+    email = "",
+    password = "",
+    avatarId = "clever-fox",
+  } = req.body || {};
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
@@ -936,7 +946,9 @@ async function listGeminiGenerateContentModels(apiKey) {
 
     const models = response.data?.models || [];
     return models
-      .filter((entry) => entry?.supportedGenerationMethods?.includes("generateContent"))
+      .filter((entry) =>
+        entry?.supportedGenerationMethods?.includes("generateContent"),
+      )
       .map((entry) => entry?.name?.replace(/^models\//, ""))
       .filter(Boolean);
   } catch (error) {
@@ -1185,7 +1197,9 @@ function normalizeForComparison(value = "") {
 }
 
 function normalizeOutput(value = "") {
-  return String(value || "").replace(/\r\n/g, "\n").trim();
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .trim();
 }
 
 function buildSamplesFromJoinedText(sampleInput = "", sampleOutput = "") {
@@ -1211,8 +1225,12 @@ function attachNormalizedSamples(problem = {}) {
     ...createDefaultProblemState(),
     ...problem,
   };
-  const normalizedJoinedInput = normalizeWhitespace(normalizedProblem.sampleInput);
-  const normalizedJoinedOutput = normalizeWhitespace(normalizedProblem.sampleOutput);
+  const normalizedJoinedInput = normalizeWhitespace(
+    normalizedProblem.sampleInput,
+  );
+  const normalizedJoinedOutput = normalizeWhitespace(
+    normalizedProblem.sampleOutput,
+  );
   const normalizedIncomingSamples = Array.isArray(problem?.samples)
     ? problem.samples
         .map((sample, index) => ({
@@ -1223,16 +1241,27 @@ function attachNormalizedSamples(problem = {}) {
         .filter((sample) => sample.input || sample.output)
     : [];
   const joinedFromIncomingSamples = {
-    input: normalizedIncomingSamples.map((sample) => sample.input).filter(Boolean).join("\n\n"),
-    output: normalizedIncomingSamples.map((sample) => sample.output).filter(Boolean).join("\n\n"),
+    input: normalizedIncomingSamples
+      .map((sample) => sample.input)
+      .filter(Boolean)
+      .join("\n\n"),
+    output: normalizedIncomingSamples
+      .map((sample) => sample.output)
+      .filter(Boolean)
+      .join("\n\n"),
   };
   const joinedTextLooksEdited =
-    normalizedJoinedInput !== normalizeWhitespace(joinedFromIncomingSamples.input) ||
-    normalizedJoinedOutput !== normalizeWhitespace(joinedFromIncomingSamples.output);
+    normalizedJoinedInput !==
+      normalizeWhitespace(joinedFromIncomingSamples.input) ||
+    normalizedJoinedOutput !==
+      normalizeWhitespace(joinedFromIncomingSamples.output);
   const samples =
     normalizedIncomingSamples.length > 0 && !joinedTextLooksEdited
       ? normalizedIncomingSamples
-      : buildSamplesFromJoinedText(normalizedJoinedInput, normalizedJoinedOutput);
+      : buildSamplesFromJoinedText(
+          normalizedJoinedInput,
+          normalizedJoinedOutput,
+        );
 
   const tagsRaw = normalizedProblem.tags;
   const tags = Array.isArray(tagsRaw)
@@ -2057,10 +2086,9 @@ ${code}
 
     res.json(jsonResponse);
   } catch (error) {
-    const errorMsg =
-      toFriendlyAiError(
-        error.response?.data?.error?.message || error.message || "Unknown error",
-      );
+    const errorMsg = toFriendlyAiError(
+      error.response?.data?.error?.message || error.message || "Unknown error",
+    );
     console.error("AI review error:", errorMsg);
     res.status(500).json({
       error: `AI Review failed: ${errorMsg}. Please check your API key and connection.`,
@@ -2132,7 +2160,9 @@ async function handleStandaloneAnalysis(req, res) {
             return res.status(200).json(parsed);
           }
         } catch {
-          console.warn(`${provider} returned non-JSON analysis, trying next provider`);
+          console.warn(
+            `${provider} returned non-JSON analysis, trying next provider`,
+          );
         }
       } catch {
         console.warn(`${provider} failed for analysis, falling back`);
@@ -2148,10 +2178,9 @@ async function handleStandaloneAnalysis(req, res) {
       raw: "All configured AI providers failed or returned an empty response.",
     });
   } catch (error) {
-    const errorMsg =
-      toFriendlyAiError(
-        error.response?.data?.error?.message || error.message || "Unknown error",
-      );
+    const errorMsg = toFriendlyAiError(
+      error.response?.data?.error?.message || error.message || "Unknown error",
+    );
     console.error("Standalone analysis error:", errorMsg);
     return res.status(500).json({
       error: "Analysis failed",
@@ -2620,13 +2649,19 @@ app.post("/api/run-sample-suite", async (req, res) => {
   }
 });
 
-async function enrichReportWithHiddenTestSignals({ roomId, sessionId, report }) {
+async function enrichReportWithHiddenTestSignals({
+  roomId,
+  sessionId,
+  report,
+}) {
   if (!isDatabaseConnected() || !report) return report;
   try {
     const rows = await HiddenTest.find({
       roomId,
       sessionId,
-      bugClass: { $in: ["off-by-one", "overflow", "empty case", "wrong loop bounds"] },
+      bugClass: {
+        $in: ["off-by-one", "overflow", "empty case", "wrong loop bounds"],
+      },
       $or: [
         { passed: false },
         { timedOut: true },
@@ -2653,7 +2688,9 @@ async function enrichReportWithHiddenTestSignals({ roomId, sessionId, report }) 
     const hiddenSignal = `Hidden tests indicate repeated ${topBug} issues (${topCount} occurrences).`;
     return {
       ...report,
-      biggestGaps: [...new Set([...(report.biggestGaps || []), hiddenSignal])].slice(0, 5),
+      biggestGaps: [
+        ...new Set([...(report.biggestGaps || []), hiddenSignal]),
+      ].slice(0, 5),
       nextSteps: [
         ...new Set([
           ...(report.nextSteps || []),
@@ -2693,14 +2730,17 @@ app.post("/api/session-intelligence/report", async (req, res) => {
     });
   }
 
-  const usePersonal =
-    Boolean(user) && personal !== "all" && personal !== false;
+  const usePersonal = Boolean(user) && personal !== "all" && personal !== false;
   const filter = usePersonal
     ? { userId: String(user._id), username: user.name }
     : {};
 
   let report = aggregateSessionReport(logDoc, filter);
-  report = await enrichReportWithHiddenTestSignals({ roomId, sessionId, report });
+  report = await enrichReportWithHiddenTestSignals({
+    roomId,
+    sessionId,
+    report,
+  });
   let previousReport = null;
   if (user?._id) {
     const existingReports = await listReportsForUser(
@@ -2723,27 +2763,54 @@ app.post("/api/session-intelligence/report", async (req, res) => {
   let newTitle = null;
   if (user) {
     const today = new Date();
-    const priorDate = user.lastActiveDate ? new Date(user.lastActiveDate) : null;
-    const diffDays = priorDate
-      ? Math.floor((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - Date.UTC(priorDate.getUTCFullYear(), priorDate.getUTCMonth(), priorDate.getUTCDate())) / 86400000)
+    const priorDate = user.lastActiveDate
+      ? new Date(user.lastActiveDate)
       : null;
-    const nextStreak = diffDays === null
-      ? 1
-      : diffDays === 0
-        ? Math.max(1, user.currentStreak || 1)
-        : diffDays === 1
-          ? (user.currentStreak || 0) + 1
-          : 1;
+    const diffDays = priorDate
+      ? Math.floor(
+          (Date.UTC(
+            today.getUTCFullYear(),
+            today.getUTCMonth(),
+            today.getUTCDate(),
+          ) -
+            Date.UTC(
+              priorDate.getUTCFullYear(),
+              priorDate.getUTCMonth(),
+              priorDate.getUTCDate(),
+            )) /
+            86400000,
+        )
+      : null;
+    const nextStreak =
+      diffDays === null
+        ? 1
+        : diffDays === 0
+          ? Math.max(1, user.currentStreak || 1)
+          : diffDays === 1
+            ? (user.currentStreak || 0) + 1
+            : 1;
     const solvedScore = Number(report.sessionScore || 0);
-    const cfProblemRating = Number(report.problemRating || roomState?.problem?.rating || 0) || 0;
+    const cfProblemRating =
+      Number(report.problemRating || roomState?.problem?.rating || 0) || 0;
     const solvedInMinutes = report.stats?.firstSubmitMs
       ? Math.round(report.stats.firstSubmitMs / 60000)
       : null;
-    const halfTimeLimitMinutes = Number(roomState?.problem?.timeLimitMinutes || 0) / 2 || null;
-    const timeBonus = halfTimeLimitMinutes && solvedInMinutes && solvedInMinutes <= halfTimeLimitMinutes ? 10 : 0;
+    const halfTimeLimitMinutes =
+      Number(roomState?.problem?.timeLimitMinutes || 0) / 2 || null;
+    const timeBonus =
+      halfTimeLimitMinutes &&
+      solvedInMinutes &&
+      solvedInMinutes <= halfTimeLimitMinutes
+        ? 10
+        : 0;
     const cfBonus = cfProblemRating >= 1600 ? 25 : 0;
     user.forkspaceRating = clampNumber(
-      Math.round((user.forkspaceRating || 1000) + (solvedScore - 60) * 1.5 + cfBonus + timeBonus),
+      Math.round(
+        (user.forkspaceRating || 1000) +
+          (solvedScore - 60) * 1.5 +
+          cfBonus +
+          timeBonus,
+      ),
       600,
       3000,
     );
@@ -2751,7 +2818,10 @@ app.post("/api/session-intelligence/report", async (req, res) => {
     user.problemsAttempted = (user.problemsAttempted || 0) + 1;
     user.currentStreak = nextStreak;
     user.lastActiveDate = today;
-    user.activityLog = [...(user.activityLog || []), { date: today, sessionId }].slice(-84);
+    user.activityLog = [
+      ...(user.activityLog || []),
+      { date: today, sessionId },
+    ].slice(-84);
     await user.save();
     const awarded = await checkAndAwardTitles(String(user._id), {
       solvedInMinutes,
@@ -2777,21 +2847,29 @@ app.post("/api/session-intelligence/report", async (req, res) => {
     io.to(roomId).emit("session-update", { session: roomState.session });
   }
 
-  return res.json({ report, shareId, sessionId, previousReport, newTitle, user: user ? buildUserPayload(user) : null });
+  return res.json({
+    report,
+    shareId,
+    sessionId,
+    previousReport,
+    newTitle,
+    user: user ? buildUserPayload(user) : null,
+  });
 });
 
 app.get("/api/session-intelligence/report/:shareId", async (req, res) => {
-  const doc = await getReportByShareId(
-    isDatabaseConnected,
-    req.params.shareId,
-  );
+  const doc = await getReportByShareId(isDatabaseConnected, req.params.shareId);
   if (!doc) {
     return res.status(404).json({ error: "Report not found" });
   }
   let previousReport = null;
   if (doc.userId) {
-    const rows = await listReportsForUser(isDatabaseConnected, String(doc.userId));
-    previousReport = rows.find((row) => row.shareId !== doc.shareId)?.report || null;
+    const rows = await listReportsForUser(
+      isDatabaseConnected,
+      String(doc.userId),
+    );
+    previousReport =
+      rows.find((row) => row.shareId !== doc.shareId)?.report || null;
   }
   return res.json({
     shareId: doc.shareId,
@@ -2953,7 +3031,7 @@ app.post("/api/rooms/:roomId/problem-selection", async (req, res) => {
     if (problemSource !== "codeforces" || !internalProblemId) {
       return res.status(400).json({
         error:
-          "Set problemSource to \"manual\" or provide problemSource \"codeforces\" with internalProblemId.",
+          'Set problemSource to "manual" or provide problemSource "codeforces" with internalProblemId.',
       });
     }
 
@@ -3007,7 +3085,9 @@ function pickColorForRoom(roomId, currentSocketId) {
     .filter((socketId) => socketId !== currentSocketId)
     .map((socketId) => userSocketMap[socketId])
     .filter(Boolean);
-  const usedColors = new Set(roomUsers.map((user) => user.color).filter(Boolean));
+  const usedColors = new Set(
+    roomUsers.map((user) => user.color).filter(Boolean),
+  );
   const availableColor = USER_COLORS.find((color) => !usedColors.has(color));
   return availableColor || USER_COLORS[roomUsers.length % USER_COLORS.length];
 }
@@ -3058,9 +3138,7 @@ io.on("connection", (socket) => {
         }
       }
 
-      const authPayload = authToken
-        ? safeVerifyJwt(authToken)
-        : null;
+      const authPayload = authToken ? safeVerifyJwt(authToken) : null;
       let authenticatedUser = null;
       if (authPayload?.userId && isDatabaseConnected()) {
         authenticatedUser = await User.findById(authPayload.userId);
@@ -3236,102 +3314,120 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("run-code", async ({ roomId, code, languageId, stdin = "" }, callback) => {
-    if (!roomId || !code) {
-      callback?.({ ok: false, error: "Missing roomId or code" });
-      return;
-    }
+  socket.on(
+    "run-code",
+    async ({ roomId, code, languageId, stdin = "" }, callback) => {
+      if (!roomId || !code) {
+        callback?.({ ok: false, error: "Missing roomId or code" });
+        return;
+      }
 
-    const supportedLanguageIds = new Set(
-      Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id),
-    );
-    if (!supportedLanguageIds.has(languageId)) {
-      callback?.({ ok: false, error: "Unsupported language" });
-      return;
-    }
-    const judge0 = getJudge0Config();
-    if (!judge0.ok) {
-      callback?.({ ok: false, error: judge0.error });
-      return;
-    }
-
-    try {
-      const execution = await executeSubmission({ code, stdin, languageId });
-      const runBy = userSocketMap[socket.id]?.username || "Guest";
-      const roomState = getOrCreateRoomState(roomId);
-      ensureIntelligenceSession(roomState);
-      const normalizedStdout = normalizeOutput(execution.stdout || "");
-      const normalizedExpected = normalizeOutput(roomState?.problem?.sampleOutput || "");
-      const hasCompileError = Boolean(execution.compile_output);
-      const hasRuntimeError = Boolean(execution.stderr);
-      const sampleMatched =
-        normalizedExpected &&
-        !hasCompileError &&
-        !hasRuntimeError &&
-        normalizedStdout === normalizedExpected;
-      const sampleMismatched =
-        normalizedExpected &&
-        !hasCompileError &&
-        !hasRuntimeError &&
-        normalizedStdout !== normalizedExpected;
-      const runEntry = {
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        status: hasCompileError ? "Compilation Error" : hasRuntimeError ? "Runtime Error" : "Completed",
-        time: execution.time || "N/A",
-        memory: execution.memory || "N/A",
-        passed: sampleMatched,
-        languageLabel:
-          Object.values(SUPPORTED_LANGUAGES).find((language) => language.id === languageId)?.label || "Unknown",
-        stdin,
-        stdout: normalizedStdout,
-        expectedOutput: normalizedExpected,
-        sampleCheck: sampleMatched ? "passed" : sampleMismatched ? "mismatch" : "not_checked",
-      };
-      roomState.session.runHistory = [runEntry, ...roomState.session.runHistory].slice(0, 5);
-      scheduleRoomStatePersist();
-
-      const intelId = roomState.session.intelligenceSessionId;
-      const runner = userSocketMap[socket.id];
-      void appendIntelligenceEvent(
-        isDatabaseConnected,
-        intelId,
-        roomId,
-        buildProblemSnapshot(roomState.problem),
-        {
-          type: "run",
-          userId: runner?.userId ? String(runner.userId) : "",
-          username: runner?.username || "Guest",
-          socketId: socket.id,
-          payload: {
-            errorType: hasCompileError
-              ? "compile"
-              : hasRuntimeError
-                ? "runtime"
-                : null,
-            sampleCheck: runEntry.sampleCheck,
-            status: runEntry.status,
-            passed: sampleMatched,
-            languageLabel: runEntry.languageLabel,
-          },
-        },
+      const supportedLanguageIds = new Set(
+        Object.values(SUPPORTED_LANGUAGES).map(({ id }) => id),
       );
+      if (!supportedLanguageIds.has(languageId)) {
+        callback?.({ ok: false, error: "Unsupported language" });
+        return;
+      }
+      const judge0 = getJudge0Config();
+      if (!judge0.ok) {
+        callback?.({ ok: false, error: judge0.error });
+        return;
+      }
 
-      io.to(roomId).emit("run-result", {
-        result: execution,
-        runBy,
-      });
-      io.to(roomId).emit("session-update", {
-        session: roomState.session,
-      });
+      try {
+        const execution = await executeSubmission({ code, stdin, languageId });
+        const runBy = userSocketMap[socket.id]?.username || "Guest";
+        const roomState = getOrCreateRoomState(roomId);
+        ensureIntelligenceSession(roomState);
+        const normalizedStdout = normalizeOutput(execution.stdout || "");
+        const normalizedExpected = normalizeOutput(
+          roomState?.problem?.sampleOutput || "",
+        );
+        const hasCompileError = Boolean(execution.compile_output);
+        const hasRuntimeError = Boolean(execution.stderr);
+        const sampleMatched =
+          normalizedExpected &&
+          !hasCompileError &&
+          !hasRuntimeError &&
+          normalizedStdout === normalizedExpected;
+        const sampleMismatched =
+          normalizedExpected &&
+          !hasCompileError &&
+          !hasRuntimeError &&
+          normalizedStdout !== normalizedExpected;
+        const runEntry = {
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          status: hasCompileError
+            ? "Compilation Error"
+            : hasRuntimeError
+              ? "Runtime Error"
+              : "Completed",
+          time: execution.time || "N/A",
+          memory: execution.memory || "N/A",
+          passed: sampleMatched,
+          languageLabel:
+            Object.values(SUPPORTED_LANGUAGES).find(
+              (language) => language.id === languageId,
+            )?.label || "Unknown",
+          stdin,
+          stdout: normalizedStdout,
+          expectedOutput: normalizedExpected,
+          sampleCheck: sampleMatched
+            ? "passed"
+            : sampleMismatched
+              ? "mismatch"
+              : "not_checked",
+        };
+        roomState.session.runHistory = [
+          runEntry,
+          ...roomState.session.runHistory,
+        ].slice(0, 5);
+        scheduleRoomStatePersist();
 
-      callback?.({ ok: true });
-    } catch (error) {
-      const message = extractUpstreamError(error, "Error running code");
-      callback?.({ ok: false, error: message });
-      socket.emit("run-error", { error: message });
-    }
-  });
+        const intelId = roomState.session.intelligenceSessionId;
+        const runner = userSocketMap[socket.id];
+        void appendIntelligenceEvent(
+          isDatabaseConnected,
+          intelId,
+          roomId,
+          buildProblemSnapshot(roomState.problem),
+          {
+            type: "run",
+            userId: runner?.userId ? String(runner.userId) : "",
+            username: runner?.username || "Guest",
+            socketId: socket.id,
+            payload: {
+              errorType: hasCompileError
+                ? "compile"
+                : hasRuntimeError
+                  ? "runtime"
+                  : null,
+              sampleCheck: runEntry.sampleCheck,
+              status: runEntry.status,
+              passed: sampleMatched,
+              languageLabel: runEntry.languageLabel,
+            },
+          },
+        );
+
+        io.to(roomId).emit("run-result", {
+          result: execution,
+          runBy,
+        });
+        io.to(roomId).emit("session-update", {
+          session: roomState.session,
+        });
+
+        callback?.({ ok: true });
+      } catch (error) {
+        const message = extractUpstreamError(error, "Error running code");
+        callback?.({ ok: false, error: message });
+        socket.emit("run-error", { error: message });
+      }
+    },
+  );
 
   socket.on("intelligence-session-end", async ({ roomId, reason }) => {
     if (!roomId) return;

@@ -2,6 +2,7 @@ import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import Editor from './pages/Editor'
 import AnalysePage from './pages/AnalysePage'
+import ChallengePage from './pages/ChallengePage'
 import MockSummaryPage from './pages/MockSummaryPage'
 import SessionReportPage from './pages/SessionReportPage'
 import AnalysisReportsPage from './pages/AnalysisReportsPage'
@@ -33,6 +34,7 @@ function AppChrome() {
         <Route path="/analyse" element={<AnalysePage />} />
         <Route path="/analysis/:analysisId" element={<AnalysePage />} />
         <Route path="/summary/:summaryId" element={<MockSummaryPage />} />
+        <Route path="/challenge/:id" element={<ChallengePage />} />
         <Route path="/report/:shareId" element={<SessionReportPage />} />
         <Route path="/card/:shareId" element={<SessionCardPage />} />
         <Route path="/history/reports" element={<AnalysisReportsPage />} />
