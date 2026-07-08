@@ -38,9 +38,10 @@ It is intentionally narrow: one problem, one shared solution, one focused workfl
 Recent product and workflow improvements reflected in this repo:
 
 - Refined the landing, workspace, analysis, and report surfaces so the main workflow reads more clearly
+- Added a daily challenge flow with LeetCode POTD and Codeforces daily picks plus leaderboard support
 - Expanded Codeforces support with browsable catalog filters plus room-side URL import helpers
 - Improved hidden test generation so room test sets refresh cleanly and useful failures can be promoted into sample tests
-- Added stronger session intelligence and standalone solution analysis flows with shareable links
+- Added stronger session intelligence and standalone solution analysis flows with shareable links, challenge links, and score-card sharing
 - Improved execution feedback, sample comparison, and room-side report visibility
 - Added cleaner fallback handling when AI quota or provider availability is limited
 - Kept guest-first entry intact while improving signed-in history and report persistence
@@ -62,6 +63,7 @@ Recent product and workflow improvements reflected in this repo:
 ### Interview workflow
 
 - Shared problem brief, prompt, constraints, notes, and sample I/O
+- Daily challenge flow for LeetCode POTD and Codeforces daily practice
 - Codeforces-first workflow with browsable catalog and room problem selection
 - URL import helpers for supported problem pages, with manual editing kept available
 - Manual statement/sample copy flow for reliable external problem setup
@@ -84,6 +86,8 @@ Recent product and workflow improvements reflected in this repo:
 - AI hints in the editor
 - AI solution review with complexity, bug-risk, style, and optimization feedback
 - Standalone analysis page with shareable analysis links
+- Daily challenge submissions with leaderboard ranking when the analysed problem matches the current daily
+- Head-to-head challenge links so one analysis result can be sent to someone else to beat
 - Session intelligence reports with strengths, gaps, next steps, and session score
 - Shareable session cards and report pages for recap, screenshots, or follow-up
 - Shareable report pages and a signed-in report history screen
@@ -120,6 +124,8 @@ Express + Socket Server
         |
         |-- Codeforces catalog
         |
+        |-- Daily challenges + challenge links
+        |
         |-- Hidden tests
         |   (LLM-assisted planning + Piston execution)
         |
@@ -130,6 +136,7 @@ Express + Socket Server
 ### Notes
 
 - `server/server.js` is the main backend for auth, sockets, execution, analysis, reports, Codeforces import/catalog, and hidden tests
+- `api/` contains serverless-friendly analysis endpoints used for deployed share links and fallback analysis fetches
 - Room state is persisted locally under `server/data/`
 - Redis pub/sub is supported for horizontal Socket.IO scaling when `REDIS_URL` is set
 - MongoDB is optional for local boot, but needed for full auth/history/report persistence
@@ -230,12 +237,12 @@ npm run start
 1. Open the home page and continue as guest or sign in.
 2. Create a room or join an existing room ID.
 3. Pick a session mode: `Peer Practice`, `Mock Interview`, or `Mentoring`.
-4. Add the problem manually, browse Codeforces, or use a supported problem URL import helper.
+4. Add the problem manually, browse Codeforces, use a supported problem URL import helper, or start from the daily challenge flow.
 5. Choose the room language and solve together in the shared editor.
 6. Use `Run` and `Submit` to compare output against visible sample tests.
 7. Use `Generate Tests` to create verified and stress-style hidden tests, then promote useful failures into the sample suite when needed.
-8. Use `Analyze` for solution review and `Report` for the room/session summary.
-9. Copy a share link for analysis, report, or session card pages if you want to send the result elsewhere.
+8. Use `Analyze` for solution review, daily challenge scoring, and optional challenge-link creation, then use `Report` for the room/session summary.
+9. Copy a share link for analysis, report, challenge, or session card pages if you want to send the result elsewhere.
 
 ---
 
@@ -243,6 +250,7 @@ npm run start
 
 ```text
 ForkSpace/
+|-- api/
 |-- src/
 |   |-- components/
 |   |   |-- Workspace/
