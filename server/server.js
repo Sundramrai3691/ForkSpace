@@ -54,6 +54,11 @@ import {
 import createHiddenTestRouter from "./hidden-tests/hiddenTestRoutes.js";
 import dailyRoutes from "./routes/dailyRoutes.js";
 import challengeRoutes from "./routes/challengeRoutes.js";
+import {
+  buildRateLimitKey,
+  consumeTokenBucket,
+  createRedisTokenBucketRateLimiter,
+} from "./middleware/rateLimiter.js";
 
 loadEnv({ path: new URL("./.env", import.meta.url) });
 mongoose.set("bufferCommands", false);
@@ -105,6 +110,45 @@ function safeVerifyJwt(token) {
     return null;
   }
 }
+
+function getClientIp(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "")
+    .split(",")[0]
+    .trim();
+  return forwardedFor || req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function getBearerToken(req) {
+  const authHeader = req.headers.authorization || "";
+  return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+}
+
+const AUTH_RATE_LIMIT = {
+  maxTokens: 5,
+  refillRatePerSecond: 5 / 60,
+  routeName: "auth",
+};
+
+const CODE_EXECUTION_RATE_LIMIT = {
+  maxTokens: 10,
+  refillRatePerSecond: 10 / 60,
+  routeName: "code-execution",
+};
+
+const authRateLimiter = createRedisTokenBucketRateLimiter({
+  redisClient: pubClient,
+  ...AUTH_RATE_LIMIT,
+  keyGenerator: (req) => `ip:${getClientIp(req)}`,
+});
+
+const codeExecutionRateLimiter = createRedisTokenBucketRateLimiter({
+  redisClient: pubClient,
+  ...CODE_EXECUTION_RATE_LIMIT,
+  keyGenerator: (req) => {
+    const payload = safeVerifyJwt(getBearerToken(req));
+    return payload?.userId ? `user:${payload.userId}` : `ip:${getClientIp(req)}`;
+  },
+});
 
 function buildUserPayload(user) {
   return {
@@ -237,7 +281,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", authRateLimiter, async (req, res) => {
   const {
     name = "",
     email = "",
@@ -276,7 +320,7 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", authRateLimiter, async (req, res) => {
   const { email = "", password = "" } = req.body || {};
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -2471,7 +2515,7 @@ async function executeSubmission({
   };
 }
 
-app.post("/api/run-code", async (req, res) => {
+app.post("/api/run-code", codeExecutionRateLimiter, async (req, res) => {
   const {
     code,
     stdin = "",
@@ -2526,7 +2570,7 @@ app.post("/api/run-code", async (req, res) => {
   }
 });
 
-app.post("/api/run-sample-suite", async (req, res) => {
+app.post("/api/run-sample-suite", codeExecutionRateLimiter, async (req, res) => {
   const {
     code,
     languageId = getLanguageConfig(DEFAULT_LANGUAGE).id,
@@ -3080,6 +3124,22 @@ const USER_COLORS = [
   "#06b6d4",
 ];
 
+async function consumeSocketCodeExecutionRateLimit(socket) {
+  const userId = userSocketMap[socket.id]?.userId;
+  const forwardedFor = String(socket.handshake?.headers?.["x-forwarded-for"] || "")
+    .split(",")[0]
+    .trim();
+  const ip = forwardedFor || socket.handshake?.address || socket.id;
+  const identifier = userId ? `user:${userId}` : `ip:${ip}`;
+
+  return consumeTokenBucket({
+    redisClient: pubClient,
+    key: buildRateLimitKey(identifier, CODE_EXECUTION_RATE_LIMIT.routeName),
+    maxTokens: CODE_EXECUTION_RATE_LIMIT.maxTokens,
+    refillRatePerSecond: CODE_EXECUTION_RATE_LIMIT.refillRatePerSecond,
+  });
+}
+
 function pickColorForRoom(roomId, currentSocketId) {
   const roomUsers = Array.from(io.sockets.adapter.rooms.get(roomId) || [])
     .filter((socketId) => socketId !== currentSocketId)
@@ -3319,6 +3379,16 @@ io.on("connection", (socket) => {
     async ({ roomId, code, languageId, stdin = "" }, callback) => {
       if (!roomId || !code) {
         callback?.({ ok: false, error: "Missing roomId or code" });
+        return;
+      }
+
+      const rateLimit = await consumeSocketCodeExecutionRateLimit(socket);
+      if (!rateLimit.allowed) {
+        callback?.({
+          ok: false,
+          error: "Rate limit exceeded",
+          retryAfterMs: rateLimit.retryAfterMs,
+        });
         return;
       }
 
