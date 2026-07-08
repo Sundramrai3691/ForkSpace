@@ -46,6 +46,8 @@ redis.call("PEXPIRE", key, ttlMs)
 return { allowed, tokens, retryAfterMs }
 `;
 
+let loggedMissingRedisClient = false;
+
 function sanitizeKeyPart(value) {
   return String(value || "anonymous").replace(/[^a-zA-Z0-9:_-]/g, "_");
 }
@@ -68,6 +70,12 @@ export async function consumeTokenBucket({
   now = Date.now,
 }) {
   if (!redisClient) {
+    if (!loggedMissingRedisClient) {
+      console.warn(
+        "Redis rate limiter disabled: no Redis client available; allowing requests without rate limiting.",
+      );
+      loggedMissingRedisClient = true;
+    }
     return { allowed: true, retryAfterMs: 0, disabled: true };
   }
 
